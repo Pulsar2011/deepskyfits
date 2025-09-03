@@ -1,0 +1,257 @@
+#include <DSTfits/DSF_version.h> //update as appropriate
+using namespace DSF;
+
+// Namespace DSF stand For DeepSkyMath.
+  gGIT *gGIT::this_ver = NULL;
+  
+  gGIT::gGIT():_VERSION("@VERSION@"),_VERSION_SHORT("@VERSION_SHORT@"),_VERSION_SHA1("@VERSION_SHA1@")
+  {
+
+  }
+
+  gGIT::~gGIT()
+  {
+  }
+
+  std::vector<int16_t> gGIT::getVersion() const
+  {
+
+    if(this_ver == NULL)
+      gGIT::this_ver = new gGIT(); 
+          
+     return gGIT::readVersion(this_ver->_VERSION_SHORT);
+  }
+
+  std::vector<int16_t> gGIT::readVersion(const std::string& ver) const
+  {
+
+    if(this_ver == NULL)
+      gGIT::this_ver = new gGIT(); 
+      
+     std::string version_str=ver;
+     std::string new_str    =ver;
+
+     std::vector<int16_t> version_num(3);
+     version_num[0]=0;
+     version_num[1]=0;
+     version_num[2]=0;
+     
+    if(version_str.find_first_of("0123456789") == std::string::npos)
+      throw std::runtime_error(std::string("Can't convert "+version_str+" to num @"+std::to_string(__LINE__)));
+    else if(version_str.find_first_of("0123456789") > 0)
+      version_str.erase(0,version_str.find_first_of("0123456789"));
+
+     if(version_str.find_first_of('.') != std::string::npos)
+     {
+       version_str.resize(version_str.find_first_of('.'));
+       try
+       {
+         version_num[0] += stoi(version_str);
+       }
+       catch(...)
+       {
+         throw std::runtime_error(std::string("Can't convert "+version_str+" to num @"+std::to_string(__LINE__)));
+       }
+       new_str.erase(0,new_str.find_first_of('.')+1);
+       version_str.clear();
+       version_str += new_str;
+     }
+     else if(version_str.find_first_not_of("0123456789") == std::string::npos)
+     {
+      try
+       {
+         version_num[0] += stoi(version_str);
+       }
+       catch(...)
+       {
+         throw std::runtime_error(std::string("Can't convert "+version_str+" to num @"+std::to_string(__LINE__)));
+       }
+     }
+
+     if(version_str.find_first_of('.') != std::string::npos)
+     {
+       version_str.resize(version_str.find_first_of('.'));
+       try
+       {
+         version_num[1] += stoi(version_str);
+       }
+       catch(...)
+       {
+         throw std::runtime_error(std::string("Can't convert "+version_str+" to num @"+std::to_string(__LINE__)));
+       }
+       new_str.erase(0,new_str.find_first_of('.')+1);
+       version_str.clear();
+       version_str += new_str;
+     }
+     else if(version_str.find_first_not_of("0123456789") == std::string::npos)
+     {
+      try
+       {
+         version_num[1] += stoi(version_str);
+       }
+       catch(...)
+       {
+         throw std::runtime_error(std::string("Can't convert "+version_str+" to num @"+std::to_string(__LINE__)));
+       }
+     }
+
+     if(version_str.find_first_of('.') != std::string::npos)
+     {
+       version_str.resize(version_str.find_first_of('.'));
+       try
+       {
+         version_num[2] += stoi(version_str);
+       }
+       catch(...)
+       {
+         throw std::runtime_error(std::string("Can't convert "+version_str+" to num @"+std::to_string(__LINE__)));
+       }
+       new_str.erase(0,new_str.find_first_of('.')+1);
+       version_str.clear();
+       version_str += new_str;
+     }
+     else if(version_str.find_first_of('-') != std::string::npos)
+     {
+       version_str.resize(version_str.find_first_of('-'));
+       try
+       {
+         version_num[2] += stoi(version_str);
+       }
+       catch(...)
+       {
+         throw std::runtime_error(std::string("Can't convert "+version_str+" to num @"+std::to_string(__LINE__)));
+       }
+       new_str.erase(0,new_str.find_first_of('-')+1);
+       version_str.clear();
+       version_str += new_str;
+     }
+     else if(version_str.find_first_not_of("0123456789") == std::string::npos)
+    {
+      try
+       {
+         version_num[2] += stoi(version_str);
+       }
+       catch(...)
+       {
+         throw std::runtime_error(std::string("Can't convert "+version_str+" to num @"+std::to_string(__LINE__)));
+       }
+    }
+     
+     return version_num;
+  }
+
+  const std::string gGIT::version()
+  {
+    if(this_ver == NULL)
+      gGIT::this_ver = new gGIT();
+
+    return this_ver->_VERSION;
+  }
+
+  const std::string gGIT::version_short()
+  {
+    if(this_ver == NULL)
+      gGIT::this_ver = new gGIT();
+
+    return this_ver->_VERSION_SHORT;
+  }
+
+  const std::string gGIT::sha1()
+  {
+    if(this_ver == NULL)
+      gGIT::this_ver = new gGIT();
+
+    return this_ver->_VERSION_SHA1;
+  }
+
+  bool gGIT::operator< (const std::string& ver)
+  {
+    std::vector<int16_t> this_ver=getVersion();
+    std::vector<int16_t> test_ver=readVersion(ver);
+
+    if(this_ver.size() != test_ver.size())
+      throw std::runtime_error(std::string("Vector size missmatche.["+std::to_string(__LINE__)+"]"));
+
+    bool checkTrue = false;
+    
+    size_t i = 0;
+    while(!checkTrue && i < this_ver.size())
+    {
+      checkTrue |= true;
+      for(size_t k=0; k < i; k++)
+        checkTrue &= (this_ver[k] <= test_ver[k]);
+
+      checkTrue &= (this_ver[i] < test_ver[i]);
+      i++;
+    }
+
+    return checkTrue;
+  }
+
+  bool gGIT::operator<=(const std::string& ver)
+  {
+    std::vector<int16_t> this_ver=getVersion();
+    std::vector<int16_t> test_ver=readVersion(ver);
+
+    if(this_ver.size() != test_ver.size())
+      throw std::runtime_error(std::string("Vector size missmatche.["+std::to_string(__LINE__)+"]"));
+
+    bool checkTrue = ((*gGIT::this_ver) < ver);
+    checkTrue |= ((this_ver[0]==test_ver[0])&&(this_ver[1]==test_ver[1])&&(this_ver[2]==test_ver[2]));
+
+    return checkTrue;
+  }
+
+  bool gGIT::operator> (const std::string& ver)
+  {
+    std::vector<int16_t> this_ver=getVersion();
+    std::vector<int16_t> test_ver=readVersion(ver);
+
+    if(this_ver.size() != test_ver.size())
+      throw std::runtime_error(std::string("Vector size missmatche.["+std::to_string(__LINE__)+"]"));
+
+    bool checkTrue = false;
+    
+    size_t i = 0;
+    while(!checkTrue && i < this_ver.size())
+    {
+      checkTrue |= true;
+      for(size_t k=0; k < i; k++)
+        checkTrue &= (this_ver[k] >= test_ver[k]);
+
+      checkTrue &= (this_ver[i] > test_ver[i]);
+      i++;
+    }
+
+    return checkTrue;
+  }
+  
+  bool gGIT::operator>=(const std::string& ver)
+  {
+    std::vector<int16_t> this_ver=getVersion();
+    std::vector<int16_t> test_ver=readVersion(ver);
+
+    if(this_ver.size() != test_ver.size())
+      throw std::runtime_error(std::string("Vector size missmatche.["+std::to_string(__LINE__)+"]"));
+
+    bool checkTrue = ((*gGIT::this_ver)>ver);
+    checkTrue |= ((this_ver[0]==test_ver[0])&&(this_ver[1]==test_ver[1])&&(this_ver[2]==test_ver[2]));
+
+    return checkTrue;
+  }
+
+  bool gGIT::operator==(const std::string& ver)
+  {
+    if(this_ver == NULL)
+      gGIT::this_ver = new gGIT();
+
+    return !(this_ver->_VERSION.compare(ver));
+  }
+
+  bool gGIT::operator!=(const std::string& ver)
+  {
+    if(this_ver == NULL)
+      gGIT::this_ver = new gGIT();
+      
+    return !((*this_ver) == ver);
+  }

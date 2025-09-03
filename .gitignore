@@ -1,0 +1,94 @@
+#--------------- C++ PRODUCT
+DerivedData/
+*#
+bin
+lib
+exe
+doc/html
+doc/latex
+._*
+*.o
+*.so
+*.dylib
+*.snm
+*.pro
+*.ep
+*.cpy
+*.new
+*.csh
+*.sh
+build
+*.*~
+scripts
+DarkSim
+.svn
+test_*.txt
+*.fits
+DST_version.cxx
+*screenlog*
+gdb
+googletest
+
+*.html
+*.tex
+
+#--------------- Qt JUNK
+moc_*
+ui_*
+*.*_parameters
+
+#--------------- ROOT JUNK
+*.d
+*Dict*
+*.root
+root*
+
+#--------------- APPLE JUNK
+*(busy)
+*.~
+*.DS_Store
+.DS_Store
+*.dSYM
+input_*
+inputs
+*xcuserdata
+CCFitsExtractorFramework
+
+#--------------- LATEX PRODUCT
+*.aux
+*.toc
+*.log
+*.nav
+*.bbl
+*.blg
+*.out
+
+#--------------- ARCHIVE
+*.gz
+*.zip
+*.gzip
+*.tar
+*.tgz
+
+#--------------- CMAKE Junk
+CMakeFiles
+*Cache*
+depcomp
+missing
+install-sh
+cmake_install.cmake
+*Makefile*
+.deps
+*install_manifest.txt
+CMakeDoxygenDefaults.cmake
+gTest_*.cmake
+CTestTestfile.cmake
+DSM_version.cxx
+gTest_version.h
+Testing
+
+#--------------- DOXYFILE
+doc/html
+test/gTest_version.h
+
+googletest/generated
