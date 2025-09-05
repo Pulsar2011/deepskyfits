@@ -183,6 +183,19 @@ set(HEADER_FILES ${CORE_HEADER})
 
 #-------------------- Configuration de la bibliothèque
 
+include(ExternalProject)
+
+ExternalProject_Add(
+    cfitsio_external
+    SOURCE_DIR ${CMAKE_SOURCE_DIR}/cfitsio
+    BINARY_DIR ${CMAKE_SOURCE_DIR}/build/cfitsio 
+    CONFIGURE_COMMAND CC=clang ${CMAKE_SOURCE_DIR}/cfitsio/configure --enable-static --disable-shared --prefix=${CMAKE_SOURCE_DIR}/build --with-gnu-ld --with-bzip2
+    BUILD_COMMAND make -j 4 libcfitsio.la
+    INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/build/cfitsio/.libs/libcfitsio.a ${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a
+    BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a
+)
+
+# Link DSTfits to cfitsio static library
 add_library(
     DSTfits
     SHARED
@@ -190,6 +203,9 @@ add_library(
     ${CORE_HEADER}
     ${version_file}
 )
+
+add_dependencies(DSTfits cfitsio_external)
+target_link_libraries(DSTfits PRIVATE ${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a)
 
 #-------------------- Configuration des test
 add_subdirectory(googletest   EXCLUDE_FROM_ALL)
@@ -246,6 +262,7 @@ ${version_file}
 Makefile
 CMakeFiles
 *.cmake
+./build/cfitsio
 ./build/lib
 ./build/exe
 ./build/test
@@ -256,6 +273,7 @@ CMakeFiles
 ./lib
 ./bin
 ./Testing
+./cfitsio_external-prefix
 )
 
 ADD_CUSTOM_COMMAND(
@@ -264,6 +282,7 @@ COMMENT "distribution clean"
 COMMAND rm ARGS    -Rf ${DISTCLEANED}
 COMMAND test -e install_manifest.txt || xargs ARGS rm -f < install_manifest.txt
 COMMAND test -e install_manifest.txt || rm ARGS -f install_manifest.txt
+COMMAND make -C ${CMAKE_SOURCE_DIR}/cfitsio distclean
 TARGET  distclean
 )
 

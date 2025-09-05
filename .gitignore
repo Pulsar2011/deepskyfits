@@ -83,12 +83,13 @@ cmake_install.cmake
 CMakeDoxygenDefaults.cmake
 gTest_*.cmake
 CTestTestfile.cmake
-DSM_version.cxx
+DSF_version.cxx
 gTest_version.h
 Testing
 
 #--------------- DOXYFILE
 doc/html
 test/gTest_version.h
+
 
 googletest/generated
