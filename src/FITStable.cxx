@@ -581,8 +581,9 @@ namespace DSL
     void FITStable::writeVector(const FITScolumn<std::vector<FITSform::complex> >* data, const int64_t& first_row)
     {
         const int64_t nelem = data->getNelem();
-        float array[nelem*2];
-        
+        // FIX: Use dynamic allocation instead of VLA
+        float* array = new float[nelem*2];
+
         int64_t n = 0;
         for(typename FITScolumn< std::vector<FITSform::complex> >::const_iterator it = data->cbegin(); it != data->cend(); it++)
         {
@@ -616,12 +617,14 @@ namespace DSL
 #endif
                )
             {
+                delete[] array;
                 throw FITSexception(tbl_status,"FITStable","writeVector<std::vector<FITSform::complex>>");
             }
             
             n++;
         }
-        
+
+        delete[] array;
         return;
     }
     
@@ -629,8 +632,9 @@ namespace DSL
     void FITStable::writeVector(const FITScolumn<std::vector<FITSform::dblcomplex> >* data, const int64_t& first_row)
     {
         const int64_t nelem = data->getNelem();
-        double array[nelem*2];
-        
+        // FIX: Use dynamic allocation instead of VLA
+        double* array = new double[nelem*2];
+
         int64_t n = 0;
         for(typename FITScolumn< std::vector<FITSform::dblcomplex> >::const_iterator it = data->cbegin(); it != data->cend(); it++)
         {
@@ -664,12 +668,14 @@ namespace DSL
 #endif
                )
             {
+                delete[] array;
                 throw FITSexception(tbl_status,"FITStable","writeVector<std::vector<FITSform::complex>>");
             }
             
             n++;
         }
-        
+
+        delete[] array;
         return;
     }
     

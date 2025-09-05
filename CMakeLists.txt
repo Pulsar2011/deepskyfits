@@ -308,7 +308,6 @@ COMMENT "distribution clean"
 COMMAND rm ARGS    -Rf ${DISTCLEANED}
 COMMAND test -e install_manifest.txt || xargs ARGS rm -f < install_manifest.txt
 COMMAND test -e install_manifest.txt || rm ARGS -f install_manifest.txt
-COMMAND make -C ${CMAKE_SOURCE_DIR}/cfitsio distclean
 TARGET  distclean
 )
 

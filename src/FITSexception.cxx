@@ -39,8 +39,7 @@ namespace DSL
         char bigOutBuf[8192];
         FILE * pFile;
         pFile = tmpfile ();
-        
-        //fflush(pFile);
+
         setvbuf(pFile,bigOutBuf,_IOFBF,8192);
         
         std::string ss = std::string("\n");
@@ -71,8 +70,11 @@ namespace DSL
         setbuf(pFile,NULL);//reset to unnamed buffer
         fclose(pFile);
         fflush(stderr);
-            
-        return ss.c_str();
+
+        // FIX: Use static buffer to avoid returning pointer to local variable
+        static std::string static_ss;
+        static_ss = ss;
+        return static_ss.c_str();
     }
         
         FITSwarning::FITSwarning():std::exception(),cname(),cfun(),msg()
@@ -108,8 +110,10 @@ namespace DSL
                 stream+=msg+"\n";
             
             stream+="\n\033[0m\n";
-            
-            return stream.c_str();
+
+            static std::string static_stream;
+            static_stream = stream;
+            return static_stream.c_str();  
         }
         
 }

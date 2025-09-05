@@ -934,7 +934,10 @@ namespace DSL
             return;
         }
         
-        char * val = (char*) it->second.value().c_str();
+        // FIX: Avoid dangling pointer from temporary string
+        std::string val_str = std::string();
+        val_str += it->second.value();
+        char * val = (char*) val_str.c_str();
         int status = 0;
         
         try

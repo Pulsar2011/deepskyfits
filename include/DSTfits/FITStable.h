@@ -446,7 +446,7 @@ namespace DSL
     void FITStable::writeVector(const FITScolumn<std::vector<T> >* data, const int64_t& first_row)
     {
         const int64_t nelem = data->getNelem();
-        T array[nelem];
+        T* array =new T[nelem];
         
         int64_t n = 0;
         for(typename FITScolumn< std::vector<T> >::const_iterator it = data->cbegin(); it != data->cend(); it++)
@@ -473,12 +473,14 @@ namespace DSL
 #endif
                )
             {
+                delete [] array;
                 throw FITSexception(tbl_status,"FITStable","writeVector<std::vector<T>>");
             }
             
             n++;
         }
 
+        delete [] array;
         return;
     }
     
