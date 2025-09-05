@@ -4,3 +4,6 @@
 [submodule "cfitsio"]
 	path = cfitsio
 	url = https://github.com/HEASARC/cfitsio.git
+[submodule "Minuit2"]
+	path = Minuit2
+	url = https://github.com/GooFit/Minuit2.git

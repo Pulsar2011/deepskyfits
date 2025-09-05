@@ -87,6 +87,12 @@ DSF_version.cxx
 gTest_version.h
 Testing
 cfitsio_external-*
+include/Minuit2
+include/cfitsio
+CPack*.cmake
+copy_cfitsio_*.cmake
+copy_minuit2_*.cmake
+
 
 
 #--------------- DOXYFILE

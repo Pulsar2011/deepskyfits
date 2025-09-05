@@ -178,12 +178,16 @@ set(Boost_USE_MULTITHREADED ON)
 file(GLOB CORE_SRC "src/*.cxx")
 file(GLOB CORE_HEADER "include/DSTfits/*.h")
 file(GLOB TEST_SRC "test/*.cxx")
+file(GLOB FITSIO_HEADER "cfitsio/*.h")
 
 set(HEADER_FILES ${CORE_HEADER})
+file(GLOB FITS_HEADER "include/cfitsio/*.h")
 
 #-------------------- Configuration de la bibliothèque
 
 include(ExternalProject)
+
+set(CFITSIO_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include/cfitsio)
 
 ExternalProject_Add(
     cfitsio_external
@@ -191,7 +195,10 @@ ExternalProject_Add(
     BINARY_DIR ${CMAKE_SOURCE_DIR}/build/cfitsio 
     CONFIGURE_COMMAND CC=clang ${CMAKE_SOURCE_DIR}/cfitsio/configure --enable-static --disable-shared --prefix=${CMAKE_SOURCE_DIR}/build --with-gnu-ld --with-bzip2
     BUILD_COMMAND make -j 4 libcfitsio.la
-    INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/build/cfitsio/.libs/libcfitsio.a ${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a
+    INSTALL_COMMAND ${CMAKE_COMMAND} -E make_directory ${CFITSIO_INCLUDE_DIR}
+        && ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/build/cfitsio/.libs/libcfitsio.a ${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a
+        # Copy each header file individually
+        && cmake -P ${CMAKE_SOURCE_DIR}/cmake/copy_cfitsio_headers.cmake
     BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a
 )
 
@@ -205,12 +212,29 @@ add_library(
 )
 
 add_dependencies(DSTfits cfitsio_external)
-target_link_libraries(DSTfits PRIVATE ${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a)
+include_directories(include/cfitsio)
+
+#-------------------- Configuration des test
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build/lib)
+
+add_subdirectory(Minuit2   EXCLUDE_FROM_ALL)
+include_directories(Minuit2/inc)
+
+add_dependencies(DSTfits Minuit2)
+
 
 #-------------------- Configuration des test
 add_subdirectory(googletest   EXCLUDE_FROM_ALL)
 include_directories(${PARENT_PATH_OF_GTEST}/googltest/googltest/include)
 enable_testing()
+
+target_link_libraries(DSTfits
+    PRIVATE ${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a
+    PRIVATE Minuit2
+    PRIVATE bz2
+    PRIVATE curl
+    PRIVATE z
+)
 
 foreach( test_source_file ${TEST_SRC} )
 	get_filename_component( tSRC ${test_source_file} NAME_WE)
@@ -274,6 +298,8 @@ CMakeFiles
 ./bin
 ./Testing
 ./cfitsio_external-prefix
+./include/cfitsio
+./include/Minuit2
 )
 
 ADD_CUSTOM_COMMAND(
@@ -290,9 +316,35 @@ TARGET  distclean
 #-------------------- Installation proceedure
 if(CMAKE_INSTALL_PREFIX)
     INSTALL(FILES ${CORE_HEADER} DESTINATION include/DSTfits)
+    INSTALL(FILES ${FITS_HEADER} DESTINATION include/cfitsio)
     INSTALL(TARGETS DSTfits
 		RUNTIME DESTINATION exe
 		LIBRARY DESTINATION lib
 		ARCHIVE DESTINATION lib
 )
 endif(CMAKE_INSTALL_PREFIX)
+
+# At the end of your CMakeLists.txt, generate a helper script for cfitsio headers:
+file(WRITE ${CMAKE_SOURCE_DIR}/cmake/copy_cfitsio_headers.cmake
+"file(GLOB FITSIO_HEADER \"${CMAKE_SOURCE_DIR}/cfitsio/*.h\")\n"
+"file(MAKE_DIRECTORY \"${CFITSIO_INCLUDE_DIR}\")\n"
+"foreach(header \${FITSIO_HEADER})\n"
+"  file(COPY \${header} DESTINATION \"${CFITSIO_INCLUDE_DIR}\")\n"
+"endforeach()\n"
+)
+
+# Generate a helper script for Minuit2 headers:
+file(WRITE ${CMAKE_SOURCE_DIR}/cmake/copy_minuit2_headers.cmake
+"file(GLOB MINUIT2_HEADER \"${CMAKE_SOURCE_DIR}/Minuit2/inc/*\")\n"
+"file(MAKE_DIRECTORY \"${CMAKE_SOURCE_DIR}/include/Minuit2\")\n"
+"foreach(header \${MINUIT2_HEADER})\n"
+"  file(COPY \${header} DESTINATION \"${CMAKE_SOURCE_DIR}/include/Minuit2\")\n"
+"endforeach()\n"
+)
+
+# Add a post-build custom command to copy Minuit2 headers
+add_custom_command(
+    TARGET DSTfits POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/cmake/copy_minuit2_headers.cmake
+    COMMENT "Copying Minuit2 headers to include/Minuit2"
+)
