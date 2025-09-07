@@ -104,12 +104,12 @@ namespace DSL
                 stream+="]: ";
             }
             
-            stream+=" !!!\n";
+            stream+=" !!!\033[0m\n";
             
             if(msg.size() > 1)
-                stream+=msg+"\n";
+                stream+="     "+msg+"\033[0m\n";
             
-            stream+="\n\033[0m\n";
+            stream+="\n";
 
             static std::string static_stream;
             static_stream = stream;
