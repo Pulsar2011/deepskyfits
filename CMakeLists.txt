@@ -236,12 +236,38 @@ target_link_libraries(DSTfits
     PRIVATE z
 )
 
+#-------------------- Download sample FITS files for testing
+set(TESTDATA_DIR ${CMAKE_SOURCE_DIR}/build/testdata)
+file(MAKE_DIRECTORY ${TESTDATA_DIR})
+
+set(SAMPLE_FITS_URL
+    "https://heasarc.gsfc.nasa.gov/FTP/fits_info/sample_files/images/rosat_pspc_rdf2_3_bk1.fits"
+    "https://heasarc.gsfc.nasa.gov/FTP/fits_info/sample_files/images/rosat_pspc_rdf2_3_im2.fits"
+)
+
+set(SAMPLE_FITS_FILE "")
+foreach(url ${SAMPLE_FITS_URL})
+    get_filename_component(fname ${url} NAME)
+    list(APPEND SAMPLE_FITS_FILE "${TESTDATA_DIR}/${fname}")
+    add_custom_command(
+        OUTPUT "${TESTDATA_DIR}/${fname}"
+        COMMAND wget -O "${TESTDATA_DIR}/${fname}" "${url}"
+        COMMENT "Downloading sample FITS file: ${fname}"
+    )
+endforeach()
+
+add_custom_target(download_testdata
+    DEPENDS ${SAMPLE_FITS_FILE}
+)
+
 foreach( test_source_file ${TEST_SRC} )
 	get_filename_component( tSRC ${test_source_file} NAME_WE)
 	add_executable(
 		${tSRC}
 		${test_source_file}
 	)
+    # Ensure test data is downloaded before running tests
+    add_dependencies(${tSRC} download_testdata)
 
     if(COMPILER_SUPPORTS_CXX17)
         target_link_libraries( ${tSRC} DSTfits gtest gtest_main)
