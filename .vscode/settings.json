@@ -39,6 +39,12 @@
         "memory_resource": "cpp",
         "tuple": "cpp",
         "type_traits": "cpp",
-        "utility": "cpp"
+        "utility": "cpp",
+        "any": "cpp",
+        "bitset": "cpp",
+        "memory": "cpp",
+        "random": "cpp",
+        "__config": "cpp",
+        "__locale": "cpp"
     }
 }
