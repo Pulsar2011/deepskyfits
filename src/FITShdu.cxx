@@ -338,7 +338,7 @@ namespace DSL
         }
         
         if(header)
-            delete header;
+            free(header);
     }
     
     /**
