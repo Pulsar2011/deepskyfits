@@ -12,25 +12,81 @@
 
 
 #include <fitsio.h>
-
 #include <limits>
-#if __cplusplus < 201103L
-#include <memory>
-#endif
+#include <iostream> // Add this for std::ostream
 
 #include "FITShdu.h"
 #include "FITSimg.h"
 #include "FITStable.h"
+#include "DSF_version.h"
 
 
 namespace DSL
 {
+
+        enum class verboseLevel: uint8_t {
+            VERBOSE_NONE    = 0x00,
+            VERBOSE_BASIC   = 0x01,
+            VERBOSE_DETAIL  = 0x0F,
+            VERBOSE_HDU     = 0x02,
+            VERBOSE_IMG     = 0x04,
+            VERBOSE_TBL     = 0x08,
+            VERBOSE_DEBUG   = 0xFF
+        };
+
+        inline verboseLevel verbose = verboseLevel::VERBOSE_NONE;
+
+        verboseLevel operator|(verboseLevel a, verboseLevel b)
+        {
+            return static_cast<verboseLevel>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
+        }
+
+        verboseLevel operator&(verboseLevel a, verboseLevel b)
+        {
+            return static_cast<verboseLevel>(static_cast<uint8_t>(a) & static_cast<uint8_t>(b));
+        }
+
+        verboseLevel& operator|=(verboseLevel& a, verboseLevel b)
+        {
+            a = a | b;
+            return a;
+        }
+
+        verboseLevel& operator&=(verboseLevel& a, verboseLevel b)
+        {
+            a = a & b;
+            return a;
+        }
+
+        verboseLevel operator~(verboseLevel a)
+        {
+            return static_cast<verboseLevel>(~static_cast<uint8_t>(a));
+        }
+
+        // Add operator<< for verboseLevel
+        //inline std::ostream& operator<<(std::ostream& os, verboseLevel v)
+        //{
+        //    os << "0x" << std::hex << static_cast<int>(v) << std::dec;
+        //    return os;
+        //}
+
+        // Display verboseLevel as binary (e.g., 0000 0001)
+        inline std::ostream& operator<<(std::ostream& os, verboseLevel v)
+        {
+            uint8_t val = static_cast<uint8_t>(v);
+            for (int i = 7; i >= 0; --i) {
+                os << ((val >> i) & 1);
+                if (i % 4 == 0 && i != 0) os << ' ';
+            }
+            return os;
+        }
+
     /**
      *  @namespace DSL
      *  @brief DeepSkyLibrary namespace
      *  @details DSL namespace stand for DeepSkyLibrary. This namespace regroup a collection of tools to manage and process data in FITS files.
      */
-#pragma mark - FITSmanager class definition
+#pragma region - FITSmanager class definition
     class FITSmanager
     {
         /**
@@ -42,92 +98,92 @@ namespace DSL
          * @details FITSmanager manage FITS file and access to the different HDU stored into the FITS file.
          */
     private:
-#if __cplusplus < 201103L
-        fitsfile *fptr;                                     //!< Pointer to a fits file.
-#else
         std::shared_ptr<fitsfile> fptr;
         static void CloseFile(fitsfile*);
-#endif
         
-        int fits_status;                                    //!< FITS access status
         int num_hdu;                                        //!< Number of hdu in the fitsfile
+        int fits_status;                                    //!< FITS access status
 
-#pragma mark • Initialization
-        void init();                                        //<! Initialize to default value
+#pragma region • Initialization
         void explore();                                     //<! Explore fits pointer and retrive basic information on its content
         
     public:
         
-#pragma mark • ctor/dtor
-        FITSmanager();                                      //!< Default constructor
-        FITSmanager(std::string, bool readOnly = true);     //!< Construct with FITS file name
-        FITSmanager(fitsfile&);                             //!< Construct from an existing FITS file
-        FITSmanager(const FITSmanager&);                    //!< Copy constructor
+#pragma endregion
+#pragma region • ctor/dtor
+        FITSmanager();                                                  //!< Default constructor
+        FITSmanager(const std::string&);                                //!< Construct with FITS file name
+        FITSmanager(const std::string&, const bool& readOnly);          //!< Construct with FITS file name
+        FITSmanager(fitsfile&);                                         //!< Construct from an existing FITS file
+        FITSmanager(const std::shared_ptr<fitsfile>&);                  //!< Construct from an existing FITS file
+        FITSmanager(const FITSmanager&);                                //!< Copy constructor
     
-        virtual ~FITSmanager();                                     //!< Destructor
+        virtual ~FITSmanager();                                         //!< Destructor
 
-#pragma mark • Diagnoze
+#pragma endregion
+#pragma region • Diagnoze
         inline const int Status() const {return fits_status;}
         
-        static const std::string getFileName(fitsfile *);
+        const std::string GetFileName() const ;
+        const std::string GetFileName(fitsfile *) const ;
+        const std::string GetFileName(const std::shared_ptr<fitsfile>&) const;
+
         
-#pragma mark • Accessing FITS file
-        static FITSmanager* Open(std::string, bool readOnly = true);
-        static FITSmanager* Create(std::string, bool replace = false);
-        void OpenFile(std::string, bool readOnly = true);
+#pragma endregion
+#pragma region • Accessing FITS file
+        FITSmanager Open(const std::string&, bool readOnly = true);
+        FITSmanager Create(const std::string&, bool replace=false);
+        void OpenFile(const std::string&, bool readOnly = true);
         
         void Close();
         
-#pragma mark • Writing FITS file to disk
+#pragma endregion
+#pragma region • Writing FITS file to disk
         void Write();
         
-#if __cplusplus < 201103L
-        inline bool isOpen(){return (fptr != NULL);}
-#else
         inline bool isOpen(){return (fptr.use_count()>0);}
-#endif
-        virtual inline void Debug(bool debug = true){FITScube::debug = debug; FITShdu::debug = debug;}
-        virtual inline bool isDebug(){return (FITScube::debug || FITShdu::debug);}
         
-#pragma mark • Accessing FITS HDU
-        inline const int NumberOfHeader(){return num_hdu;}  //!< Get the total number of HDU
-        FITShdu *GetPrimaryHeader();                        //!< Retrive primary header
-        FITShdu *GetHeaderAtIndex(int);                     //!< Retrive specific HDU
+#pragma endregion
+#pragma region • Accessing FITS HDU
+        inline const int NumberOfHeader(){return num_hdu;}              //!< Get the total number of HDU
+        const std::shared_ptr<FITShdu> GetPrimaryHeader();              //!< Retrieve primary header
+        const std::shared_ptr<FITShdu> GetHeaderAtIndex(const int&);    //!< Retrive specific HDU
         
-#pragma mark • Accessing FITS image
-        FITScube *GetPrimary();
-        FITScube *GetImageAtIndex(int);
+#pragma endregion
+#pragma region • Accessing FITS image
+        const std::shared_ptr<FITScube> GetPrimary();
+        const std::shared_ptr<FITScube> GetImageAtIndex(const int&);
         
-#pragma mark • Accessing FITS table
-        FITStable *GetTableAtIndex(int);
-        FITStable *GetTable(std::string);
-        FITStable *CreateTable(std::string, const ttype&);
+#pragma endregion
+#pragma region • Accessing FITS table
+        const std::shared_ptr<FITStable> GetTableAtIndex(const int&);
+        const std::shared_ptr<FITStable> GetTable(std::string);
+        const std::shared_ptr<FITStable> CreateTable(std::string, const ttype&);
         
-#pragma mark • Accessing file block
-#if __cplusplus < 201103L
-        inline const fitsfile& pCurrentHDU() const {return *fptr;}
-        inline       fitsfile* CurrentHDU()  const {return fptr;}
-#else
-        inline const std::shared_ptr<fitsfile> pCurrentHDU() const {return fptr;}
-        inline       std::shared_ptr<fitsfile> CurrentHDU()  const {return fptr;}
-#endif
+#pragma endregion
+#pragma region • Accessing file block
+        inline const std::shared_ptr<fitsfile>& CurrentHDU() const {return fptr;}
         
-        
-        int MoveToHDU(int);
+        int MoveToHDU(const int&);
         int MoveToPrimary();
         
         
-#pragma mark • Modifying File
+#pragma endregion
+#pragma region • Modifying File
         void AppendImage(FITScube &);
 
-#pragma mark • Modifying specific header keyword        
+#pragma endregion
+#pragma region • Modifying specific header keyword        
         void AppendKeyToPrimary(std::string, const FITSkeyword&);
         void AppendKeyToHeader(int HDU, std::string, const FITSkeyword&);
         void AppendKeyToHeader(int HDU, std::string, int, std::string, std::string cmt = "");
         
         void AppendKey(std::string, int, std::string, std::string cmt = "");
-        
+#pragma endregion
+
     };
+#pragma endregion
+
 }
 
 #endif /* defined(__DeepSkyLib__FITSmanager__) */
