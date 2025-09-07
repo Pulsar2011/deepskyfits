@@ -15,6 +15,25 @@
 namespace DSL
 {
     
+    enum class verboseLevel: uint8_t {
+        VERBOSE_NONE    = 0x00,
+        VERBOSE_BASIC   = 0x01,
+        VERBOSE_DETAIL  = 0x0F,
+        VERBOSE_HDU     = 0x02,
+        VERBOSE_IMG     = 0x04,
+        VERBOSE_TBL     = 0x08,
+        VERBOSE_DEBUG   = 0xFF
+    };
+
+    inline verboseLevel verbose = verboseLevel::VERBOSE_NONE;
+
+    verboseLevel operator|(verboseLevel a, verboseLevel b);
+    verboseLevel operator&(verboseLevel a, verboseLevel b);
+    verboseLevel& operator|=(verboseLevel& a, verboseLevel b);
+    verboseLevel& operator&=(verboseLevel& a, verboseLevel b);
+    verboseLevel operator~(verboseLevel a);
+    std::ostream& operator<<(std::ostream& os, verboseLevel v);
+
     enum ttype
     {
         /**
@@ -48,6 +67,27 @@ namespace DSL
         tcplx    = TCOMPLEX,
         tdbcplx  = TDBLCOMPLEX,
         tnone    = 666,
+    };
+
+    enum key_type
+    {
+        /*!
+         *  @enum Possible type for FITS keywords
+         *  @details key_type defines the base type of the FITS KEYWORD value.
+         */
+        fChar    = TSTRING,       //!< string
+        fShort   = TSHORT ,       //!< short integer
+        fUShort  = TUSHORT ,       //!< short integer
+        fInt     = TINT   ,       //!< integer
+        fUInt    = TUINT   ,       //!< integer
+        fLong    = TLONG  ,       //!< long integer
+        fLongLong= TLONGLONG,     //!< long long integer
+        fULong   = TULONG,     //!< long long integer
+        fBool    = TLOGICAL,      //!< boolean
+        fFloat   = TFLOAT,        //!< floiting poind
+        fDouble  = TDOUBLE,       //!< double floiting point
+        fByte    = TBYTE,
+        fUndef,     //!< undefined
     };
     
 }

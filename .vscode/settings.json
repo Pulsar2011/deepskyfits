@@ -45,6 +45,8 @@
         "memory": "cpp",
         "random": "cpp",
         "__config": "cpp",
-        "__locale": "cpp"
+        "__locale": "cpp",
+        "valarray": "cpp",
+        "map": "cpp"
     }
 }

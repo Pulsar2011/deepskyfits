@@ -17,19 +17,20 @@
 #include <map>
 #include <vector>
 #include <limits>
-
 #include <fitsio.h>
+
+#include <DSTfits/FITSdata.h>
 
 namespace DSL
 {
 
-    /*!
+     /*!
      * @typedef DSL::key_code
      * @details DSL::key_code is a short-cut type used to describe HDU name
      */
     typedef std::string key_code;
     
-#pragma mark - FITSkeyword class definition
+#pragma region  - FITSkeyword class definition
     /*!
      * @class DSL::FITSkeyword FITShdu.h "fitsExtractor/FITShdu.h"
      * @author GILLARD William
@@ -40,67 +41,52 @@ namespace DSL
      */
     class FITSkeyword
     {
-    public:
-        enum key_type
-        {
-            /*!
-             *  @enum DSL::FITSkeyword::key_type
-             *  @details FITSkeyword::key_type defines the base type of the FITS KEYWORD value.
-             */
-            fChar    = TSTRING,       //!< string
-            fShort   = TSHORT ,       //!< short integer
-            fUShort  = TUSHORT ,       //!< short integer
-            fInt     = TINT   ,       //!< integer
-            fUInt    = TUINT   ,       //!< integer
-            fLong    = TLONG  ,       //!< long integer
-            fLongLong= TLONGLONG,     //!< long long integer
-            fULong   = TULONG,     //!< long long integer
-            fBool    = TLOGICAL,      //!< boolean
-            fFloat   = TFLOAT,        //!< floiting poind
-            fDouble  = TDOUBLE,       //!< double floiting point
-            fByte    = TBYTE,
-            fUndef,     //!< undefined
-        };
-        
-        static std::string GetDataType(const key_type&);
+        public:
+            static std::string GetDataType(const key_type&);
 
-#pragma mark • ctor/dtor
-        FITSkeyword(std::string, std::string);                //!< Constructor
-        FITSkeyword(std::string, std::string, key_type);     //!< Constructor
-        FITSkeyword(std::string);                            //!< Constructor
-        FITSkeyword(std::string, key_type);     //!< Constructor
-        FITSkeyword(const FITSkeyword&);                     //!< Copy constructor
-        ~FITSkeyword();                                      //!< Destructor
+#pragma region  • ctor/dtor
+            FITSkeyword(const std::string&, const std::string&);                        //!< Constructor
+            FITSkeyword(const std::string&, const std::string&, const key_type&);       //!< Constructor
+            FITSkeyword(const std::string&);                                            //!< Constructor
+            FITSkeyword(const std::string&, const key_type&);                           //!< Constructor
+            FITSkeyword(const FITSkeyword&);                                            //!< Copy constructor
+            ~FITSkeyword();                                                             //!< Destructor
         
-#pragma mark • Accessor
-        inline std::string* value() {return &fvalue;}       //!< Get pointer to the FITS KEYWORD value
-        inline std::string* comment() {return &fcomment;}   //!< Get pointer to the FITS KEYWORD description
-        inline key_type type(){return ftype;}               //!< Get type of the FITS KEYWORD value
-        
-        inline std::string value() const {return fvalue;}       //!< Get pointer to the FITS KEYWORD value
-        inline std::string comment() const {return fcomment;}   //!< Get pointer to the FITS KEYWORD description
-        inline key_type type() const {return ftype;}            //!< Get type of the FITS KEYWORD value
-        
-#pragma mark • Modifier
-        void setValue(std::string);                         //!< Set value for key
-        
-#pragma mark • Dump
-        void Dump( std::ostream& ) const;                   //!< Print out FITS KEYWORD value and descritpion
-    
-    private:
-        std::string fvalue;                                 //!< FITS KEEYWORD value
-        std::string fcomment;                               //!< FITS KEEYWORD description
-        key_type ftype;                                     //!< FITS KEEYWORD base type
-        
-        bool is_digits(const std::string &str)
-        {
-            return str.find_first_not_of("-+0123456789.") == std::string::npos;
-        }
+#pragma endregion
+#pragma region  • Accessor
+            inline std::string& value()   {return fvalue;}                 //!< Get pointer to the FITS KEYWORD value
+            inline std::string& comment() {return fcomment;}               //!< Get pointer to the FITS KEYWORD description
+            inline key_type&    type()    {return ftype;}                  //!< Get type of the FITS KEYWORD value
 
-#pragma mark • Processing
-        void Process(std::string, std::string);             //!< Retrive FITS KEYWORD value and description
+            inline const std::string& value()   const {return fvalue;}     //!< Get pointer to the FITS KEYWORD value
+            inline const std::string& comment() const {return fcomment;}   //!< Get pointer to the FITS KEYWORD description
+            inline const key_type&    type()    const {return ftype;}      //!< Get type of the FITS KEYWORD value
+        
+#pragma endregion
+#pragma region  • Modifier
+            void setValue(const std::string&);                         //!< Set value for key
+        
+#pragma endregion
+#pragma region  • Dump
+            void Dump( std::ostream& ) const;                   //!< Print out FITS KEYWORD value and descritpion
     
+        private:
+            std::string fvalue;                                 //!< FITS KEEYWORD value
+            std::string fcomment;                               //!< FITS KEEYWORD description
+            key_type ftype;                                     //!< FITS KEEYWORD base type
+            
+            bool is_digits(const std::string &str)
+            {
+                return str.find_first_not_of("-+0123456789.") == std::string::npos;
+            }
+
+#pragma endregion
+#pragma region  • Processing
+            void Process(const std::string&, const std::string&);             //!< Retrive FITS KEYWORD value and description
+#pragma endregion
     };
+#pragma endregion
+#pragma region  - FITSDictionary definition
     
     /*!
      @typedef DSL::FITSDictionary 
@@ -108,7 +94,10 @@ namespace DSL
      */
     typedef std::map<key_code,FITSkeyword> FITSDictionary ;
     
-#pragma mark - FITShdu class definition
+
+#pragma endregion
+
+#pragma region  - FITShdu class definition
     /*!
      * @class DSL::FITShdu FITShdu.h "fitsExtractor/FITShdu.h"
      * @author GILLARD William
@@ -123,39 +112,42 @@ namespace DSL
         FITSDictionary hdu;                 //!< FITS KEYWORD manager
     
     protected:
-#pragma mark • Processing
-        void Process(std::string);          //!< Decipher FITS HEADER
+#pragma region  • Processing
+        void Process(const std::string&);          //!< Decipher FITS HEADER
         
-#pragma mark • I/O
-        void        WriteCharValueForKey(FITSDictionary::const_iterator, fitsfile *fptr) const;
-        void        WriteIntValueForKey(FITSDictionary::const_iterator, fitsfile *fptr) const;     //!< Write KEYWORD integer value to the HDU
-        void        WriteBoolValueForKey(FITSDictionary::const_iterator, fitsfile *fptr) const;    //!< Write KEYWORD boolean value to the HDU
-        void        WriteShortValueForKey(FITSDictionary::const_iterator, fitsfile *fptr) const;   //!< Write KEYWORD short value to the HDU
-        void        WriteLongValueForKey(FITSDictionary::const_iterator, fitsfile *fptr) const;    //!< Write KEYWORD long value to the HDU
-        void        WriteULongValueForKey(FITSDictionary::const_iterator, fitsfile *fptr) const;    //!< Write KEYWORD long value to the HDU
-        void        WriteLongLongValueForKey(FITSDictionary::const_iterator, fitsfile *fptr) const;//!< Write KEYWORD lon long value to the HDU
-        void        WriteFloatValueForKey(FITSDictionary::const_iterator, fitsfile *fptr) const;   //!< Write KEYWORD float value to the HDU
-        void        WriteDoubleValueForKey(FITSDictionary::const_iterator, fitsfile *fptr) const;  //!< Write KEYWORD double value to the HDU
+#pragma endregion
+#pragma region  • I/O
+        void        WriteCharValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;
+        void        WriteIntValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;     //!< Write KEYWORD integer value to the HDU
+        void        WriteBoolValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;    //!< Write KEYWORD boolean value to the HDU
+        void        WriteShortValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;   //!< Write KEYWORD short value to the HDU
+        void        WriteLongValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;    //!< Write KEYWORD long value to the HDU
+        void        WriteULongValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;    //!< Write KEYWORD long value to the HDU
+        void        WriteLongLongValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;//!< Write KEYWORD lon long value to the HDU
+        void        WriteFloatValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;   //!< Write KEYWORD float value to the HDU
+        void        WriteDoubleValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;  //!< Write KEYWORD double value to the HDU
         
     public:
-#pragma mark • ctor/dtor
+#pragma endregion
+#pragma region  • ctor/dtor
         FITShdu();                          //!< Default constructor
-        FITShdu(fitsfile *fptr);            //!< Construct from fitsfile
+        FITShdu(const std::shared_ptr<fitsfile>& fptr);            //!< Construct from fitsfile
         FITShdu(const FITShdu &);           //!< Copy constructor
         virtual ~FITShdu();                 //!< Destructor
         
-#pragma mark • Accessor
-        int          GetIntValueForKey(std::string) const;     //!< Retrive KEYWORD integer value
-        unsigned int GetUIntValueForKey(std::string) const;     //!< Retrive KEYWORD integer value
-        bool         GetBoolValueForKey(std::string) const;    //!< Retrive KEYWORD boolean value
-        short        GetShortValueForKey(std::string) const;   //!< Retrive KEYWORD short value
-        long         GetLongValueForKey(std::string) const;    //!< Retrive KEYWORD long value
-        long long    GetLongLongValueForKey(std::string) const;//!< Retrive KEYWORD lon long value
-        float        GetFloatValueForKey(std::string) const;   //!< Retrive KEYWORD float value
-        double       GetDoubleValueForKey(std::string) const;  //!< Retrive KEYWORD double value
+#pragma endregion
+#pragma region  • Accessor
+        int          GetIntValueForKey     (const std::string&) const;     //!< Retrive KEYWORD integer value
+        unsigned int GetUIntValueForKey    (const std::string&) const;     //!< Retrive KEYWORD integer value
+        bool         GetBoolValueForKey    (const std::string&) const;    //!< Retrive KEYWORD boolean value
+        short        GetShortValueForKey   (const std::string&) const;   //!< Retrive KEYWORD short value
+        long         GetLongValueForKey    (const std::string&) const;    //!< Retrive KEYWORD long value
+        long long    GetLongLongValueForKey(const std::string&) const;//!< Retrive KEYWORD lon long value
+        float        GetFloatValueForKey   (const std::string&) const;   //!< Retrive KEYWORD float value
+        double       GetDoubleValueForKey  (const std::string&) const;  //!< Retrive KEYWORD double value
         
-        std::string GetValueForKey(std::string, FITSkeyword::key_type&) const; //!< Retrive KEYWORD  value as a string.
-        std::string GetValueForKey(std::string) const;                         //!< Retrive KEYWORD  value as a string.
+        std::string GetValueForKey(const std::string&, key_type&) const; //!< Retrive KEYWORD  value as a string.
+        std::string GetValueForKey(const std::string&) const;                         //!< Retrive KEYWORD  value as a string.
         
         inline FITSDictionary::const_iterator begin() const {return hdu.begin();}
         inline FITSDictionary::const_iterator end() const {return hdu.end();}
@@ -164,40 +156,48 @@ namespace DSL
         
         long long GetDimension() const;
 
-#pragma mark • Modifier
+#pragma endregion
+#pragma region  • Modifier
 
-        void valueForKey(key_code, std::string, FITSkeyword::key_type tk = FITSkeyword::fChar, std::string cmt = std::string());         //!< Set value for key
-        void valueForKey(key_code, short    , std::string cmt);           //!< Set value for key
-        void valueForKey(key_code, int      , std::string cmt);           //!< Set value for key
-        void valueForKey(key_code, long     , std::string cmt);           //!< Set value for key
-        void valueForKey(key_code, long long, std::string cmt);           //!< Set value for key
-        void valueForKey(key_code, size_t   , std::string cmt);           //!< Set value for key
-        void valueForKey(key_code, bool     , std::string cmt);           //!< Set value for key
-        void valueForKey(key_code, float    , std::string cmt);           //!< Set value for key
-        void valueForKey(key_code, double   , std::string cmt);           //!< Set value for key
-        void valueForKey(key_code, uint32_t, std::string cmt);           //!< Set value for key
+        void valueForKey(const key_code&, const std::string&, const key_type& tk);                             //!< Set value for key
+        void valueForKey(const key_code&, const std::string&, const key_type& tk, const std::string&);         //!< Set value for key
+        void valueForKey(const key_code&, const std::string&, const std::string&);                             //!< Set value for key
+        void valueForKey(const key_code&, const std::string&);                                                 //!< Set value for key
+        void valueForKey(const key_code&, const short&      , const std::string&);           //!< Set value for key
+        void valueForKey(const key_code&, const int&        , const std::string&);           //!< Set value for key
+        void valueForKey(const key_code&, const long&       , const std::string&);           //!< Set value for key
+        void valueForKey(const key_code&, const long long&  , const std::string&);           //!< Set value for key
+        void valueForKey(const key_code&, const size_t&     , const std::string&);           //!< Set value for key
+        void valueForKey(const key_code&, const bool&       , const std::string&);           //!< Set value for key
+        void valueForKey(const key_code&, const float&      , const std::string&);           //!< Set value for key
+        void valueForKey(const key_code&, const double&     , const std::string&);           //!< Set value for key
+        void valueForKey(const key_code&, const uint32_t&   , const std::string&);           //!< Set value for key
        
-        void valueForKey(key_code, short    );           //!< Set value for key
-        void valueForKey(key_code, int      );           //!< Set value for key
-        void valueForKey(key_code, long     );           //!< Set value for key
-        void valueForKey(key_code, long long);           //!< Set value for key
-        void valueForKey(key_code, size_t   );           //!< Set value for key
-        void valueForKey(key_code, bool     );           //!< Set value for key
-        void valueForKey(key_code, float    );           //!< Set value for key
-        void valueForKey(key_code, double   );           //!< Set value for key
+        void valueForKey(const key_code&, const short&    );           //!< Set value for key
+        void valueForKey(const key_code&, const int&      );           //!< Set value for key
+        void valueForKey(const key_code&, const long&     );           //!< Set value for key
+        void valueForKey(const key_code&, const long long&);           //!< Set value for key
+        void valueForKey(const key_code&, const size_t&   );           //!< Set value for key
+        void valueForKey(const key_code&, const bool&     );           //!< Set value for key
+        void valueForKey(const key_code&, const float&    );           //!< Set value for key
+        void valueForKey(const key_code&, const double&   );           //!< Set value for key
         
-        void deleteKey(key_code);
+        void deleteKey(const key_code&);
 
-#pragma mark • I/O
-        void Write(fitsfile *) const;
+#pragma endregion
+#pragma region  • I/O
+        void Write(const std::shared_ptr<fitsfile>& ) const;
         
-#pragma mark • Dump
+#pragma endregion
+#pragma region  • Dump
         void Dump( std::ostream& ) const;               //!< Print out KEYWORD and their associated value and description.
         
-#pragma mark • Static member
+#pragma endregion
+#pragma region  • Static member
         static bool debug;
-        
+#pragma endregion
     };
+#pragma endregion
 }
 
 #endif /* defined(__FitsExtractor__FITShdu__) */

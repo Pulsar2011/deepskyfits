@@ -23,7 +23,7 @@ namespace DSL
 
 #pragma mark - FITSkeyword class implementation
     
-    std::string FITSkeyword::GetDataType(const FITSkeyword::key_type& tt)
+    std::string FITSkeyword::GetDataType(const key_type& tt)
     {
         switch (tt)
         {
@@ -87,7 +87,7 @@ namespace DSL
      *  @param val KEYWORD physical value as string
      *  @param cmt KEYWORD description
      */
-    FITSkeyword::FITSkeyword(std::string val, std::string cmt)
+    FITSkeyword::FITSkeyword(const std::string& val, const std::string& cmt)
     {
         Process(val, cmt);
     }
@@ -97,7 +97,7 @@ namespace DSL
      *  @param val KEYWORD physical value as string
      *  @param cmt KEYWORD description
      */
-    FITSkeyword::FITSkeyword(std::string val, std::string cmt, key_type kt)
+    FITSkeyword::FITSkeyword(const std::string& val, const std::string& cmt, const key_type& kt)
     {
         if(kt == key_type::fUndef)
             Process(val, cmt);
@@ -114,7 +114,7 @@ namespace DSL
      *  @param val KEYWORD physical value as string
      *  @param cmt KEYWORD description
      */
-    FITSkeyword::FITSkeyword(std::string val, key_type kt)
+    FITSkeyword::FITSkeyword(const std::string& val, const key_type& kt)
     {
         if(kt == key_type::fUndef)
             Process(val,  std::string());
@@ -131,7 +131,7 @@ namespace DSL
      *  @param val KEYWORD physical value as string
      *  @note The KEYWORD description is left blank
      */
-    FITSkeyword::FITSkeyword(std::string val)
+    FITSkeyword::FITSkeyword(const std::string& val)
     {
         Process(val, std::string());
     }
@@ -158,7 +158,7 @@ namespace DSL
         if(fcomment.size() > 0)
             fcomment.clear();
         
-        ftype = FITSkeyword::fUndef;
+        ftype = fUndef;
     }
     
 #pragma mark • Processing
@@ -167,7 +167,7 @@ namespace DSL
      *  @param val KEYWORD physical value as string
      *  @param cmt KEYWORD description
      */
-    void FITSkeyword::Process(std::string val, std::string cmt)
+    void FITSkeyword::Process(const std::string& val, const std::string& cmt)
     {
         fcomment = std::string(cmt);
         fvalue   = std::string(val);
@@ -181,15 +181,15 @@ namespace DSL
             has_only_digits = true;
     
         if(! has_only_digits )
-            ftype = FITSkeyword::fChar;
+            ftype = fChar;
         else if(fvalue.find('.') != std::string::npos ||
                 fvalue.find('e') != std::string::npos ||
                 fvalue.find('E') != std::string::npos )
-            ftype = FITSkeyword::fDouble;
+            ftype = fDouble;
         else if(fvalue.find('-') == std::string::npos )
-            ftype = FITSkeyword::fULong;
+            ftype = fULong;
         else
-            ftype = FITSkeyword::fLongLong;
+            ftype = fLongLong;
         
         try
         {
@@ -199,7 +199,6 @@ namespace DSL
         catch(std::exception &e)
         {
             std::cerr<<e.what()<<std::flush;
-            
             fcomment.resize(80-fvalue.size()-1);
         }
     }
@@ -211,7 +210,7 @@ namespace DSL
      *
      *  @note A check of type consistancy is performed. The type isn't modified but the value is adapted to the base type.
      */
-    void FITSkeyword::setValue(std::string value)
+    void FITSkeyword::setValue(const std::string& value)
     {
         if(!is_digits(value) && ftype != fChar)
         {
@@ -230,91 +229,47 @@ namespace DSL
                 break;
                 
             case fShort:
-#if __cplusplus >= 201103L
                 fvalue = std::to_string(std::stoi(value));
-#else
-                fvalue = std::to_string(std::stoll(value));
-#endif
                 break;
                 
             case fUShort:
-#if __cplusplus >= 201103L
                 fvalue = std::to_string(std::stoi(value));
-#else
-                fvalue = std::to_string(static_cast<unsigned short>( std::stoull(value) ));
-#endif
                 break;
                 
             case fInt:
-#if __cplusplus >= 201103L
                 fvalue = std::to_string(std::stoi(value));
-#else
-                fvalue = std::to_string( std::stoll(value) );
-#endif
                 break;
                 
             case fUInt:
-#if __cplusplus >= 201103L
                 fvalue = std::to_string(std::stoi(value));
-#else
-                fvalue = std::to_string( std::stoull(value) );
-#endif
                 break;
                 
             case fLong:
-#if __cplusplus >= 201103L
                 fvalue = std::to_string(std::stoi(value));
-#else
-                fvalue = std::to_string( std::stoll(value) );
-#endif
                 break;
                 
             case fLongLong:
-#if __cplusplus >= 201103L
                 fvalue = std::to_string(std::stoi(value));
-#else
-                fvalue = std::to_string( std::stoll(value) );
-#endif
                 break;
                 
             case fULong:
-#if __cplusplus >= 201103L
                 fvalue = std::to_string(std::stoi(value));
-#else
-                fvalue = std::to_string( std::stoll(value) );
-#endif
                 break;
                 
             case fBool:
-#if __cplusplus >= 201103L
                 fvalue = std::to_string(std::stoi(value) != 0);
-#else
-                fvalue = std::to_string(static_cast<long long int>( std::stoll(value) != 0 ));
-#endif
                 break;
                 
             case fFloat:
-#if __cplusplus >= 201103L
                 fvalue = std::to_string(std::stof(value));
-#else
-                fvalue = std::to_string(static_cast<double>( std::stof(value) ));
-#endif
                 break;
                 
             case fDouble:
-#if __cplusplus >= 201103L
                 fvalue = std::to_string(std::stod(value));
-#else
-                fvalue = std::to_string(static_cast<double>( std::stod(value) ));
-#endif
                 break;
                 
             case fByte:
-#if __cplusplus >= 201103L
                 fvalue = std::to_string(std::stoi(value));
-#else
-                fvalue = std::to_string( std::stoll(value) );
-#endif
                 break;
                 
             default:
@@ -360,20 +315,18 @@ namespace DSL
      *  @details Allocate memory to an empty header data block
      */
     FITShdu::FITShdu()
-    {
-
-    }
+    { }
     
     /**
      *  @brief Constructor
      */
-    FITShdu::FITShdu(fitsfile *fptr)
+    FITShdu::FITShdu(const std::shared_ptr<fitsfile>& fptr)
     {
         char *header = NULL;
         int  nKey    = 0;
         int  status  = 0, cflags = 0;
         
-        cflags = fits_hdr2str(fptr, 0, NULL, 0, &header, &nKey, &status);
+        cflags = fits_hdr2str(fptr.get(), 0, NULL, 0, &header, &nKey, &status);
         
         if(cflags || header == NULL)
         {
@@ -411,7 +364,7 @@ namespace DSL
      *  @details Read FITS header and extract value for each KEYWORD.
      *  @param h : Input header
      */
-    void FITShdu::Process(std::string h)
+    void FITShdu::Process(const std::string& h)
     {
         size_t pos = 0;
         while (pos < h.size())
@@ -479,7 +432,7 @@ namespace DSL
             else if(   iKey->first == "COMMENT"
                     || iKey->first == "HISTORY" )
             {
-                (* (iKey->second).value()) += std::string(" ") + value;
+                ((iKey->second).value()) += std::string(" ") + value;
             }
             
             pos += 80;
@@ -514,9 +467,9 @@ namespace DSL
      *  @return Integer value associated to the KEYWORD
      *  @note If the KEYWORD value isn't a numerical value OR if the KEYWORD doesn't exist, NaN is returned
      */
-    int FITShdu::GetIntValueForKey(std::string key) const
+    int FITShdu::GetIntValueForKey(const std::string& key) const
     {
-        FITSkeyword::key_type tt = FITSkeyword::fUndef;
+        key_type tt = fUndef;
         
         std::string outString = GetValueForKey(key, tt);
         if(outString.size() < 1)
@@ -526,7 +479,7 @@ namespace DSL
         
         try
         {
-            if(tt == FITSkeyword::fUndef || tt == FITSkeyword::fChar)
+            if(tt == fUndef || tt == fChar)
                 throw FITSexception(0,"FITShdu","GetIntValueForKey","Value for key "+key+" isn't a numerical value.");
         }
         catch(std::exception &e)
@@ -545,9 +498,9 @@ namespace DSL
      *  @return Unsigned Integer value associated to the KEYWORD
      *  @note If the KEYWORD value isn't a numerical value OR if the KEYWORD doesn't exist, NaN is returned
      */
-    unsigned int FITShdu::GetUIntValueForKey(std::string key) const
+    unsigned int FITShdu::GetUIntValueForKey(const std::string& key) const
     {
-        FITSkeyword::key_type tt = FITSkeyword::fUndef;
+        key_type tt = fUndef;
         
         std::string outString = GetValueForKey(key, tt);
         if(outString.size() < 1)
@@ -557,7 +510,7 @@ namespace DSL
         
         try
         {
-            if(tt == FITSkeyword::fUndef || tt == FITSkeyword::fChar)
+            if(tt == fUndef || tt == fChar)
                 throw FITSexception(0,"FITShdu","GetUIntValueForKey","Value for key "+key+" isn't a numerical value.");
         }
         catch(std::exception &e)
@@ -576,9 +529,9 @@ namespace DSL
      *  @return boolean value associated to the KEYWORD
      *  @note If the KEYWORD value isn't a numerical value OR if the KEYWORD doesn't exist, false is returned
      */
-    bool FITShdu::GetBoolValueForKey(std::string key) const
+    bool FITShdu::GetBoolValueForKey(const std::string& key) const
     {
-        FITSkeyword::key_type tt = FITSkeyword::fUndef;
+        key_type tt = fUndef;
         
         std::string outString = GetValueForKey(key, tt);
         if(outString.size() < 1)
@@ -588,7 +541,7 @@ namespace DSL
         
         try
         {
-            if(tt == FITSkeyword::fUndef || tt == FITSkeyword::fChar)
+            if(tt == fUndef || tt == fChar)
                 throw FITSexception(0,"FITShdu","GetBoolValueForKey","Value for key "+key+" isn't a numerical value.");
         }
         catch(std::exception &e)
@@ -617,9 +570,9 @@ namespace DSL
      *  @return Short integer value associated to the KEYWORD
      *  @note If the KEYWORD value isn't a numerical value OR if the KEYWORD doesn't exist, NaN is returned
      */
-    short FITShdu::GetShortValueForKey(std::string key) const
+    short FITShdu::GetShortValueForKey(const std::string& key) const
     {
-        FITSkeyword::key_type tt = FITSkeyword::fUndef;
+        key_type tt = fUndef;
         
         std::string outString = GetValueForKey(key, tt);
         if(outString.size() < 1)
@@ -629,7 +582,7 @@ namespace DSL
         
         try
         {
-            if(tt == FITSkeyword::fUndef || tt == FITSkeyword::fChar)
+            if(tt == fUndef || tt == fChar)
                 throw FITSexception(0,"FITShdu","GetShortValueForKey","Value for key "+key+" isn't a numerical value.");
         }
         catch(std::exception &e)
@@ -648,9 +601,9 @@ namespace DSL
      *  @return Long integer value associated to the KEYWORD
      *  @note If the KEYWORD value isn't a numerical value OR if the KEYWORD doesn't exist, NaN is returned
      */
-    long FITShdu::GetLongValueForKey(std::string key) const
+    long FITShdu::GetLongValueForKey(const std::string& key) const
     {
-        FITSkeyword::key_type tt = FITSkeyword::fUndef;
+        key_type tt = fUndef;
         
         std::string outString = GetValueForKey(key, tt);
         if(outString.size() < 1)
@@ -660,7 +613,7 @@ namespace DSL
         
         try
         {
-            if(tt == FITSkeyword::fUndef || tt == FITSkeyword::fChar)
+            if(tt == fUndef || tt == fChar)
                 throw FITSexception(0,"FITShdu","GetLongValueForKey","Value for key "+key+" isn't a numerical value.");
         }
         catch(std::exception &e)
@@ -679,9 +632,9 @@ namespace DSL
      *  @return Long long integer value associated to the KEYWORD
      *  @note If the KEYWORD value isn't a numerical value OR if the KEYWORD doesn't exist, NaN is returned
      */
-    long long FITShdu::GetLongLongValueForKey(std::string key) const
+    long long FITShdu::GetLongLongValueForKey(const std::string& key) const
     {
-        FITSkeyword::key_type tt = FITSkeyword::fUndef;
+        key_type tt = fUndef;
         
         std::string outString = GetValueForKey(key, tt);
         if(outString.size() < 1)
@@ -691,7 +644,7 @@ namespace DSL
         
         try
         {
-            if(tt == FITSkeyword::fUndef || tt == FITSkeyword::fChar)
+            if(tt == fUndef || tt == fChar)
                 throw FITSexception(0,"FITShdu","GetLongLongValueForKey","Value for key "+key+" isn't a numerical value.");
         }
         catch(std::exception &e)
@@ -710,9 +663,9 @@ namespace DSL
      *  @return Float value associated to the KEYWORD
      *  @note If the KEYWORD value isn't a numerical value OR if the KEYWORD doesn't exist, NaN is returned
      */
-    float FITShdu::GetFloatValueForKey(std::string key) const
+    float FITShdu::GetFloatValueForKey(const std::string& key) const
     {
-        FITSkeyword::key_type tt = FITSkeyword::fUndef;
+        key_type tt = fUndef;
         
         std::string outString = GetValueForKey(key, tt);
         if(outString.size() < 1)
@@ -722,7 +675,7 @@ namespace DSL
         
         try
         {
-            if(tt == FITSkeyword::fUndef || tt == FITSkeyword::fChar)
+            if(tt == fUndef || tt == fChar)
                 throw FITSexception(0,"FITShdu","GetFloatValueForKey","Value for key "+key+" isn't a numerical value.");
         }
         catch(std::exception &e)
@@ -741,9 +694,9 @@ namespace DSL
      *  @return Double value associated to the KEYWORD
      *  @note If the KEYWORD value isn't a numerical value OR if the KEYWORD doesn't exist, NaN is returned
      */
-    double FITShdu::GetDoubleValueForKey(std::string key) const
+    double FITShdu::GetDoubleValueForKey(const std::string& key) const
     {
-        FITSkeyword::key_type tt = FITSkeyword::fUndef;
+        key_type tt = fUndef;
         
         std::string outString = GetValueForKey(key, tt);
         if(outString.size() < 1)
@@ -753,7 +706,7 @@ namespace DSL
         
         try
         {
-            if(tt == FITSkeyword::fUndef || tt == FITSkeyword::fChar)
+            if(tt == fUndef || tt == fChar)
                 throw FITSexception(0,"FITShdu","GetDoubleValueForKey","Value for key "+key+" isn't a numerical value.");
         }
         catch(std::exception &e)
@@ -771,11 +724,11 @@ namespace DSL
      *  @param key KEYWORD name
      *  @param type Upon return base type of the KEYWORD physical value
      *  @return the value associated to the KEYWORD into a std::string
-     *  @note If the KEYWORD doesn't exist, an empty std::string is returned and type is set to FITSkeyword::fUndef
+     *  @note If the KEYWORD doesn't exist, an empty std::string is returned and type is set to fUndef
      */
-    std::string FITShdu::GetValueForKey(std::string key, FITSkeyword::key_type& type) const
+    std::string FITShdu::GetValueForKey(const std::string& key, key_type& type) const
     {
-        type = FITSkeyword::fUndef;
+        type = fUndef;
         
         FITSDictionary::const_iterator iKey = hdu.find(key);
         if(iKey == hdu.end())
@@ -790,11 +743,11 @@ namespace DSL
      *  @details Retrive physical value for a specific KEYWORD.
      *  @param key KEYWORD name
      *  @return the value associated to the KEYWORD into a std::string
-     *  @note If the KEYWORD doesn't exist, an empty std::string is returned and type is set to FITSkeyword::fUndef
+     *  @note If the KEYWORD doesn't exist, an empty std::string is returned and type is set to fUndef
      */
-    std::string FITShdu::GetValueForKey(std::string key) const
+    std::string FITShdu::GetValueForKey(const std::string& key) const
     {
-        FITSkeyword::key_type type = FITSkeyword::fUndef;
+        key_type type = fUndef;
        
         return GetValueForKey(key, type);
     }
@@ -829,7 +782,7 @@ namespace DSL
      *  @details Write FITS header to the current HDU
      *  @param fptr : HDU where this header will be written
      */
-    void FITShdu::Write(fitsfile *fptr) const
+    void FITShdu::Write(const std::shared_ptr<fitsfile>& fptr) const
     {
         if(fptr == NULL)
         {
@@ -845,8 +798,7 @@ namespace DSL
         {
             if(it->first == "DATE")
                 continue;
-            
-            
+                        
             if( it->first == "EXTEND" || it->first == "SIMPLE" || it->first == "XTENSION" )
                 continue;
             
@@ -856,38 +808,37 @@ namespace DSL
             if( it->first == "HISTORY")
                 continue;
             
-            
             switch(it->second.type())
             {
-                case FITSkeyword::fChar:
+                case fChar:
                     WriteCharValueForKey( it, fptr );
                     break;
                     
-                case FITSkeyword::fShort:
+                case fShort:
                     WriteShortValueForKey( it, fptr );
                     break;
                     
-                case FITSkeyword::fInt:
+                case fInt:
                     WriteIntValueForKey( it, fptr );
                     break;
                     
-                case FITSkeyword::fLong:
+                case fLong:
                     WriteLongValueForKey( it, fptr );
                     break;
                     
-                case FITSkeyword::fULong:
+                case fULong:
                     WriteULongValueForKey( it, fptr );
                     break;
                     
-                case FITSkeyword::fLongLong:
+                case fLongLong:
                     WriteLongLongValueForKey( it, fptr );
                     break;
                     
-                case FITSkeyword::fFloat:
+                case fFloat:
                     WriteFloatValueForKey( it, fptr );
                     break;
                     
-                case FITSkeyword::fDouble:
+                case fDouble:
                     WriteDoubleValueForKey( it, fptr );
                     break;
                     
@@ -916,9 +867,9 @@ namespace DSL
      *  @param it : FITSDictionary iterator encapsulating KEYWORD, VALUE and COMMENT filed of the FITS Header keyword
      *  @param fptr : HDU where this header will be written
      */
-    void FITShdu::WriteCharValueForKey(FITSDictionary::const_iterator it, fitsfile *fptr) const
+    void FITShdu::WriteCharValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
     {
-        if(fptr == NULL)
+        if(fptr == nullptr || fptr.use_count() < 1)
         {
             throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteCharValueForKey","received nullptr");
         }
@@ -942,7 +893,7 @@ namespace DSL
         
         try
         {
-            if(fits_update_key(fptr, TSTRING, (char*) it->first.c_str(), val, (char*) it->second.comment().c_str(), &status ) )
+            if(fits_update_key(fptr.get(), TSTRING, (char*) it->first.c_str(), val, (char*) it->second.comment().c_str(), &status ) )
                 throw FITSexception(status,"FITShdu","Write");
         }
         catch (std::exception &e)
@@ -958,9 +909,9 @@ namespace DSL
      *  @param it : FITSDictionary iterator encapsulating KEYWORD, VALUE and COMMENT filed of the FITS Header keyword
      *  @param fptr : HDU where this header will be written
      */
-    void FITShdu::WriteIntValueForKey(FITSDictionary::const_iterator it, fitsfile *fptr) const
+    void FITShdu::WriteIntValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
     {
-        if(fptr == NULL)
+        if(fptr == nullptr || fptr.use_count() < 1)
         {
             throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteIntValueForKey","received nullptr");
         }
@@ -981,7 +932,7 @@ namespace DSL
         
         try
         {
-            if(fits_update_key(fptr, TINT, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+            if(fits_update_key(fptr.get(), TINT, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
                 throw FITSexception(status,"FITShdu","Write");
         }
         catch (std::exception& e)
@@ -997,13 +948,12 @@ namespace DSL
      *  @param it : FITSDictionary iterator encapsulating KEYWORD, VALUE and COMMENT filed of the FITS Header keyword
      *  @param fptr : HDU where this header will be written
      */
-    void FITShdu::WriteBoolValueForKey(FITSDictionary::const_iterator it, fitsfile *fptr) const
+    void FITShdu::WriteBoolValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
     {
-        if(fptr == NULL)
+        if(fptr == nullptr || fptr.use_count() < 1)
         {
             throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteBoolValueForKey","received nullptr");
         }
-        
         
         try
         {
@@ -1021,7 +971,7 @@ namespace DSL
         
         try
         {
-            if( fits_update_key(fptr, TLOGICAL, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+            if( fits_update_key(fptr.get(), TLOGICAL, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
                 throw FITSexception(status,"FITShdu","Write");
         }
         catch (std::exception& e)
@@ -1037,9 +987,9 @@ namespace DSL
      *  @param it : FITSDictionary iterator encapsulating KEYWORD, VALUE and COMMENT filed of the FITS Header keyword
      *  @param fptr : HDU where this header will be written
      */
-    void FITShdu::WriteShortValueForKey(FITSDictionary::const_iterator it, fitsfile *fptr) const
+    void FITShdu::WriteShortValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
     {
-        if(fptr == NULL)
+        if(fptr == nullptr || fptr.use_count() < 1)
         {
             throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteShortValueForKey","received nullptr");
         }
@@ -1060,7 +1010,7 @@ namespace DSL
         
         try
         {
-            if( fits_update_key(fptr, TSHORT, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+            if( fits_update_key(fptr.get(), TSHORT, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
                 throw FITSexception(status,"FITShdu","Write");
         }
         catch (std::exception& e)
@@ -1076,9 +1026,9 @@ namespace DSL
      *  @param it : FITSDictionary iterator encapsulating KEYWORD, VALUE and COMMENT filed of the FITS Header keyword
      *  @param fptr : HDU where this header will be written
      */
-    void FITShdu::WriteLongValueForKey(FITSDictionary::const_iterator it, fitsfile *fptr) const
+    void FITShdu::WriteLongValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
     {
-        if(fptr == NULL)
+        if(fptr == nullptr || fptr.use_count() < 1)
         {
             throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteLongValueForKey","received nullptr");
         }
@@ -1099,7 +1049,7 @@ namespace DSL
         
         try
         {
-            if( fits_update_key(fptr, TLONG, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+            if( fits_update_key(fptr.get(), TLONG, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
                 throw FITSexception(status,"FITShdu","Write");
         }
         catch (std::exception& e)
@@ -1115,9 +1065,9 @@ namespace DSL
      *  @param it : FITSDictionary iterator encapsulating KEYWORD, VALUE and COMMENT filed of the FITS Header keyword
      *  @param fptr : HDU where this header will be written
      */
-    void FITShdu::WriteULongValueForKey(FITSDictionary::const_iterator it, fitsfile *fptr) const
+    void FITShdu::WriteULongValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
     {
-        if(fptr == NULL)
+        if(fptr == nullptr || fptr.use_count() < 1)
         {
             throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteLongValueForKey","received nullptr");
         }
@@ -1138,7 +1088,7 @@ namespace DSL
         
         try
         {
-            if( fits_update_key(fptr, TULONG, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+            if( fits_update_key(fptr.get(), TULONG, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
                 throw FITSexception(status,"FITShdu","Write");
         }
         catch (std::exception& e)
@@ -1154,9 +1104,9 @@ namespace DSL
      *  @param it : FITSDictionary iterator encapsulating KEYWORD, VALUE and COMMENT filed of the FITS Header keyword
      *  @param fptr : HDU where this header will be written
      */
-    void FITShdu::WriteLongLongValueForKey(FITSDictionary::const_iterator it, fitsfile *fptr) const
+    void FITShdu::WriteLongLongValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
     {
-        if(fptr == NULL)
+        if(fptr == nullptr || fptr.use_count() < 1)
         {
             throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteLongValueForKey","received nullptr");
         }
@@ -1177,7 +1127,7 @@ namespace DSL
         
         try
         {
-            if( fits_update_key(fptr, TLONGLONG, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+            if( fits_update_key(fptr.get(), TLONGLONG, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
                 throw FITSexception(status,"FITShdu","Write");
         }
         catch (std::exception& e)
@@ -1193,9 +1143,9 @@ namespace DSL
      *  @param it : FITSDictionary iterator encapsulating KEYWORD, VALUE and COMMENT filed of the FITS Header keyword
      *  @param fptr : HDU where this header will be written
      */
-    void FITShdu::WriteFloatValueForKey(FITSDictionary::const_iterator it, fitsfile *fptr) const
+    void FITShdu::WriteFloatValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
     {
-        if(fptr == NULL)
+        if(fptr == nullptr || fptr.use_count() < 1)
         {
             throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteLongValueForKey","received nullptr");
         }
@@ -1216,7 +1166,7 @@ namespace DSL
         
         try
         {
-            if( fits_update_key(fptr, TFLOAT, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+            if( fits_update_key(fptr.get(), TFLOAT, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
                 throw FITSexception(status,"FITShdu","Write");
         }
         catch (std::exception& e)
@@ -1232,9 +1182,9 @@ namespace DSL
      *  @param it : FITSDictionary iterator encapsulating KEYWORD, VALUE and COMMENT filed of the FITS Header keyword
      *  @param fptr : HDU where this header will be written
      */
-    void FITShdu::WriteDoubleValueForKey(FITSDictionary::const_iterator it, fitsfile *fptr) const
+    void FITShdu::WriteDoubleValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
     {
-        if(fptr == NULL)
+        if(fptr == nullptr || fptr.use_count() < 1)
         {
             throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteLongValueForKey","received nullptr");
         }
@@ -1246,6 +1196,7 @@ namespace DSL
         }
         catch (std::exception& e)
         {
+            if((verbose & verboseLevel::VERBOSE_BASIC)== verboseLevel::VERBOSE_BASIC)
             std::cerr<<e.what()<<std::flush;
             return;
         }
@@ -1255,7 +1206,7 @@ namespace DSL
         
         try
         {
-            if( fits_update_key(fptr, TDOUBLE, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+            if( fits_update_key(fptr.get(), TDOUBLE, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
                 throw FITSexception(status,"FITShdu","Write");
         }
         catch (std::exception& e)
@@ -1267,6 +1218,19 @@ namespace DSL
     }
     
 #pragma mark • Modifier
+
+    /**
+     *  Modify the value associated to a FITS keyword. If the keyword doesn't exists, a new filed is added to the disctionary with the given KEYWORD and its associated value.
+     *
+     *  @param keyword   Keyword name
+     *  @param value Keyword value, has a string
+     *  @param kt    Base type of the keyword value.
+     *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
+     */
+    void FITShdu::valueForKey(const key_code& keyword, const std::string& value, const key_type& kt)
+    {
+        valueForKey(keyword, value, kt, std::string());
+    }
     
     /**
      *  Modify the value associated to a FITS keyword. If the keyword doesn't exists, a new filed is added to the disctionary with the given KEYWORD and its associated value.
@@ -1277,7 +1241,7 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(key_code keyword, std::string value, FITSkeyword::key_type kt, std::string cmt)
+    void FITShdu::valueForKey(const key_code& keyword, const std::string& value, const key_type& kt, const std::string& cmt)
     {
         FITSDictionary::iterator it = hdu.find(keyword);
         if(it != hdu.end())
@@ -1308,6 +1272,31 @@ namespace DSL
         
         hdu.insert(std::pair<key_code,FITSkeyword>(keyword, FITSkeyword(value,cmt)));
     }
+
+    /**
+     *  Modify the value associated to a FITS keyword. If the keyword doesn't exists, a new filed is added to the disctionary with the given KEYWORD and its associated value.
+     *
+     *  @param keyword   Keyword name
+     *  @param value Keyword value, has a string
+     *  @param cmt commentair describing the keyword.
+     *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
+     */
+    void FITShdu::valueForKey(const key_code& keyword, const std::string& value, const std::string& cmt)
+    {
+        valueForKey(keyword, value, fChar, cmt);
+    }
+
+    /**
+     *  Modify the value associated to a FITS keyword. If the keyword doesn't exists, a new filed is added to the disctionary with the given KEYWORD and its associated value.
+     *
+     *  @param keyword   Keyword name
+     *  @param value Keyword value, has a string
+     *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
+     */
+    void FITShdu::valueForKey(const key_code& keyword, const std::string& value)
+    {
+        valueForKey(keyword, value, fChar, std::string());
+    }
         
     /**
      *  Modify the value associated to a FITS keyword. If the keyword doesn't exists, a new filed is added to the disctionary with the given KEYWORD and its associated value.
@@ -1317,16 +1306,12 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(key_code keyword, short value, std::string cmt)
+    void FITShdu::valueForKey(const key_code& keyword, const short& value, const std::string& cmt)
     {
-#if __cplusplus >= 201103L
-        valueForKey(keyword, std::to_string(value), FITSkeyword::fShort,cmt);
-#else
-        valueForKey(keyword, std::to_string(static_cast<long long int>( value )), FITSkeyword::fShort,cmt);
-#endif
+        valueForKey(keyword, std::to_string(value), fShort,cmt);
     }
     
-    void FITShdu::valueForKey(key_code keyword, short value)
+    void FITShdu::valueForKey(const key_code& keyword, const short& value)
     {
         valueForKey(keyword, value, std::string());
     }
@@ -1339,16 +1324,12 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(key_code keyword, int value, std::string cmt)
+    void FITShdu::valueForKey(const key_code& keyword, const int& value, const std::string& cmt)
     {
-#if __cplusplus >= 201103L
-        valueForKey(keyword, std::to_string(value), FITSkeyword::fInt ,cmt);
-#else
-        valueForKey(keyword, std::to_string(static_cast<long long int>( value )), FITSkeyword::fInt,cmt);
-#endif
+        valueForKey(keyword, std::to_string(value), fInt ,cmt);
     }
     
-    void FITShdu::valueForKey(key_code keyword, int value)
+    void FITShdu::valueForKey(const key_code& keyword, const int& value)
     {
         valueForKey(keyword, value, std::string());
     }
@@ -1361,16 +1342,12 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(key_code keyword, long value, std::string cmt)
+    void FITShdu::valueForKey(const key_code& keyword, const long& value, const std::string& cmt)
     {
-#if __cplusplus >= 201103L
-        valueForKey(keyword, std::to_string(value), FITSkeyword::fLong,cmt);
-#else
-        valueForKey(keyword, std::to_string(static_cast<long long int>( value )), FITSkeyword::fLong,cmt);
-#endif
+        valueForKey(keyword, std::to_string(value), fLong,cmt);
     }
     
-    void FITShdu::valueForKey(key_code keyword, long value)
+    void FITShdu::valueForKey(const key_code& keyword, const long& value)
     {
         valueForKey(keyword, value, std::string());
     }
@@ -1383,17 +1360,13 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(key_code keyword, long long value, std::string cmt)
+    void FITShdu::valueForKey(const key_code& keyword, const long long& value, const std::string& cmt)
     {
-#if __cplusplus >= 201103L
-        valueForKey(keyword, std::to_string(value), FITSkeyword::fLongLong,cmt);
-#else
-        valueForKey(keyword, std::to_string(static_cast<long long int>( value )), FITSkeyword::fLongLong,cmt);
-#endif
+        valueForKey(keyword, std::to_string(value), fLongLong,cmt);
         
     }
     
-    void FITShdu::valueForKey(key_code keyword, long long value)
+    void FITShdu::valueForKey(const key_code& keyword, const long long& value)
     {
         valueForKey(keyword, value, std::string());
     }
@@ -1406,17 +1379,12 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(key_code keyword, size_t value, std::string cmt)
+    void FITShdu::valueForKey(const key_code& keyword, const size_t& value, const std::string& cmt)
     {
-#if __cplusplus >= 201103L
-        valueForKey(keyword, std::to_string(value), FITSkeyword::fLongLong,cmt);
-#else
-        valueForKey(keyword, std::to_string(static_cast<long long int>( value )), FITSkeyword::fLongLong,cmt);
-#endif
-        
+        valueForKey(keyword, std::to_string(value), fLongLong,cmt);
     }
     
-    void FITShdu::valueForKey(key_code keyword, size_t value)
+    void FITShdu::valueForKey(const key_code& keyword, const size_t& value)
     {
         valueForKey(keyword, value, std::string());
     }
@@ -1429,16 +1397,12 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(key_code keyword, bool value, std::string cmt)
+    void FITShdu::valueForKey(const key_code& keyword, const bool& value, const std::string& cmt)
     {
-#if __cplusplus >= 201103L
-        valueForKey(keyword, std::to_string(value), FITSkeyword::fBool, cmt);
-#else
-        valueForKey(keyword, std::to_string(static_cast<long long unsigned int>( value )), FITSkeyword::fBool, cmt);
-#endif
+        valueForKey(keyword, std::to_string(value), fBool, cmt);
     }
     
-    void FITShdu::valueForKey(key_code keyword, bool value)
+    void FITShdu::valueForKey(const key_code& keyword, const bool& value)
     {
         valueForKey(keyword, value, std::string());
     }
@@ -1451,16 +1415,12 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(key_code keyword, float value, std::string cmt)
+    void FITShdu::valueForKey(const key_code& keyword, const float& value, const std::string& cmt)
     {
-#if __cplusplus >= 201103L
-        valueForKey(keyword, std::to_string(value), FITSkeyword::fFloat, cmt);
-#else
-        valueForKey(keyword, std::to_string(static_cast<long double>( value )), FITSkeyword::fFloat, cmt);
-#endif
+        valueForKey(keyword, std::to_string(value), fFloat, cmt);
     }
     
-    void FITShdu::valueForKey(key_code keyword, float value)
+    void FITShdu::valueForKey(const key_code& keyword, const float& value)
     {
         valueForKey(keyword, value, std::string());
     }
@@ -1473,13 +1433,9 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(key_code keyword, double value, std::string cmt)
+    void FITShdu::valueForKey(const key_code& keyword, const double& value, const std::string& cmt)
     {
-#if __cplusplus >= 201103L
-        valueForKey(keyword, std::to_string(value), FITSkeyword::fDouble, cmt);
-#else
-        valueForKey(keyword, std::to_string(static_cast<long double>( value )), FITSkeyword::fDouble, cmt);
-#endif
+        valueForKey(keyword, std::to_string(value), fDouble, cmt);
     }
     
     /**
@@ -1490,16 +1446,12 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(key_code keyword, uint32_t value, std::string cmt)
+    void FITShdu::valueForKey(const key_code& keyword, const uint32_t& value, const std::string& cmt)
     {
-#if __cplusplus >= 201103L
-        valueForKey(keyword, std::to_string(value), FITSkeyword::fDouble, cmt);
-#else
-        valueForKey(keyword, std::to_string(static_cast<long long unsigned int>( value )), FITSkeyword::fDouble, cmt);
-#endif
+        valueForKey(keyword, std::to_string(value), fDouble, cmt);
     }
     
-    void FITShdu::valueForKey(key_code keyword, double value)
+    void FITShdu::valueForKey(const key_code& keyword, const double& value)
     {
         valueForKey(keyword, value, std::string());
     }
@@ -1509,7 +1461,7 @@ namespace DSL
      *  Remove Keyword from HDU
      *  @param keyword keyword to be removed
      */
-    void FITShdu::deleteKey(key_code keyword)
+    void FITShdu::deleteKey(const key_code& keyword)
     {
         FITSDictionary::iterator it = hdu.find(keyword);
         
