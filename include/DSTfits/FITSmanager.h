@@ -24,63 +24,6 @@
 namespace DSL
 {
 
-        enum class verboseLevel: uint8_t {
-            VERBOSE_NONE    = 0x00,
-            VERBOSE_BASIC   = 0x01,
-            VERBOSE_DETAIL  = 0x0F,
-            VERBOSE_HDU     = 0x02,
-            VERBOSE_IMG     = 0x04,
-            VERBOSE_TBL     = 0x08,
-            VERBOSE_DEBUG   = 0xFF
-        };
-
-        inline verboseLevel verbose = verboseLevel::VERBOSE_NONE;
-
-        verboseLevel operator|(verboseLevel a, verboseLevel b)
-        {
-            return static_cast<verboseLevel>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
-        }
-
-        verboseLevel operator&(verboseLevel a, verboseLevel b)
-        {
-            return static_cast<verboseLevel>(static_cast<uint8_t>(a) & static_cast<uint8_t>(b));
-        }
-
-        verboseLevel& operator|=(verboseLevel& a, verboseLevel b)
-        {
-            a = a | b;
-            return a;
-        }
-
-        verboseLevel& operator&=(verboseLevel& a, verboseLevel b)
-        {
-            a = a & b;
-            return a;
-        }
-
-        verboseLevel operator~(verboseLevel a)
-        {
-            return static_cast<verboseLevel>(~static_cast<uint8_t>(a));
-        }
-
-        // Add operator<< for verboseLevel
-        //inline std::ostream& operator<<(std::ostream& os, verboseLevel v)
-        //{
-        //    os << "0x" << std::hex << static_cast<int>(v) << std::dec;
-        //    return os;
-        //}
-
-        // Display verboseLevel as binary (e.g., 0000 0001)
-        inline std::ostream& operator<<(std::ostream& os, verboseLevel v)
-        {
-            uint8_t val = static_cast<uint8_t>(v);
-            for (int i = 7; i >= 0; --i) {
-                os << ((val >> i) & 1);
-                if (i % 4 == 0 && i != 0) os << ' ';
-            }
-            return os;
-        }
-
     /**
      *  @namespace DSL
      *  @brief DeepSkyLibrary namespace

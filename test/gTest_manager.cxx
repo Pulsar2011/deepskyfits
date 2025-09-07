@@ -252,6 +252,7 @@ TEST(FITSmanager, exception_manager)
 TEST(FITSmanager, move_between_hdu)
 {
     int hdu_num=0;
+    int status=0;
     FITSmanager ffm("build/testdata/rosat_pspc_rdf2_3_im2.fits");
     ASSERT_EQ(ffm.NumberOfHeader(), 3);
     
@@ -279,7 +280,7 @@ TEST(FITSmanager, move_between_hdu)
     EXPECT_EQ(fits_get_hdu_num(this_hdu.get(), &hdu_num),1);
     EXPECT_EQ(hdu_num, 1);
 
-    fits_movabs_hdu(this_hdu.get(), 2, NULL, NULL);
+    fits_movabs_hdu(this_hdu.get(), 2, NULL, &status);
     fits_get_hdu_num(this_hdu.get(), &hdu_num);
     EXPECT_EQ(hdu_num, 2);
 

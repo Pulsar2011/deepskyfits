@@ -18,8 +18,12 @@
 
 #include <DSTfits/FITSimg.h>
 
+
+
 namespace DSL
 {
+class FITSmanager;
+
 #pragma mark - FITScube class implementation
     
     bool FITScube::debug = false;
@@ -53,7 +57,7 @@ namespace DSL
     {
         hdu = NULL;
         
-        //mask = pixel_mask();
+        //mask = pxMask();
         
         BITPIX  = 0;
         eqBITPIX= 0;
@@ -76,11 +80,11 @@ namespace DSL
      *  @details Read current HDU of the fitsfile to extract a 2D images
      *  @param fptr: Pointer to the fitfile
      */
-    FITScube::FITScube(fitsfile *fptr)
+    FITScube::FITScube(const std::shared_ptr<fitsfile>& fptr)
     {
         init();
         
-        if(fptr == NULL)
+        if(fptr == nullptr || fptr.use_count() < 1)
         {
             img_status = SHARED_NULPTR;
             throw FITSexception(img_status,"FITScube","ctor","received nullptr");
@@ -88,7 +92,7 @@ namespace DSL
         
         //- GET CURRENT HDU TYPE. RETURN AN ERROR IF IT ISN'T AN IMAGE
         int hdu_type = 0;
-        if( fits_get_hdu_type(fptr, &hdu_type, &img_status) )
+        if( fits_get_hdu_type(fptr.get(), &hdu_type, &img_status) )
         {
             throw FITSexception(img_status,"FITScube","ctor");
         }
@@ -126,12 +130,12 @@ namespace DSL
         }
         
         //  • GET DATA TYPE
-        if( fits_get_img_type(fptr, &BITPIX, &img_status) )
+        if( fits_get_img_type(fptr.get(), &BITPIX, &img_status) )
         {
             throw FITSexception(img_status,"FITScube","ctor");
         }
         
-        if( fits_get_img_equivtype(fptr, &eqBITPIX, &img_status) )
+        if( fits_get_img_equivtype(fptr.get(), &eqBITPIX, &img_status) )
         {
             throw FITSexception(img_status,"FITScube","ctor");
         }
@@ -141,7 +145,7 @@ namespace DSL
         if(name.size() < 1)
             name += "PRIMARY";
         
-        mask = pixel_mask(static_cast<size_t>( Nelements() ));
+        mask = pxMask(static_cast<size_t>( Nelements() ));
         
 #if __cplusplus < 201103L
         mask.resize(static_cast<size_t>( Nelements() ),0);
@@ -606,9 +610,9 @@ namespace DSL
      *  @details Write DataCube to the current HDU of a fits file
      *  @param fptr : Pointer to the HDU where data will be written
      */
-    void FITScube::Write(fitsfile* fptr)
+    void FITScube::Write(const std::shared_ptr<fitsfile>& fptr)
     {
-        if(fptr == NULL)
+        if(fptr == nullptr || fptr.use_count() < 1)
         {
             throw FITSexception(NULL_INPUT_PTR,"FITScube","Write","received nullptr");
         }
@@ -632,11 +636,12 @@ namespace DSL
             fileName.erase(0,1);
         }
         
-        fitsfile *fptr = NULL;
-        if( fits_create_file(&fptr, (char*) fileName.c_str(), &img_status ) )
+        fitsfile * raw_fptr = nullptr;
+        if( fits_create_file(&raw_fptr, (char*) fileName.c_str(), &img_status ) )
         {
             throw FITSexception(img_status,"FITScube","Write","FILE : "+fileName);
         }
+        std::shared_ptr<fitsfile> fptr(raw_fptr, [](fitsfile* p){ int status=0; fits_close_file(p, &status); });
         
         std::cout<<"\033[31m[FITScube::Write]\033[0m: Create image of "<<Naxis.size()<<" axis (";
         long long int *axis = new long long int [Naxis.size()];
@@ -654,23 +659,21 @@ namespace DSL
             throw FITSexception(img_status,"FITScube","Write","FILE : "+fileName);
         }
     
-        if( fits_create_imgll(fptr, BITPIX, static_cast<int>( Naxis.size() ), axis,  &img_status ) )
+        if( fits_create_imgll(fptr.get(), BITPIX, static_cast<int>( Naxis.size() ), axis,  &img_status ) )
         {
-            delete fptr;
-            fptr = NULL;
-            
+            fptr.reset();          
             throw FITSexception(img_status,"FITScube","ctor","FILE : "+fileName);
         }
         
         delete [] axis;
-        if(fptr == NULL)
+        if(fptr == nullptr || fptr.use_count() < 1)
             return;
         
         Write(fptr);
         
         try
         {
-            if( fits_close_file(fptr, &img_status) )
+            if( fits_close_file(fptr.get(), &img_status) )
             {
                 throw FITSexception(img_status,"FITScube","Close","FILE : "+fileName);
             }
@@ -680,7 +683,7 @@ namespace DSL
             std::cerr<<e.what()<<std::flush;
         }
         
-        fptr = NULL;
+        fptr.reset();
 
     }
     

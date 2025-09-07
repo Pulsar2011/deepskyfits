@@ -10,6 +10,7 @@
 #include <DSTfits/FITSexception.h>
 #include <DSTfits/FITSmanager.h>
 #include <DSTfits/FITSimg.h>
+#include <DSTfits/FITSdata.h>
 #include <DSTfits/DSF_version.h>
 
 #include<stdexcept>
@@ -18,6 +19,50 @@
 
 namespace DSL
 {
+    verboseLevel operator|(verboseLevel a, verboseLevel b)
+    {
+        return static_cast<verboseLevel>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
+    }
+
+    verboseLevel operator&(verboseLevel a, verboseLevel b)
+    {
+        return static_cast<verboseLevel>(static_cast<uint8_t>(a) & static_cast<uint8_t>(b));
+    }
+
+    verboseLevel& operator|=(verboseLevel& a, verboseLevel b)
+    {
+        a = a | b;
+        return a;
+    }
+
+    verboseLevel& operator&=(verboseLevel& a, verboseLevel b)
+    {
+        a = a & b;
+        return a;
+    }
+
+    verboseLevel operator~(verboseLevel a)
+    {
+        return static_cast<verboseLevel>(~static_cast<uint8_t>(a));
+    }
+
+    // Add operator<< for verboseLevel
+    //inline std::ostream& operator<<(std::ostream& os, verboseLevel v)
+    //{
+    //    os << "0x" << std::hex << static_cast<int>(v) << std::dec;
+    //    return os;
+    //}
+
+    // Display verboseLevel as binary (e.g., 0000 0001)
+    std::ostream& operator<<(std::ostream& os, verboseLevel v)
+    {
+        uint8_t val = static_cast<uint8_t>(v);
+        for (int i = 7; i >= 0; --i) {
+            os << ((val >> i) & 1);
+            if (i % 4 == 0 && i != 0) os << ' ';
+        }
+        return os;
+    }
 
 #pragma region • Initialization
 
@@ -349,7 +394,7 @@ namespace DSL
         
         if(fits_status)
             return NULL;
-        hdu = new FITShdu(fptr.get());
+        hdu = new FITShdu(fptr);
 
         return std::shared_ptr<FITShdu>(hdu);
     }
@@ -396,39 +441,39 @@ namespace DSL
             switch (BITPIX)
             {
                 case 8:
-                    img = new FITSimg<uint8_t>(fptr.get());
+                    img = new FITSimg<uint8_t>(fptr);
                     break;
             
                 case 10:
-                    img = new FITSimg<int8_t>(fptr.get());
+                    img = new FITSimg<int8_t>(fptr);
                     break;
                 
                 case 16:
-                    img = new FITSimg<int16_t>(fptr.get());
+                    img = new FITSimg<int16_t>(fptr);
                     break;
                 
                 case 20:
-                    img = new FITSimg<uint16_t>(fptr.get());
+                    img = new FITSimg<uint16_t>(fptr);
                     break;
                 
                 case 32:
-                    img = new FITSimg<int32_t>(fptr.get());
+                    img = new FITSimg<int32_t>(fptr);
                     break;
                 
                 case 40:
-                    img = new FITSimg<uint32_t>(fptr.get());
+                    img = new FITSimg<uint32_t>(fptr);
                     break;
                 
                 case 64:
-                    img = new FITSimg<int64_t>(fptr.get());
+                    img = new FITSimg<int64_t>(fptr);
                     break;
                 
                 case -32:
-                    img = new FITSimg<float>(fptr.get());
+                    img = new FITSimg<float>(fptr);
                     break;
                 
                 case -64:
-                    img = new FITSimg<double>(fptr.get());
+                    img = new FITSimg<double>(fptr);
                     break;
                 
                 default:
@@ -590,7 +635,7 @@ namespace DSL
         }
                 
         num_hdu++;
-        img.Write(fptr.get());
+        img.Write(fptr);
     }
     
 #pragma endregion
@@ -612,7 +657,7 @@ namespace DSL
         try
         {
         switch (val.type()) {
-            case FITSkeyword::fChar :
+            case fChar :
                 if(val.value().size() < 68)
                 {
                     if(ffukys(fptr.get(), const_cast<char*>( key.c_str() ), const_cast<char*>( val.value().c_str() ), comment, &fits_status ))
@@ -629,31 +674,31 @@ namespace DSL
                 }
                 break;
                 
-            case FITSkeyword::fShort :
+            case fShort :
                 AppendKeyToHeader(HDU, key, TSHORT, val.value(), val.comment());
                 break;
                 
-            case FITSkeyword::fInt :
+            case fInt :
                 AppendKeyToHeader(HDU, key, TINT, val.value(), val.comment());
                 break;
                 
-            case FITSkeyword::fLong :
+            case fLong :
                 AppendKeyToHeader(HDU, key, TLONG, val.value(), val.comment());
                 break;
                 
-            case FITSkeyword::fLongLong :
+            case fLongLong :
                 AppendKeyToHeader(HDU, key, TLONGLONG, val.value(), val.comment());
                 break;
                 
-            case FITSkeyword::fBool :
+            case fBool :
                 AppendKeyToHeader(HDU, key, TBYTE, val.value(), val.comment());
                 break;
                 
-            case FITSkeyword::fFloat :
+            case fFloat :
                 AppendKeyToHeader(HDU, key, TFLOAT, val.value(), val.comment());
                 break;
                 
-            case FITSkeyword::fDouble :
+            case fDouble :
                 AppendKeyToHeader(HDU, key, TDOUBLE, val.value(), val.comment());
                 break;
                 
