@@ -517,7 +517,7 @@ namespace DSL
             std::string comment;
             
             key_code key = hdu_entry.substr(0, 8);
-            key.erase(remove_if(key.begin(), key.end(), isspace), key.end());
+            key.erase(std::remove_if(key.begin(), key.end(), [](unsigned char c){ return std::isspace(c); }), key.end());
             if(key.size() < 1 || key == "END")
             {
                 pos += 80;
@@ -559,7 +559,7 @@ namespace DSL
             if(   key != "COMMENT"
                && key != "HISTORY" )
             {
-                value.erase(remove_if(value.begin(), value.end(), isspace), value.end());
+                value.erase(std::remove_if(value.begin(), value.end(), [](unsigned char c){ return std::isspace(c); }), value.end());
                 while(value.find_first_of("'") != std::string::npos)
                     value.erase(value.find_first_of("'"), 1);
             }
@@ -1033,13 +1033,19 @@ namespace DSL
         if(it == hdu.end())
             throw FITSexception(KEY_NO_EXIST,"FITShdu","WriteCharValueForKey","Reach end of header");
         
-        // FIX: Avoid dangling pointer from temporary string
-        std::string val_str = std::string();
-        val_str += it->second.value();
-        char * val = (char*) val_str.c_str();
+        // Build local null-terminated buffers for key, value and comment to avoid casting away const
+        std::string keystr = it->first;
+        std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
+
+        std::string val_str = it->second.value();
+        std::vector<char> valbuf(val_str.c_str(), val_str.c_str()+val_str.size()+1);
+
+        std::string cmt_str = it->second.comment();
+        std::vector<char> cmtbuf(cmt_str.c_str(), cmt_str.c_str()+cmt_str.size()+1);
+
         int status = 0;
-        
-        if(fits_update_key(fptr.get(), TSTRING, (char*) it->first.c_str(), val, (char*) it->second.comment().c_str(), &status ) )
+
+        if(fits_update_key(fptr.get(), TSTRING, keybuf.data(), valbuf.data(), cmtbuf.data(), &status ) )
             throw FITSexception(status,"FITShdu","Write");
         
         return;
@@ -1061,9 +1067,15 @@ namespace DSL
             throw FITSexception(SEEK_ERROR,"FITShdu","WriteBoolValueForKey","Reach end of header");
         
         int val = std::stoi(it->second.value());
+        std::string keystr = it->first;
+        std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
+
+        std::string cmt_str = it->second.comment();
+        std::vector<char> cmtbuf(cmt_str.c_str(), cmt_str.c_str()+cmt_str.size()+1);
+
         int status = 0;
-        
-        if( fits_update_key(fptr.get(), TLOGICAL, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+
+        if( fits_update_key(fptr.get(), TLOGICAL, keybuf.data(), &val, cmtbuf.data(), &status ) )
             throw FITSexception(status,"FITShdu","Write");
         
         return;
@@ -1085,9 +1097,15 @@ namespace DSL
         // parse into fixed-width then cast to platform 'short' for CFITSIO
         int16_t tmp = static_cast<int16_t>(std::stoi(it->second.value()));
         short val = static_cast<short>(tmp);
+        std::string keystr = it->first;
+        std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
+
+        std::string cmt_str = it->second.comment();
+        std::vector<char> cmtbuf(cmt_str.c_str(), cmt_str.c_str()+cmt_str.size()+1);
+
         int status = 0;
 
-        if( fits_update_key(fptr.get(), TSHORT, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+        if( fits_update_key(fptr.get(), TSHORT, keybuf.data(), &val, cmtbuf.data(), &status ) )
             throw FITSexception(status,"FITShdu","Write");
 
         return;
@@ -1108,9 +1126,15 @@ namespace DSL
 
         uint16_t tmp = static_cast<uint16_t>(std::stoul(it->second.value()));
         unsigned short val = static_cast<unsigned short>(tmp);
+        std::string keystr = it->first;
+        std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
+
+        std::string cmt_str = it->second.comment();
+        std::vector<char> cmtbuf(cmt_str.c_str(), cmt_str.c_str()+cmt_str.size()+1);
+
         int status = 0;
 
-        if( fits_update_key(fptr.get(), TSHORT, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+        if( fits_update_key(fptr.get(), TSHORT, keybuf.data(), &val, cmtbuf.data(), &status ) )
             throw FITSexception(status,"FITShdu","Write");
 
         return;
@@ -1131,9 +1155,15 @@ namespace DSL
 
         int32_t tmp = static_cast<int32_t>(std::stoi(it->second.value()));
         int val = static_cast<int>(tmp);
+        std::string keystr = it->first;
+        std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
+
+        std::string cmt_str = it->second.comment();
+        std::vector<char> cmtbuf(cmt_str.c_str(), cmt_str.c_str()+cmt_str.size()+1);
+
         int status = 0;
 
-        if(fits_update_key(fptr.get(), TINT, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+        if(fits_update_key(fptr.get(), TINT, keybuf.data(), &val, cmtbuf.data(), &status ) )
             throw FITSexception(status,"FITShdu","Write");
 
         return;
@@ -1154,9 +1184,15 @@ namespace DSL
 
         uint32_t tmp = static_cast<uint32_t>(std::stoul(it->second.value()));
         int val = static_cast<int>(static_cast<int32_t>(tmp));
+        std::string keystr = it->first;
+        std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
+
+        std::string cmt_str = it->second.comment();
+        std::vector<char> cmtbuf(cmt_str.c_str(), cmt_str.c_str()+cmt_str.size()+1);
+
         int status = 0;
 
-        if(fits_update_key(fptr.get(), TINT, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+        if(fits_update_key(fptr.get(), TINT, keybuf.data(), &val, cmtbuf.data(), &status ) )
             throw FITSexception(status,"FITShdu","Write");
 
         return;
@@ -1177,9 +1213,15 @@ namespace DSL
 
         int32_t tmp = static_cast<int32_t>(std::stol(it->second.value()));
         long val = static_cast<long>(tmp);
+        std::string keystr = it->first;
+        std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
+
+        std::string cmt_str = it->second.comment();
+        std::vector<char> cmtbuf(cmt_str.c_str(), cmt_str.c_str()+cmt_str.size()+1);
+
         int status = 0;
 
-        if( fits_update_key(fptr.get(), TLONG, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+        if( fits_update_key(fptr.get(), TLONG, keybuf.data(), &val, cmtbuf.data(), &status ) )
             throw FITSexception(status,"FITShdu","Write");
 
         return;
@@ -1200,9 +1242,15 @@ namespace DSL
 
         uint32_t tmp = static_cast<uint32_t>(std::stoul(it->second.value()));
         unsigned long val = static_cast<unsigned long>(tmp);
+        std::string keystr = it->first;
+        std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
+
+        std::string cmt_str = it->second.comment();
+        std::vector<char> cmtbuf(cmt_str.c_str(), cmt_str.c_str()+cmt_str.size()+1);
+
         int status = 0;
 
-        if( fits_update_key(fptr.get(), TULONG, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+        if( fits_update_key(fptr.get(), TULONG, keybuf.data(), &val, cmtbuf.data(), &status ) )
             throw FITSexception(status,"FITShdu","Write");
 
         return;
@@ -1223,9 +1271,15 @@ namespace DSL
 
         int64_t tmp = static_cast<int64_t>(std::stoll(it->second.value()));
         long long val = static_cast<long long>(tmp);
+        std::string keystr = it->first;
+        std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
+
+        std::string cmt_str = it->second.comment();
+        std::vector<char> cmtbuf(cmt_str.c_str(), cmt_str.c_str()+cmt_str.size()+1);
+
         int status = 0;
 
-        if( fits_update_key(fptr.get(), TLONGLONG, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+        if( fits_update_key(fptr.get(), TLONGLONG, keybuf.data(), &val, cmtbuf.data(), &status ) )
             throw FITSexception(status,"FITShdu","Write");
 
         return;
@@ -1246,9 +1300,15 @@ namespace DSL
 
         uint64_t tmp = static_cast<uint64_t>(std::stoull(it->second.value()));
         unsigned long long val = static_cast<unsigned long long>(tmp);
+        std::string keystr = it->first;
+        std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
+
+        std::string cmt_str = it->second.comment();
+        std::vector<char> cmtbuf(cmt_str.c_str(), cmt_str.c_str()+cmt_str.size()+1);
+
         int status = 0;
 
-        if( fits_update_key(fptr.get(), TULONGLONG, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+        if( fits_update_key(fptr.get(), TULONGLONG, keybuf.data(), &val, cmtbuf.data(), &status ) )
             throw FITSexception(status,"FITShdu","Write");
         
         return;
@@ -1270,9 +1330,15 @@ namespace DSL
             throw FITSexception(SEEK_ERROR,"FITShdu","WriteLongValueForKey","Reach end of header");
         
         float val = std::stof(it->second.value());
+        std::string keystr = it->first;
+        std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
+
+        std::string cmt_str = it->second.comment();
+        std::vector<char> cmtbuf(cmt_str.c_str(), cmt_str.c_str()+cmt_str.size()+1);
+
         int status = 0;
-        
-        if( fits_update_key(fptr.get(), TFLOAT, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+
+        if( fits_update_key(fptr.get(), TFLOAT, keybuf.data(), &val, cmtbuf.data(), &status ) )
                 throw FITSexception(status,"FITShdu","Write");
         
         return;
@@ -1294,10 +1360,17 @@ namespace DSL
             throw FITSexception(SEEK_ERROR,"FITShdu","WriteLongValueForKey","Reach end of header");
         
 
-            double val = std::stod(it->second.value());
+        double val = std::stod(it->second.value());
+
+        std::string keystr = it->first;
+        std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
+
+        std::string cmt_str = it->second.comment();
+        std::vector<char> cmtbuf(cmt_str.c_str(), cmt_str.c_str()+cmt_str.size()+1);
+
         int status = 0;
-        
-        if( fits_update_key(fptr.get(), TDOUBLE, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+
+        if( fits_update_key(fptr.get(), TDOUBLE, keybuf.data(), &val, cmtbuf.data(), &status ) )
                 throw FITSexception(status,"FITShdu","Write");
         
         return;
