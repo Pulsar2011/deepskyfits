@@ -17,6 +17,16 @@
 #include <sstream>
 #include <cstring>
 #include <regex>
+#include <string>
+#include <cstdint>
+#include <climits>
+#include <iomanip>
+
+// Ensure basic integer sizes for narrowing casts / CFITSIO interoperability
+static_assert(CHAR_BIT == 8, "This code assumes 8-bit chars");
+static_assert(sizeof(short) >= 2, "Expected short >= 16 bits");
+static_assert(sizeof(int) >= 4, "Expected int >= 32 bits");
+static_assert(sizeof(long long) >= 8, "Expected long long >= 64 bits");
 
 namespace DSL
 {
@@ -50,13 +60,17 @@ namespace DSL
             case fLong:
                 return "TLONG";
                 break;
+
+            case fULong:
+                return "TULONG";
+                break;
                 
             case fLongLong:
                 return "TLONGLONG";
                 break;
                 
-            case fULong:
-                return "TULONG";
+            case fULongLong:
+                return "TULONGLONG";
                 break;
                 
             case fBool:
@@ -171,25 +185,63 @@ namespace DSL
     {
         fcomment = std::string(cmt);
         fvalue   = std::string(val);
+        ftype=fUndef;
         
         if( fvalue.size() < 1 )
             return;
-        
+                
         bool has_only_digits = false;
         
         if(std::regex_match ( fvalue.begin(), fvalue.end(), std::regex("[+-]*[0-9]+[\\.]*[0-9]*([eE][+-][0-9]+)*")))
             has_only_digits = true;
+
+
     
         if(! has_only_digits )
+        {
             ftype = fChar;
-        else if(fvalue.find('.') != std::string::npos ||
+        }
+        else if(fvalue.find('.') != std::string::npos && (
                 fvalue.find('e') != std::string::npos ||
-                fvalue.find('E') != std::string::npos )
+                fvalue.find('E') != std::string::npos    ))
             ftype = fDouble;
-        else if(fvalue.find('-') == std::string::npos )
-            ftype = fULong;
+        else if(fvalue.find('.') != std::string::npos)
+            ftype = fFloat;
+        else if(fvalue.find('-') != std::string::npos )
+        {
+            int64_t num = std::stoll(fvalue, nullptr, 10);
+            
+            if(std::llabs(num) <= INT8_MAX)
+                ftype = fShort;
+            else if(std::llabs(num) <= INT16_MAX)
+                ftype = fInt;
+            else if(std::llabs(num) <= INT32_MAX)
+                ftype = fLong;
+            else if(std::llabs(num) <= INT64_MAX)
+                ftype = fLongLong;
+            else
+                throw FITSexception(BAD_KEYCHAR,"FITSkeyword","Process","numerical value out of range "+val+" ["+std::to_string(__LINE__)+"]");
+        }
         else
-            ftype = fLongLong;
+        {
+            uint64_t num = std::stoull(fvalue, nullptr, 10);
+            
+            if(num <= 1)
+                ftype = fByte;
+            else if(num <= UINT8_MAX)
+                ftype = fUShort;
+            else if(num <= UINT16_MAX)
+                ftype = fUInt;
+            else if(num <= UINT32_MAX)
+                ftype = fULong;
+            else if(num <= UINT64_MAX)
+                ftype = fULong;
+            else
+                throw FITSexception(BAD_KEYCHAR,"FITSkeyword","Process","numerical value out of range "+val+" ["+std::to_string(__LINE__)+"]");
+        }
+
+        if(ftype == fUndef)
+            throw FITSexception(BAD_KEYCHAR,"FITSkeyword","Process",std::string("Keyword type undefined")+std::string(" [")+std::to_string(__LINE__)+std::string("]"));
         
         try
         {
@@ -212,71 +264,160 @@ namespace DSL
      */
     void FITSkeyword::setValue(const std::string& value)
     {
-        if(!is_digits(value) && ftype != fChar)
+        // For character types accept any value
+        if(ftype == fChar)
         {
-            throw FITSexception(0, "FITSkeyword","setValue","KEYWORD type unconsistancy for key "+value+".");
-        }
-        
-        if(fvalue == value)
+            fvalue = value;
             return;
-        
-        fvalue.clear();
-        
-        switch (ftype)
-        {
-            case fChar:
-                fvalue = value;
-                break;
-                
-            case fShort:
-                fvalue = std::to_string(std::stoi(value));
-                break;
-                
-            case fUShort:
-                fvalue = std::to_string(std::stoi(value));
-                break;
-                
-            case fInt:
-                fvalue = std::to_string(std::stoi(value));
-                break;
-                
-            case fUInt:
-                fvalue = std::to_string(std::stoi(value));
-                break;
-                
-            case fLong:
-                fvalue = std::to_string(std::stoi(value));
-                break;
-                
-            case fLongLong:
-                fvalue = std::to_string(std::stoi(value));
-                break;
-                
-            case fULong:
-                fvalue = std::to_string(std::stoi(value));
-                break;
-                
-            case fBool:
-                fvalue = std::to_string(std::stoi(value) != 0);
-                break;
-                
-            case fFloat:
-                fvalue = std::to_string(std::stof(value));
-                break;
-                
-            case fDouble:
-                fvalue = std::to_string(std::stod(value));
-                break;
-                
-            case fByte:
-                fvalue = std::to_string(std::stoi(value));
-                break;
-                
-            default:
-                fvalue = value;
-                break;
         }
-        
+
+        // Empty value -> treat as clearing
+        if(value.empty() && ftype == fChar)
+        {
+            fvalue = value;
+            return;
+        }
+        else if(value.empty())
+            throw FITSexception(0, "FITSkeyword", "setValue", "Non string KEYWORD can't be empty.");
+
+        // Numeric format check (integer, float, or exponent)
+        static const std::regex num_re("^[+-]?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?$");
+        if(!std::regex_match(value, num_re))
+        {
+            throw FITSexception(0, "FITSkeyword", "setValue", "KEYWORD type unconsistancy for key "+value+".");
+        }
+
+        try
+        {
+            switch(ftype)
+            {
+                case fShort: // mapped from Process: abs(num) <= 127
+                {
+                    int64_t num = std::stoll(value);
+                    if(std::llabs(num) > INT8_MAX)
+                        throw FITSexception(0, "FITSkeyword", "setValue", "Value out of range for fShort: "+value);
+                    fvalue.clear();
+                    fvalue += std::string(value);
+                    break;
+                }
+
+                case fInt: // abs(num) <= 32767
+                {
+                    int64_t num = std::stoll(value);
+                    if(std::llabs(num) > INT16_MAX)
+                        throw FITSexception(0, "FITSkeyword", "setValue", "Value out of range for fInt: "+value);
+                    fvalue.clear();
+                    fvalue += std::string(value);
+                    break;
+                }
+
+                case fLong: // abs(num) <= 2147483647
+                {
+                    int64_t num = std::stoll(value);
+                    if(std::llabs(num) > INT32_MAX)
+                        throw FITSexception(0, "FITSkeyword", "setValue", "Value out of range for fLong: "+value);
+                    fvalue.clear();
+                    fvalue += std::string(value);
+                    break;
+                }
+
+                case fLongLong:
+                {
+                    int64_t num = std::stoll(value);
+                    if(std::llabs(num) > INT64_MAX)
+                        throw FITSexception(0, "FITSkeyword", "setValue", "Value out of range for fLong: "+value);
+                    fvalue.clear();
+                    fvalue += std::string(value);
+                    break;
+                }
+
+                case fByte: // unsigned small: num <= 1
+                {
+                    uint64_t num = std::stoll(value);
+                    if(num > 1)
+                        throw FITSexception(0, "FITSkeyword", "setValue", "Value out of range for fByte: "+value);
+                    fvalue.clear();
+                    fvalue += std::string(value);
+                    break;
+                }
+
+                case fUShort: // num <= 255
+                {
+                    uint64_t num = std::stoll(value);
+                    if(num > UINT8_MAX)
+                        throw FITSexception(0, "FITSkeyword", "setValue", "Value out of range for fUShort: "+value);
+                    fvalue.clear();
+                    fvalue += std::string(value);
+                    break;
+                }
+
+                case fUInt: // num <= 65535
+                {
+                    uint64_t num = std::stoll(value);
+                    if(num > UINT16_MAX)
+                        throw FITSexception(0, "FITSkeyword", "setValue", "Value out of range for fUInt: "+value);
+                    fvalue.clear();
+                    fvalue += std::string(value);
+                    break;
+                }
+
+                case fULong: // larger unsigned
+                {
+                    uint64_t num = std::stoll(value);
+                    if(num > UINT32_MAX)
+                        throw FITSexception(0, "FITSkeyword", "setValue", "Value out of range for fUInt: "+value);
+                    fvalue.clear();
+                    fvalue += std::string(value);
+                    break;
+                }
+
+                case fULongLong: // larger unsigned
+                {
+                    uint64_t num = std::stoll(value);
+                    if(num > UINT64_MAX)
+                        throw FITSexception(0, "FITSkeyword", "setValue", "Value out of range for fUInt: "+value);
+                    fvalue.clear();
+                    fvalue += std::string(value);
+                    break;
+                }
+
+                case fBool:
+                {
+                    int b = std::stoi(value);
+                    if(std::abs(b) > 1)
+                        throw FITSexception(0, "FITSkeyword", "setValue", "Value out of range for fBool: "+value);
+                    fvalue.clear();
+                    fvalue += std::string(value);
+                    break;
+                }
+
+                case fFloat:
+                {
+                    fvalue.clear();
+                    fvalue += std::string(value);
+                    break;
+                }
+
+                case fDouble:
+                {
+                    fvalue.clear();
+                    fvalue += std::string(value);
+                    break;
+                }
+
+                default:
+                    // Unknown type -> refuse
+                    throw FITSexception(BAD_KEYCHAR, "FITSkeyword", "setValue", "Unknown target type when setting value: "+value);
+            }
+        }
+        catch(const std::invalid_argument& e)
+        {
+            throw FITSexception(0, "FITSkeyword", "setValue", std::string("Invalid numeric value: ")+value);
+        }
+        catch(const std::out_of_range& e)
+        {
+            throw FITSexception(0, "FITSkeyword", "setValue", std::string("Numeric value out of range: ")+value);
+        }
     }
     
 #pragma mark • Dump
@@ -428,7 +569,20 @@ namespace DSL
                 iKey = hdu.find(key);
             
             if(iKey == hdu.end())
-                hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment)));
+            {
+                if(key.find("NAXIS") != std::string::npos)
+                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fULongLong)));
+                else if(key == "BITPIX")
+                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fInt)));
+                else if(key == "BZERO")
+                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fDouble)));
+                else if(key == "BSCALE")
+                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fDouble)));
+                else if(key == "BLANK")
+                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fUInt)));
+                else
+                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment)));
+            }
             else if(   iKey->first == "COMMENT"
                     || iKey->first == "HISTORY" )
             {
@@ -461,67 +615,6 @@ namespace DSL
     }
 
 #pragma mark • Accessor
-    /**
-     *  @details Retrive physical value for a specific KEYWORD.
-     *  @param key KEYWORD name
-     *  @return Integer value associated to the KEYWORD
-     *  @note If the KEYWORD value isn't a numerical value OR if the KEYWORD doesn't exist, NaN is returned
-     */
-    int FITShdu::GetIntValueForKey(const std::string& key) const
-    {
-        key_type tt = fUndef;
-        
-        std::string outString = GetValueForKey(key, tt);
-        if(outString.size() < 1)
-        {
-            return std::numeric_limits<int>::min();
-        }
-        
-        try
-        {
-            if(tt == fUndef || tt == fChar)
-                throw FITSexception(0,"FITShdu","GetIntValueForKey","Value for key "+key+" isn't a numerical value.");
-        }
-        catch(std::exception &e)
-        {
-            std::cerr<<e.what()<<std::flush;
-            
-            return std::numeric_limits<int>::min();
-        }
-        
-        return  std::stoi(outString);
-    }
-    
-    /**
-     *  @details Retrive physical value for a specific KEYWORD.
-     *  @param key KEYWORD name
-     *  @return Unsigned Integer value associated to the KEYWORD
-     *  @note If the KEYWORD value isn't a numerical value OR if the KEYWORD doesn't exist, NaN is returned
-     */
-    unsigned int FITShdu::GetUIntValueForKey(const std::string& key) const
-    {
-        key_type tt = fUndef;
-        
-        std::string outString = GetValueForKey(key, tt);
-        if(outString.size() < 1)
-        {
-            return std::numeric_limits<unsigned int>::min();
-        }
-        
-        try
-        {
-            if(tt == fUndef || tt == fChar)
-                throw FITSexception(0,"FITShdu","GetUIntValueForKey","Value for key "+key+" isn't a numerical value.");
-        }
-        catch(std::exception &e)
-        {
-            std::cerr<<e.what()<<std::flush;
-            
-            return std::numeric_limits<unsigned int>::min();
-        }
-        
-        return  static_cast<unsigned int>( std::stoi(outString) );
-    }
     
     /**
      *  @details Retrive physical value for a specific KEYWORD.
@@ -539,16 +632,8 @@ namespace DSL
             return false;
         }
         
-        try
-        {
-            if(tt == fUndef || tt == fChar)
-                throw FITSexception(0,"FITShdu","GetBoolValueForKey","Value for key "+key+" isn't a numerical value.");
-        }
-        catch(std::exception &e)
-        {
-            std::cerr<<e.what()<<std::flush;
-            return false;
-        }
+        if(tt == fUndef || tt == fChar)
+            throw FITSexception(0,"FITShdu","GetBoolValueForKey","Value for key "+key+" isn't a numerical value.");
         
         try
         {
@@ -570,29 +655,80 @@ namespace DSL
      *  @return Short integer value associated to the KEYWORD
      *  @note If the KEYWORD value isn't a numerical value OR if the KEYWORD doesn't exist, NaN is returned
      */
-    short FITShdu::GetShortValueForKey(const std::string& key) const
+    int8_t FITShdu::GetInt8ValueForKey(const std::string& key) const
     {
         key_type tt = fUndef;
         
         std::string outString = GetValueForKey(key, tt);
         if(outString.size() < 1)
         {
-            return std::numeric_limits<short>::min();
+            return std::numeric_limits<int8_t>::min();
         }
         
-        try
+        if(tt == fUndef || tt == fChar)
+            throw FITSexception(0,"FITShdu","GetShortValueForKey","Value for key "+key+" isn't a numerical value.");
+        
+        return static_cast<int8_t>( std::stoi(outString) );
+    }
+
+    uint8_t FITShdu::GetUInt8ValueForKey  (const std::string& key) const
+    {
+        key_type tt = fUndef;
+        
+        std::string outString = GetValueForKey(key, tt);
+        if(outString.size() < 1)
         {
-            if(tt == fUndef || tt == fChar)
-                throw FITSexception(0,"FITShdu","GetShortValueForKey","Value for key "+key+" isn't a numerical value.");
-        }
-        catch(std::exception &e)
-        {
-            std::cerr<<e.what()<<std::flush;
-            
-            return std::numeric_limits<short>::min();
+            return std::numeric_limits<uint8_t>::min();
         }
         
-        return static_cast<short>( std::stoi(outString) );
+        if(tt == fUndef || tt == fChar)
+            throw FITSexception(0,"FITShdu","GetSUhortValueForKey","Value for key "+key+" isn't a numerical value.");
+        
+        return static_cast<uint8_t>( std::stoul(outString) );
+    }
+
+    /**
+     *  @details Retrive physical value for a specific KEYWORD.
+     *  @param key KEYWORD name
+     *  @return Integer value associated to the KEYWORD
+     *  @note If the KEYWORD value isn't a numerical value OR if the KEYWORD doesn't exist, NaN is returned
+     */
+    int16_t FITShdu::GetInt16ValueForKey(const std::string& key) const
+    {
+        key_type tt = fUndef;
+        
+        std::string outString = GetValueForKey(key, tt);
+        if(outString.size() < 1)
+        {
+            return std::numeric_limits<int16_t>::min();
+        }
+        
+        if(tt == fUndef || tt == fChar)
+            throw FITSexception(0,"FITShdu","GetIntValueForKey","Value for key "+key+" isn't a numerical value.");
+        
+        return  static_cast<int16_t>(std::stoi(outString));
+    }
+    
+    /**
+     *  @details Retrive physical value for a specific KEYWORD.
+     *  @param key KEYWORD name
+     *  @return Unsigned Integer value associated to the KEYWORD
+     *  @note If the KEYWORD value isn't a numerical value OR if the KEYWORD doesn't exist, NaN is returned
+     */
+    uint16_t FITShdu::GetUInt16ValueForKey(const std::string& key) const
+    {
+        key_type tt = fUndef;
+        
+        std::string outString = GetValueForKey(key, tt);
+        if(outString.size() < 1)
+        {
+            return std::numeric_limits<uint16_t>::min();
+        }
+        
+        if(tt == fUndef || tt == fChar)
+            throw FITSexception(0,"FITShdu","GetUIntValueForKey","Value for key "+key+" isn't a numerical value.");
+        
+        return  static_cast<uint16_t>( std::stoi(outString) );
     }
     
     /**
@@ -601,29 +737,42 @@ namespace DSL
      *  @return Long integer value associated to the KEYWORD
      *  @note If the KEYWORD value isn't a numerical value OR if the KEYWORD doesn't exist, NaN is returned
      */
-    long FITShdu::GetLongValueForKey(const std::string& key) const
+    int32_t FITShdu::GetInt32ValueForKey(const std::string& key) const
     {
         key_type tt = fUndef;
         
         std::string outString = GetValueForKey(key, tt);
         if(outString.size() < 1)
         {
-            return std::numeric_limits<long>::min();
+            return std::numeric_limits<int32_t>::min();
         }
         
-        try
+        if(tt == fUndef || tt == fChar)
+            throw FITSexception(0,"FITShdu","GetLongValueForKey","Value for key "+key+" isn't a numerical value.");
+        
+        return static_cast<int32_t>(std::stol(outString));
+    }
+
+    /**
+     *  @details Retrive physical value for a specific KEYWORD.
+     *  @param key KEYWORD name
+     *  @return Long integer value associated to the KEYWORD
+     *  @note If the KEYWORD value isn't a numerical value OR if the KEYWORD doesn't exist, NaN is returned
+     */
+    uint32_t FITShdu::GetUInt32ValueForKey(const std::string& key) const
+    {
+        key_type tt = fUndef;
+        
+        std::string outString = GetValueForKey(key, tt);
+        if(outString.size() < 1)
         {
-            if(tt == fUndef || tt == fChar)
-                throw FITSexception(0,"FITShdu","GetLongValueForKey","Value for key "+key+" isn't a numerical value.");
-        }
-        catch(std::exception &e)
-        {
-            std::cerr<<e.what()<<std::flush;
-            
-            return std::numeric_limits<long>::min();
+            return std::numeric_limits<uint32_t>::min();
         }
         
-        return std::stol(outString);
+        if(tt == fUndef || tt == fChar)
+            throw FITSexception(0,"FITShdu","GetLongValueForKey","Value for key "+key+" isn't a numerical value.");
+        
+        return static_cast<uint32_t>(std::stoul(outString));
     }
     
     /**
@@ -632,29 +781,42 @@ namespace DSL
      *  @return Long long integer value associated to the KEYWORD
      *  @note If the KEYWORD value isn't a numerical value OR if the KEYWORD doesn't exist, NaN is returned
      */
-    long long FITShdu::GetLongLongValueForKey(const std::string& key) const
+    int64_t FITShdu::GetInt64ValueForKey(const std::string& key) const
     {
         key_type tt = fUndef;
         
         std::string outString = GetValueForKey(key, tt);
         if(outString.size() < 1)
         {
-            return std::numeric_limits<long long>::min();
+            return std::numeric_limits<int64_t>::min();
         }
         
-        try
+        if(tt == fUndef || tt == fChar)
+            throw FITSexception(0,"FITShdu","GetLongLongValueForKey","Value for key "+key+" isn't a numerical value.");
+        
+        return static_cast<int64_t>(std::stoll(outString));
+    }
+
+    /**
+     *  @details Retrive physical value for a specific KEYWORD.
+     *  @param key KEYWORD name
+     *  @return Long long integer value associated to the KEYWORD
+     *  @note If the KEYWORD value isn't a numerical value OR if the KEYWORD doesn't exist, NaN is returned
+     */
+    uint64_t FITShdu::GetUInt64ValueForKey(const std::string& key) const
+    {
+        key_type tt = fUndef;
+        
+        std::string outString = GetValueForKey(key, tt);
+        if(outString.size() < 1)
         {
-            if(tt == fUndef || tt == fChar)
-                throw FITSexception(0,"FITShdu","GetLongLongValueForKey","Value for key "+key+" isn't a numerical value.");
-        }
-        catch(std::exception &e)
-        {
-            std::cerr<<e.what()<<std::flush;
-            
-            return std::numeric_limits<long long>::min();
+            return std::numeric_limits<uint64_t>::min();
         }
         
-        return std::stoll(outString);
+        if(tt == fUndef || tt == fChar)
+            throw FITSexception(0,"FITShdu","GetLongLongValueForKey","Value for key "+key+" isn't a numerical value.");
+        
+        return static_cast<uint64_t>(std::stoull(outString));
     }
     
     /**
@@ -673,17 +835,8 @@ namespace DSL
             return std::numeric_limits<float>::quiet_NaN();
         }
         
-        try
-        {
-            if(tt == fUndef || tt == fChar)
-                throw FITSexception(0,"FITShdu","GetFloatValueForKey","Value for key "+key+" isn't a numerical value.");
-        }
-        catch(std::exception &e)
-        {
-            std::cerr<<e.what()<<std::flush;
-            
-            return std::numeric_limits<float>::min();
-        }
+        if(tt == fUndef || tt == fChar)
+            throw FITSexception(0,"FITShdu","GetFloatValueForKey","Value for key "+key+" isn't a numerical value.");
         
         return std::stof(outString);
     }
@@ -704,17 +857,8 @@ namespace DSL
             return std::numeric_limits<double>::quiet_NaN();
         }
         
-        try
-        {
-            if(tt == fUndef || tt == fChar)
-                throw FITSexception(0,"FITShdu","GetDoubleValueForKey","Value for key "+key+" isn't a numerical value.");
-        }
-        catch(std::exception &e)
-        {
-            std::cerr<<e.what()<<std::flush;
-            
-            return std::numeric_limits<double>::min();
-        }
+        if(tt == fUndef || tt == fChar)
+            throw FITSexception(0,"FITShdu","GetDoubleValueForKey","Value for key "+key+" isn't a numerical value.");
         
         return std::stod(outString);
     }
@@ -732,7 +876,7 @@ namespace DSL
         
         FITSDictionary::const_iterator iKey = hdu.find(key);
         if(iKey == hdu.end())
-            return std::string();
+            throw FITSexception(SEEK_ERROR,"FITShdu","GetValueForKey","Key "+key+" not found in HDU");
         
         type = iKey->second.type();
         
@@ -756,20 +900,21 @@ namespace DSL
      *  Estimate the total dimention of a FITS cube or FITS table based on the information embeded into the Header.
      *  @return The total size of the FITS cube or table.
      */
-    long long FITShdu::GetDimension() const
+    size_t FITShdu::GetDimension() const
     {
         FITSDictionary::const_iterator it= hdu.find("NAXIS1");
         if(it == hdu.end())
             return 0;
         
-        long long int n = 1;
-        long long dim = std::stoll(it->second.value());
+        size_t n = 1;
+        uint64_t dim64 = std::stoull(it->second.value());
+        size_t dim = static_cast<size_t>(dim64);
         while(it != hdu.end())
         {
             n++;
             it = hdu.find(std::string("NAXIS")+std::to_string(n));
             if(it != hdu.end())
-                dim *= std::stoll(it->second.value());
+                dim *= std::stoull(it->second.value());
         }
         
         return dim;
@@ -790,7 +935,8 @@ namespace DSL
             return;
         }
         
-        std::cout<<"\033[31m[FITShdu::Write]\033[0m"<<std::endl;
+        if((verbose&verboseLevel::VERBOSE_HDU)==verboseLevel::VERBOSE_HDU)
+            std::cout<<"\033[31m[FITShdu::Write]\033[0m"<<std::endl;
         
         FITSDictionary::const_iterator it;
         
@@ -815,23 +961,35 @@ namespace DSL
                     break;
                     
                 case fShort:
-                    WriteShortValueForKey( it, fptr );
+                    WriteInt8ValueForKey( it, fptr );
+                    break;
+                
+                case fUShort:
+                    WriteUInt8ValueForKey( it, fptr );
                     break;
                     
                 case fInt:
-                    WriteIntValueForKey( it, fptr );
+                    WriteInt16ValueForKey( it, fptr );
+                    break;
+                
+                case fUInt:
+                    WriteUInt16ValueForKey( it, fptr );
                     break;
                     
                 case fLong:
-                    WriteLongValueForKey( it, fptr );
+                    WriteInt32ValueForKey( it, fptr );
                     break;
                     
                 case fULong:
-                    WriteULongValueForKey( it, fptr );
+                    WriteUInt32ValueForKey( it, fptr );
                     break;
                     
                 case fLongLong:
-                    WriteLongLongValueForKey( it, fptr );
+                    WriteInt64ValueForKey( it, fptr );
+                    break;
+                
+                case fULongLong:
+                    WriteUInt64ValueForKey( it, fptr );
                     break;
                     
                 case fFloat:
@@ -870,20 +1028,10 @@ namespace DSL
     void FITShdu::WriteCharValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
     {
         if(fptr == nullptr || fptr.use_count() < 1)
-        {
             throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteCharValueForKey","received nullptr");
-        }
         
-        try
-        {
-            if(it == hdu.end())
-                throw FITSexception(SEEK_ERROR,"FITShdu","WriteCharValueForKey","Reach end of header");
-        }
-        catch (std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-            return;
-        }
+        if(it == hdu.end())
+            throw FITSexception(KEY_NO_EXIST,"FITShdu","WriteCharValueForKey","Reach end of header");
         
         // FIX: Avoid dangling pointer from temporary string
         std::string val_str = std::string();
@@ -891,54 +1039,8 @@ namespace DSL
         char * val = (char*) val_str.c_str();
         int status = 0;
         
-        try
-        {
-            if(fits_update_key(fptr.get(), TSTRING, (char*) it->first.c_str(), val, (char*) it->second.comment().c_str(), &status ) )
-                throw FITSexception(status,"FITShdu","Write");
-        }
-        catch (std::exception &e)
-        {
-            std::cerr<<e.what()<<std::flush;
-        }
-        
-        return;
-    }
-    
-    /**
-     *  @details Write or update FITS header KEYWORD and its associated VALUE and COMMENT to the current HDU
-     *  @param it : FITSDictionary iterator encapsulating KEYWORD, VALUE and COMMENT filed of the FITS Header keyword
-     *  @param fptr : HDU where this header will be written
-     */
-    void FITShdu::WriteIntValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
-    {
-        if(fptr == nullptr || fptr.use_count() < 1)
-        {
-            throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteIntValueForKey","received nullptr");
-        }
-        
-        try
-        {
-            if(it == hdu.end())
-                throw FITSexception(SEEK_ERROR,"FITShdu","WriteIntValueForKey","Reach end of header");
-        }
-        catch (std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-            return;
-        }
-        
-        int val = std::stoi(it->second.value());
-        int status = 0;
-        
-        try
-        {
-            if(fits_update_key(fptr.get(), TINT, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
-                throw FITSexception(status,"FITShdu","Write");
-        }
-        catch (std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-        }
+        if(fits_update_key(fptr.get(), TSTRING, (char*) it->first.c_str(), val, (char*) it->second.comment().c_str(), &status ) )
+            throw FITSexception(status,"FITShdu","Write");
         
         return;
     }
@@ -955,29 +1057,14 @@ namespace DSL
             throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteBoolValueForKey","received nullptr");
         }
         
-        try
-        {
-            if(it == hdu.end())
-                throw FITSexception(SEEK_ERROR,"FITShdu","WriteBoolValueForKey","Reach end of header");
-        }
-        catch (std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-            return;
-        }
+        if(it == hdu.end())
+            throw FITSexception(SEEK_ERROR,"FITShdu","WriteBoolValueForKey","Reach end of header");
         
         int val = std::stoi(it->second.value());
         int status = 0;
         
-        try
-        {
-            if( fits_update_key(fptr.get(), TLOGICAL, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
-                throw FITSexception(status,"FITShdu","Write");
-        }
-        catch (std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-        }
+        if( fits_update_key(fptr.get(), TLOGICAL, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+            throw FITSexception(status,"FITShdu","Write");
         
         return;
     }
@@ -987,37 +1074,91 @@ namespace DSL
      *  @param it : FITSDictionary iterator encapsulating KEYWORD, VALUE and COMMENT filed of the FITS Header keyword
      *  @param fptr : HDU where this header will be written
      */
-    void FITShdu::WriteShortValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
+    void FITShdu::WriteInt8ValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
     {
         if(fptr == nullptr || fptr.use_count() < 1)
-        {
             throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteShortValueForKey","received nullptr");
-        }
-        
-        try
-        {
-            if(it == hdu.end())
-                throw FITSexception(SEEK_ERROR,"FITShdu","WriteShortValueForKeyv","Reach end of header");
-        }
-        catch (std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-            return;
-        }
-        
-        short val = std::stoi(it->second.value());
+
+        if(it == hdu.end())
+            throw FITSexception(SEEK_ERROR,"FITShdu","WriteShortValueForKeyv","Reach end of header");
+
+        // parse into fixed-width then cast to platform 'short' for CFITSIO
+        int16_t tmp = static_cast<int16_t>(std::stoi(it->second.value()));
+        short val = static_cast<short>(tmp);
         int status = 0;
-        
-        try
-        {
-            if( fits_update_key(fptr.get(), TSHORT, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
-                throw FITSexception(status,"FITShdu","Write");
-        }
-        catch (std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-        }
-        
+
+        if( fits_update_key(fptr.get(), TSHORT, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+            throw FITSexception(status,"FITShdu","Write");
+
+        return;
+    }
+
+    /**
+     *  @details Write or update FITS header KEYWORD and its associated VALUE and COMMENT to the current HDU
+     *  @param it : FITSDictionary iterator encapsulating KEYWORD, VALUE and COMMENT filed of the FITS Header keyword
+     *  @param fptr : HDU where this header will be written
+     */
+    void FITShdu::WriteUInt8ValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
+    {
+        if(fptr == nullptr || fptr.use_count() < 1)
+            throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteShortValueForKey","received nullptr");
+
+        if(it == hdu.end())
+            throw FITSexception(SEEK_ERROR,"FITShdu","WriteShortValueForKeyv","Reach end of header");
+
+        uint16_t tmp = static_cast<uint16_t>(std::stoul(it->second.value()));
+        unsigned short val = static_cast<unsigned short>(tmp);
+        int status = 0;
+
+        if( fits_update_key(fptr.get(), TSHORT, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+            throw FITSexception(status,"FITShdu","Write");
+
+        return;
+    }
+
+    /**
+     *  @details Write or update FITS header KEYWORD and its associated VALUE and COMMENT to the current HDU
+     *  @param it : FITSDictionary iterator encapsulating KEYWORD, VALUE and COMMENT filed of the FITS Header keyword
+     *  @param fptr : HDU where this header will be written
+     */
+    void FITShdu::WriteInt16ValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
+    {
+        if(fptr == nullptr || fptr.use_count() < 1)
+            throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteIntValueForKey","received nullptr");
+
+        if(it == hdu.end())
+            throw FITSexception(SEEK_ERROR,"FITShdu","WriteIntValueForKey","Reach end of header");
+
+        int32_t tmp = static_cast<int32_t>(std::stoi(it->second.value()));
+        int val = static_cast<int>(tmp);
+        int status = 0;
+
+        if(fits_update_key(fptr.get(), TINT, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+            throw FITSexception(status,"FITShdu","Write");
+
+        return;
+    }
+
+    /**
+     *  @details Write or update FITS header KEYWORD and its associated VALUE and COMMENT to the current HDU
+     *  @param it : FITSDictionary iterator encapsulating KEYWORD, VALUE and COMMENT filed of the FITS Header keyword
+     *  @param fptr : HDU where this header will be written
+     */
+    void FITShdu::WriteUInt16ValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
+    {
+        if(fptr == nullptr || fptr.use_count() < 1)
+            throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteIntValueForKey","received nullptr");
+
+        if(it == hdu.end())
+            throw FITSexception(SEEK_ERROR,"FITShdu","WriteIntValueForKey","Reach end of header");
+
+        uint32_t tmp = static_cast<uint32_t>(std::stoul(it->second.value()));
+        int val = static_cast<int>(static_cast<int32_t>(tmp));
+        int status = 0;
+
+        if(fits_update_key(fptr.get(), TINT, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+            throw FITSexception(status,"FITShdu","Write");
+
         return;
     }
     
@@ -1026,37 +1167,21 @@ namespace DSL
      *  @param it : FITSDictionary iterator encapsulating KEYWORD, VALUE and COMMENT filed of the FITS Header keyword
      *  @param fptr : HDU where this header will be written
      */
-    void FITShdu::WriteLongValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
+    void FITShdu::WriteInt32ValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
     {
         if(fptr == nullptr || fptr.use_count() < 1)
-        {
             throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteLongValueForKey","received nullptr");
-        }
-        
-        try
-        {
-            if(it == hdu.end())
-                throw FITSexception(SEEK_ERROR,"FITShdu","WriteLongValueForKey","Reach end of header");
-        }
-        catch (std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-            return;
-        }
-        
-        long int val = std::stol(it->second.value());
+
+        if(it == hdu.cend())
+            throw FITSexception(SEEK_ERROR,"FITShdu","WriteLongValueForKey","Reach end of header");
+
+        int32_t tmp = static_cast<int32_t>(std::stol(it->second.value()));
+        long val = static_cast<long>(tmp);
         int status = 0;
-        
-        try
-        {
-            if( fits_update_key(fptr.get(), TLONG, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
-                throw FITSexception(status,"FITShdu","Write");
-        }
-        catch (std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-        }
-        
+
+        if( fits_update_key(fptr.get(), TLONG, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+            throw FITSexception(status,"FITShdu","Write");
+
         return;
     }
     
@@ -1065,37 +1190,21 @@ namespace DSL
      *  @param it : FITSDictionary iterator encapsulating KEYWORD, VALUE and COMMENT filed of the FITS Header keyword
      *  @param fptr : HDU where this header will be written
      */
-    void FITShdu::WriteULongValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
+    void FITShdu::WriteUInt32ValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
     {
         if(fptr == nullptr || fptr.use_count() < 1)
-        {
             throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteLongValueForKey","received nullptr");
-        }
-        
-        try
-        {
-            if(it == hdu.end())
-                throw FITSexception(SEEK_ERROR,"FITShdu","WriteLongValueForKey","Reach end of header");
-        }
-        catch (std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-            return;
-        }
-        
-        unsigned long int val = std::stoul(it->second.value());
+
+        if(it == hdu.end())
+            throw FITSexception(SEEK_ERROR,"FITShdu","WriteLongValueForKey","Reach end of header");
+
+        uint32_t tmp = static_cast<uint32_t>(std::stoul(it->second.value()));
+        unsigned long val = static_cast<unsigned long>(tmp);
         int status = 0;
-        
-        try
-        {
-            if( fits_update_key(fptr.get(), TULONG, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
-                throw FITSexception(status,"FITShdu","Write");
-        }
-        catch (std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-        }
-        
+
+        if( fits_update_key(fptr.get(), TULONG, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+            throw FITSexception(status,"FITShdu","Write");
+
         return;
     }
     
@@ -1104,36 +1213,43 @@ namespace DSL
      *  @param it : FITSDictionary iterator encapsulating KEYWORD, VALUE and COMMENT filed of the FITS Header keyword
      *  @param fptr : HDU where this header will be written
      */
-    void FITShdu::WriteLongLongValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
+    void FITShdu::WriteInt64ValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
     {
         if(fptr == nullptr || fptr.use_count() < 1)
-        {
             throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteLongValueForKey","received nullptr");
-        }
-        
-        try
-        {
-            if(it == hdu.end())
-                throw FITSexception(SEEK_ERROR,"FITShdu","WriteLongValueForKey","Reach end of header");
-        }
-        catch (std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-            return;
-        }
-        
-        long long int val = std::stoll(it->second.value());
+
+        if(it == hdu.end())
+            throw FITSexception(SEEK_ERROR,"FITShdu","WriteLongValueForKey","Reach end of header");
+
+        int64_t tmp = static_cast<int64_t>(std::stoll(it->second.value()));
+        long long val = static_cast<long long>(tmp);
         int status = 0;
-        
-        try
-        {
-            if( fits_update_key(fptr.get(), TLONGLONG, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
-                throw FITSexception(status,"FITShdu","Write");
-        }
-        catch (std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-        }
+
+        if( fits_update_key(fptr.get(), TLONGLONG, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+            throw FITSexception(status,"FITShdu","Write");
+
+        return;
+    }
+
+    /**
+     *  @details Write or update FITS header KEYWORD and its associated VALUE and COMMENT to the current HDU
+     *  @param it : FITSDictionary iterator encapsulating KEYWORD, VALUE and COMMENT filed of the FITS Header keyword
+     *  @param fptr : HDU where this header will be written
+     */
+    void FITShdu::WriteUInt64ValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
+    {
+        if(fptr == nullptr || fptr.use_count() < 1)
+            throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteLongValueForKey","received nullptr");
+
+        if(it == hdu.end())
+            throw FITSexception(SEEK_ERROR,"FITShdu","WriteLongValueForKey","Reach end of header");
+
+        uint64_t tmp = static_cast<uint64_t>(std::stoull(it->second.value()));
+        unsigned long long val = static_cast<unsigned long long>(tmp);
+        int status = 0;
+
+        if( fits_update_key(fptr.get(), TULONGLONG, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+            throw FITSexception(status,"FITShdu","Write");
         
         return;
     }
@@ -1150,29 +1266,14 @@ namespace DSL
             throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteLongValueForKey","received nullptr");
         }
         
-        try
-        {
-            if(it == hdu.end())
-                throw FITSexception(SEEK_ERROR,"FITShdu","WriteLongValueForKey","Reach end of header");
-        }
-        catch (std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-            return;
-        }
+        if(it == hdu.end())
+            throw FITSexception(SEEK_ERROR,"FITShdu","WriteLongValueForKey","Reach end of header");
         
         float val = std::stof(it->second.value());
         int status = 0;
         
-        try
-        {
-            if( fits_update_key(fptr.get(), TFLOAT, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+        if( fits_update_key(fptr.get(), TFLOAT, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
                 throw FITSexception(status,"FITShdu","Write");
-        }
-        catch (std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-        }
         
         return;
     }
@@ -1189,30 +1290,15 @@ namespace DSL
             throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteLongValueForKey","received nullptr");
         }
         
-        try
-        {
-            if(it == hdu.end())
-                throw FITSexception(SEEK_ERROR,"FITShdu","WriteLongValueForKey","Reach end of header");
-        }
-        catch (std::exception& e)
-        {
-            if((verbose & verboseLevel::VERBOSE_BASIC)== verboseLevel::VERBOSE_BASIC)
-            std::cerr<<e.what()<<std::flush;
-            return;
-        }
+        if(it == hdu.end())
+            throw FITSexception(SEEK_ERROR,"FITShdu","WriteLongValueForKey","Reach end of header");
         
-        double val = std::stod(it->second.value());
+
+            double val = std::stod(it->second.value());
         int status = 0;
         
-        try
-        {
-            if( fits_update_key(fptr.get(), TDOUBLE, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
+        if( fits_update_key(fptr.get(), TDOUBLE, (char*) it->first.c_str(), &val, (char*) it->second.comment().c_str(), &status ) )
                 throw FITSexception(status,"FITShdu","Write");
-        }
-        catch (std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-        }
         
         return;
     }
@@ -1252,18 +1338,20 @@ namespace DSL
                 {
                     std::stringstream ss;
                     ss<<"KEYWORD "<<keyword<<" ALREADY EXIST BUT IT ISN'T OF THE SAME TYPE."<<std::endl
-                      <<"VALUE WON'T BE MODIFIED.\033[34m"<<keyword<<"\033[0m -> "<<kt<<" % "<<it->second.type()<<std::endl
-                      <<"\033[34m"<<it->first;
+                      <<"VALUE WON'T BE MODIFIED.\033[34m "<<keyword<<"\033[0m -> "<<kt<<" ["<<FITSkeyword::GetDataType(kt)<<"] % "<<it->second.type()<<" ["<<FITSkeyword::GetDataType(it->second.type())<<"]"<<std::endl
+                      <<"\033[34m"<<it->first<<std::flush;
                     it->second.Dump(ss);
-                    std::cerr<<"\033[0m"<<std::endl;
                     
-                    throw FITSexception(BAD_ORDER,"FITShdu","valueForKey",ss.str());
+                    throw FITSwarning("FITShdu","valueForKey",ss.str());
                 }
             }
             catch(std::exception &e)
             {
-                std::cerr<<e.what()<<std::flush;
-                return;
+                if((verbose & DSL::verboseLevel::VERBOSE_DETAIL)==DSL::verboseLevel::VERBOSE_DETAIL)
+                    std::cerr<<e.what()<<std::endl;
+
+                if((verbose&verboseLevel::VERBOSE_DEBUG)==verboseLevel::VERBOSE_DEBUG)
+                    throw e;
             }
             
             it->second.setValue(value);
@@ -1297,7 +1385,7 @@ namespace DSL
     {
         valueForKey(keyword, value, fChar, std::string());
     }
-        
+
     /**
      *  Modify the value associated to a FITS keyword. If the keyword doesn't exists, a new filed is added to the disctionary with the given KEYWORD and its associated value.
      *
@@ -1306,16 +1394,16 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(const key_code& keyword, const short& value, const std::string& cmt)
+    void FITShdu::valueForKey(const key_code& keyword, const int8_t& value, const std::string& cmt)
     {
         valueForKey(keyword, std::to_string(value), fShort,cmt);
     }
     
-    void FITShdu::valueForKey(const key_code& keyword, const short& value)
+    void FITShdu::valueForKey(const key_code& keyword, const int8_t& value)
     {
         valueForKey(keyword, value, std::string());
     }
-    
+
     /**
      *  Modify the value associated to a FITS keyword. If the keyword doesn't exists, a new filed is added to the disctionary with the given KEYWORD and its associated value.
      *
@@ -1324,16 +1412,16 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(const key_code& keyword, const int& value, const std::string& cmt)
+    void FITShdu::valueForKey(const key_code& keyword, const int16_t& value, const std::string& cmt)
     {
         valueForKey(keyword, std::to_string(value), fInt ,cmt);
     }
     
-    void FITShdu::valueForKey(const key_code& keyword, const int& value)
+    void FITShdu::valueForKey(const key_code& keyword, const int16_t& value)
     {
         valueForKey(keyword, value, std::string());
     }
-    
+
     /**
      *  Modify the value associated to a FITS keyword. If the keyword doesn't exists, a new filed is added to the disctionary with the given KEYWORD and its associated value.
      *
@@ -1342,16 +1430,16 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(const key_code& keyword, const long& value, const std::string& cmt)
+    void FITShdu::valueForKey(const key_code& keyword, const int32_t& value, const std::string& cmt)
     {
         valueForKey(keyword, std::to_string(value), fLong,cmt);
     }
     
-    void FITShdu::valueForKey(const key_code& keyword, const long& value)
+    void FITShdu::valueForKey(const key_code& keyword, const int32_t& value)
     {
         valueForKey(keyword, value, std::string());
     }
-    
+
     /**
      *  Modify the value associated to a FITS keyword. If the keyword doesn't exists, a new filed is added to the disctionary with the given KEYWORD and its associated value.
      *
@@ -1360,13 +1448,13 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(const key_code& keyword, const long long& value, const std::string& cmt)
+    void FITShdu::valueForKey(const key_code& keyword, const int64_t& value, const std::string& cmt)
     {
         valueForKey(keyword, std::to_string(value), fLongLong,cmt);
         
     }
     
-    void FITShdu::valueForKey(const key_code& keyword, const long long& value)
+    void FITShdu::valueForKey(const key_code& keyword, const int64_t& value)
     {
         valueForKey(keyword, value, std::string());
     }
@@ -1417,10 +1505,78 @@ namespace DSL
      */
     void FITShdu::valueForKey(const key_code& keyword, const float& value, const std::string& cmt)
     {
-        valueForKey(keyword, std::to_string(value), fFloat, cmt);
+        if(std::fabs(value) > 1e-4 && std::fabs(value) < 1e4)
+            valueForKey(keyword, std::to_string(value), fFloat, cmt);
+        else
+        {
+            std::ostringstream oss;
+            oss << std::setprecision(std::numeric_limits<float>::max_digits10) << std::scientific << value;
+            valueForKey(keyword, oss.str(), fFloat, cmt);
+        }
     }
     
     void FITShdu::valueForKey(const key_code& keyword, const float& value)
+    {
+        valueForKey(keyword, value, std::string());
+    }
+
+    /**
+     *  Modify the value associated to a FITS keyword. If the keyword doesn't exists, a new filed is added to the disctionary with the given KEYWORD and its associated value.
+     *
+     *  @param keyword   Keyword name
+     *  @param value Keyword value, has a string
+     *  @param cmt commentair describing the keyword.
+     *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
+     */
+    void FITShdu::valueForKey(const key_code& keyword, const double& value, const std::string& cmt)
+    {
+        if(std::fabs(value) > 1e-4 && std::fabs(value) < 1e4)
+            valueForKey(keyword, std::to_string(value), fDouble, cmt);
+        else
+        {
+            std::ostringstream oss;
+            oss << std::setprecision(std::numeric_limits<double>::max_digits10) << std::scientific << value;
+            valueForKey(keyword, oss.str(), fDouble, cmt);
+        }
+    }
+
+    void FITShdu::valueForKey(const key_code& keyword, const double& value)
+    {
+        valueForKey(keyword, value, std::string());
+    }
+
+    /**
+     *  Modify the value associated to a FITS keyword. If the keyword doesn't exists, a new filed is added to the disctionary with the given KEYWORD and its associated value.
+     *
+     *  @param keyword Keyword name
+     *  @param value Keyword value, has a string
+     *  @param cmt commentair describing the keyword.
+     *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
+     */
+    void FITShdu::valueForKey(const key_code& keyword, const uint8_t& value, const std::string& cmt)
+    {
+        valueForKey(keyword, std::to_string(value), fUShort, cmt);
+    }
+
+    void FITShdu::valueForKey(const key_code& keyword, const uint8_t& value)
+    {
+        valueForKey(keyword, value, std::string());
+    }
+
+    /**
+     *  Modify the value associated to a FITS keyword. If the keyword doesn't exists, a new filed is added to the disctionary with the given KEYWORD and its associated value.
+     *
+     *  @param keyword Keyword name
+     *  @param value Keyword value, has a string
+     *  @param cmt commentair describing the keyword.
+     *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
+     */
+    void FITShdu::valueForKey(const key_code& keyword, const uint16_t& value, const std::string& cmt)
+    {
+        valueForKey(keyword, std::to_string(value), fUInt, cmt);
+    }
+
+    void FITShdu::valueForKey(const key_code& keyword, const uint16_t& value)
     {
         valueForKey(keyword, value, std::string());
     }
@@ -1433,11 +1589,16 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(const key_code& keyword, const double& value, const std::string& cmt)
+    void FITShdu::valueForKey(const key_code& keyword, const uint32_t& value, const std::string& cmt)
     {
-        valueForKey(keyword, std::to_string(value), fDouble, cmt);
+        valueForKey(keyword, std::to_string(value), fULong, cmt);
     }
-    
+
+    void FITShdu::valueForKey(const key_code& keyword, const uint32_t& value)
+    {
+        valueForKey(keyword, value, std::string());
+    }
+
     /**
      *  Modify the value associated to a FITS keyword. If the keyword doesn't exists, a new filed is added to the disctionary with the given KEYWORD and its associated value.
      *
@@ -1446,12 +1607,12 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(const key_code& keyword, const uint32_t& value, const std::string& cmt)
+    void FITShdu::valueForKey(const key_code& keyword, const uint64_t& value, const std::string& cmt)
     {
-        valueForKey(keyword, std::to_string(value), fDouble, cmt);
+        valueForKey(keyword, std::to_string(value), fULongLong, cmt);
     }
-    
-    void FITShdu::valueForKey(const key_code& keyword, const double& value)
+
+    void FITShdu::valueForKey(const key_code& keyword, const uint64_t& value)
     {
         valueForKey(keyword, value, std::string());
     }
@@ -1469,9 +1630,5 @@ namespace DSL
             return;
         
         hdu.erase(it);
-    }
-    
-#pragma mark • static member
-    bool FITShdu::debug = false;
-    
+    }    
 }

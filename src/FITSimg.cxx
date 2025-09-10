@@ -107,7 +107,7 @@ class FITSmanager;
         
         //- GET BASIC INFORMATION RELATED TO THE IMAGE
         //  • GET NUMBER OF AXIS
-        long long unsigned int number_axis = static_cast<long long unsigned int>( hdu->GetIntValueForKey("NAXIS") );
+        uint64_t number_axis = hdu->GetUInt64ValueForKey("NAXIS");
         
         if( number_axis < 1 )
         {
@@ -120,7 +120,7 @@ class FITSmanager;
 #if __cplusplus < 201103L
             Naxis.push_back(static_cast<size_t>( hdu->GetIntValueForKey("NAXIS"+std::to_string(static_cast<long long>(iAxe)))));
 #else
-            Naxis.push_back(static_cast<size_t>( hdu->GetIntValueForKey("NAXIS"+std::to_string(iAxe))));
+            Naxis.push_back(static_cast<size_t>( hdu->GetUInt64ValueForKey("NAXIS"+std::to_string(iAxe))));
 #endif
         
         if(Naxis.size() < 1)
@@ -476,14 +476,14 @@ class FITSmanager;
         for(size_t i = 0; i < pixel.size(); i++)
         {
 #if __cplusplus < 201103L
-            double crval = (pHDU().FindKey("CRVAL"+std::to_string(static_cast<long long>(i+1))))? pHDU().GetDoubleValueForKey("CRVAL"+std::to_string(static_cast<long long>(i+1))) : 0.;
-            double cdelt = (pHDU().FindKey("CDELT"+std::to_string(static_cast<long long>(i+1))))? pHDU().GetDoubleValueForKey("CDELT"+std::to_string(static_cast<long long>(i+1))) : 1.;
-            double crpix = (pHDU().FindKey("CRPIX"+std::to_string(static_cast<long long>(i+1))))? pHDU().GetDoubleValueForKey("CRPIX"+std::to_string(static_cast<long long>(i+1))) : 0.;
+            double crval = (pHDU().Exists("CRVAL"+std::to_string(static_cast<long long>(i+1))))? pHDU().GetDoubleValueForKey("CRVAL"+std::to_string(static_cast<long long>(i+1))) : 0.;
+            double cdelt = (pHDU().Exists("CDELT"+std::to_string(static_cast<long long>(i+1))))? pHDU().GetDoubleValueForKey("CDELT"+std::to_string(static_cast<long long>(i+1))) : 1.;
+            double crpix = (pHDU().Exists("CRPIX"+std::to_string(static_cast<long long>(i+1))))? pHDU().GetDoubleValueForKey("CRPIX"+std::to_string(static_cast<long long>(i+1))) : 0.;
 
 #else
-            double crval = (pHDU().FindKey("CRVAL"+std::to_string(i+1)))? pHDU().GetDoubleValueForKey("CRVAL"+std::to_string(i+1)) : 0.;
-            double cdelt = (pHDU().FindKey("CDELT"+std::to_string(i+1)))? pHDU().GetDoubleValueForKey("CDELT"+std::to_string(i+1)) : 1.;
-            double crpix = (pHDU().FindKey("CRPIX"+std::to_string(i+1)))? pHDU().GetDoubleValueForKey("CRPIX"+std::to_string(i+1)) : 0.;
+            double crval = (pHDU().Exists("CRVAL"+std::to_string(i+1)))? pHDU().GetDoubleValueForKey("CRVAL"+std::to_string(i+1)) : 0.;
+            double cdelt = (pHDU().Exists("CDELT"+std::to_string(i+1)))? pHDU().GetDoubleValueForKey("CDELT"+std::to_string(i+1)) : 1.;
+            double crpix = (pHDU().Exists("CRPIX"+std::to_string(i+1)))? pHDU().GetDoubleValueForKey("CRPIX"+std::to_string(i+1)) : 0.;
 #endif
             
             wcs[i] = (pixel[i] - crpix) * cdelt + crval;
@@ -530,14 +530,14 @@ class FITSmanager;
         {
             //std::cout<<xPixel[i]<<"  ->  ";
 #if __cplusplus < 201103L
-            double crval = (pHDU().FindKey("CRVAL"+std::to_string(static_cast<long long>(i+1))))? pHDU().GetDoubleValueForKey("CRVAL"+std::to_string(static_cast<long long>(i+1))) : 0.;
-            double cdelt = (pHDU().FindKey("CDELT"+std::to_string(static_cast<long long>(i+1))))? pHDU().GetDoubleValueForKey("CDELT"+std::to_string(static_cast<long long>(i+1))) : 1.;
-            double crpix = (pHDU().FindKey("CRPIX"+std::to_string(static_cast<long long>(i+1))))? pHDU().GetDoubleValueForKey("CRPIX"+std::to_string(static_cast<long long>(i+1))) : 0.;
+            double crval = (pHDU().Exists("CRVAL"+std::to_string(static_cast<long long>(i+1))))? pHDU().GetDoubleValueForKey("CRVAL"+std::to_string(static_cast<long long>(i+1))) : 0.;
+            double cdelt = (pHDU().Exists("CDELT"+std::to_string(static_cast<long long>(i+1))))? pHDU().GetDoubleValueForKey("CDELT"+std::to_string(static_cast<long long>(i+1))) : 1.;
+            double crpix = (pHDU().Exists("CRPIX"+std::to_string(static_cast<long long>(i+1))))? pHDU().GetDoubleValueForKey("CRPIX"+std::to_string(static_cast<long long>(i+1))) : 0.;
 
 #else
-            double crval = (pHDU().FindKey("CRVAL"+std::to_string(i+1)))? pHDU().GetDoubleValueForKey("CRVAL"+std::to_string(i+1)) : 0.;
-            double cdelt = (pHDU().FindKey("CDELT"+std::to_string(i+1)))? pHDU().GetDoubleValueForKey("CDELT"+std::to_string(i+1)) : 1.;
-            double crpix = (pHDU().FindKey("CRPIX"+std::to_string(i+1)))? pHDU().GetDoubleValueForKey("CRPIX"+std::to_string(i+1)) : 0.;
+            double crval = (pHDU().Exists("CRVAL"+std::to_string(i+1)))? pHDU().GetDoubleValueForKey("CRVAL"+std::to_string(i+1)) : 0.;
+            double cdelt = (pHDU().Exists("CDELT"+std::to_string(i+1)))? pHDU().GetDoubleValueForKey("CDELT"+std::to_string(i+1)) : 1.;
+            double crpix = (pHDU().Exists("CRPIX"+std::to_string(i+1)))? pHDU().GetDoubleValueForKey("CRPIX"+std::to_string(i+1)) : 0.;
 #endif
             
             xPixel[i] -= crval;

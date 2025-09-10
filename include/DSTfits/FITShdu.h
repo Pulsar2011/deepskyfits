@@ -77,7 +77,7 @@ namespace DSL
             
             bool is_digits(const std::string &str)
             {
-                return str.find_first_not_of("-+0123456789.") == std::string::npos;
+                return str.find_first_not_of("-+0123456789.eE") == std::string::npos;
             }
 
 #pragma endregion
@@ -118,69 +118,83 @@ namespace DSL
 #pragma endregion
 #pragma region  • I/O
         void        WriteCharValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;
-        void        WriteIntValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;     //!< Write KEYWORD integer value to the HDU
         void        WriteBoolValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;    //!< Write KEYWORD boolean value to the HDU
-        void        WriteShortValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;   //!< Write KEYWORD short value to the HDU
-        void        WriteLongValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;    //!< Write KEYWORD long value to the HDU
-        void        WriteULongValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;    //!< Write KEYWORD long value to the HDU
-        void        WriteLongLongValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;//!< Write KEYWORD lon long value to the HDU
+        void        WriteInt8ValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;   //!< Write KEYWORD short value to the HDU
+        void        WriteUInt8ValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;   //!< Write KEYWORD short value to the HDU
+        void        WriteInt16ValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;     //!< Write KEYWORD integer value to the HDU
+        void        WriteUInt16ValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;     //!< Write KEYWORD integer value to the HDU
+        void        WriteInt32ValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;    //!< Write KEYWORD long value to the HDU
+        void        WriteUInt32ValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;    //!< Write KEYWORD long value to the HDU
+        void        WriteInt64ValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;//!< Write KEYWORD lon long value to the HDU
+        void        WriteUInt64ValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;//!< Write KEYWORD lon long value to the HDU
         void        WriteFloatValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;   //!< Write KEYWORD float value to the HDU
         void        WriteDoubleValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;  //!< Write KEYWORD double value to the HDU
         
     public:
 #pragma endregion
 #pragma region  • ctor/dtor
-        FITShdu();                          //!< Default constructor
-        FITShdu(const std::shared_ptr<fitsfile>& fptr);            //!< Construct from fitsfile
-        FITShdu(const FITShdu &);           //!< Copy constructor
-        virtual ~FITShdu();                 //!< Destructor
+        FITShdu();                                              //!< Default constructor
+        FITShdu(const std::shared_ptr<fitsfile>& fptr);         //!< Construct from fitsfile
+        FITShdu(const FITShdu &);                               //!< Copy constructor
+        virtual ~FITShdu();                                     //!< Destructor
         
 #pragma endregion
 #pragma region  • Accessor
-        int          GetIntValueForKey     (const std::string&) const;     //!< Retrive KEYWORD integer value
-        unsigned int GetUIntValueForKey    (const std::string&) const;     //!< Retrive KEYWORD integer value
-        bool         GetBoolValueForKey    (const std::string&) const;    //!< Retrive KEYWORD boolean value
-        short        GetShortValueForKey   (const std::string&) const;   //!< Retrive KEYWORD short value
-        long         GetLongValueForKey    (const std::string&) const;    //!< Retrive KEYWORD long value
-        long long    GetLongLongValueForKey(const std::string&) const;//!< Retrive KEYWORD lon long value
-        float        GetFloatValueForKey   (const std::string&) const;   //!< Retrive KEYWORD float value
-        double       GetDoubleValueForKey  (const std::string&) const;  //!< Retrive KEYWORD double value
+        bool     GetBoolValueForKey  (const std::string&) const;   //!< Retrive KEYWORD boolean value
+        uint8_t  GetUInt8ValueForKey (const std::string&) const;   //!< Retrive KEYWORD unsigned short value
+        int8_t   GetInt8ValueForKey  (const std::string&) const;   //!< Retrive KEYWORD short value
+        uint16_t GetUInt16ValueForKey(const std::string&) const;   //!< Retrive KEYWORD unsigned integer value
+        int16_t  GetInt16ValueForKey (const std::string&) const;   //!< Retrive KEYWORD integer value        
+        uint32_t GetUInt32ValueForKey(const std::string&) const;   //!< Retrive KEYWORD long value
+        int32_t  GetInt32ValueForKey (const std::string&) const;   //!< Retrive KEYWORD long value
+        uint64_t GetUInt64ValueForKey(const std::string&) const;   //!< Retrive KEYWORD lon long value
+        int64_t  GetInt64ValueForKey (const std::string&) const;   //!< Retrive KEYWORD lon long value
+        float    GetFloatValueForKey (const std::string&) const;   //!< Retrive KEYWORD float value
+        double   GetDoubleValueForKey(const std::string&) const;   //!< Retrive KEYWORD double value
         
         std::string GetValueForKey(const std::string&, key_type&) const; //!< Retrive KEYWORD  value as a string.
         std::string GetValueForKey(const std::string&) const;                         //!< Retrive KEYWORD  value as a string.
         
-        inline FITSDictionary::const_iterator begin() const {return hdu.begin();}
-        inline FITSDictionary::const_iterator end() const {return hdu.end();}
+        inline FITSDictionary::const_iterator begin() const {return hdu.cbegin();}
+        inline FITSDictionary::const_iterator end() const {return hdu.cend();}
         inline FITSDictionary::const_iterator GetEntry(key_code keyword) const {return hdu.find(keyword);}
-        inline bool FindKey(key_code keyword) const {return hdu.find(keyword) != hdu.end();}
+        inline bool Exists(key_code keyword) const {return hdu.find(keyword) != hdu.end();}
         
-        long long GetDimension() const;
+        size_t GetDimension() const;
+
 
 #pragma endregion
 #pragma region  • Modifier
 
-        void valueForKey(const key_code&, const std::string&, const key_type& tk);                             //!< Set value for key
-        void valueForKey(const key_code&, const std::string&, const key_type& tk, const std::string&);         //!< Set value for key
-        void valueForKey(const key_code&, const std::string&, const std::string&);                             //!< Set value for key
-        void valueForKey(const key_code&, const std::string&);                                                 //!< Set value for key
-        void valueForKey(const key_code&, const short&      , const std::string&);           //!< Set value for key
-        void valueForKey(const key_code&, const int&        , const std::string&);           //!< Set value for key
-        void valueForKey(const key_code&, const long&       , const std::string&);           //!< Set value for key
-        void valueForKey(const key_code&, const long long&  , const std::string&);           //!< Set value for key
-        void valueForKey(const key_code&, const size_t&     , const std::string&);           //!< Set value for key
-        void valueForKey(const key_code&, const bool&       , const std::string&);           //!< Set value for key
-        void valueForKey(const key_code&, const float&      , const std::string&);           //!< Set value for key
-        void valueForKey(const key_code&, const double&     , const std::string&);           //!< Set value for key
-        void valueForKey(const key_code&, const uint32_t&   , const std::string&);           //!< Set value for key
+        void valueForKey(const key_code&, const std::string&, const key_type& tk);                      //!< Set value for key
+        void valueForKey(const key_code&, const std::string&, const key_type& tk, const std::string&);  //!< Set value for key
+        void valueForKey(const key_code&, const std::string&, const std::string&);                      //!< Set value for key
+        void valueForKey(const key_code&, const std::string&);                                          //!< Set value for key
+        void valueForKey(const key_code&, const size_t&     , const std::string&);                      //!< Set value for key
+        void valueForKey(const key_code&, const bool&       , const std::string&);                      //!< Set value for key
+        void valueForKey(const key_code&, const float&      , const std::string&);                      //!< Set value for key
+        void valueForKey(const key_code&, const double&     , const std::string&);                      //!< Set value for key
+        void valueForKey(const key_code&, const uint8_t&    , const std::string&);                      //!< Set value for key
+        void valueForKey(const key_code&, const uint16_t&   , const std::string&);                      //!< Set value for key
+        void valueForKey(const key_code&, const uint32_t&   , const std::string&);                      //!< Set value for key
+        void valueForKey(const key_code&, const uint64_t&   , const std::string&);                      //!< Set value for key
+        void valueForKey(const key_code&, const  int8_t&    , const std::string&);                      //!< Set value for key
+        void valueForKey(const key_code&, const  int16_t&   , const std::string&);                      //!< Set value for key
+        void valueForKey(const key_code&, const  int32_t&   , const std::string&);                      //!< Set value for key
+        void valueForKey(const key_code&, const  int64_t&   , const std::string&);                      //!< Set value for key
        
-        void valueForKey(const key_code&, const short&    );           //!< Set value for key
-        void valueForKey(const key_code&, const int&      );           //!< Set value for key
-        void valueForKey(const key_code&, const long&     );           //!< Set value for key
-        void valueForKey(const key_code&, const long long&);           //!< Set value for key
-        void valueForKey(const key_code&, const size_t&   );           //!< Set value for key
-        void valueForKey(const key_code&, const bool&     );           //!< Set value for key
-        void valueForKey(const key_code&, const float&    );           //!< Set value for key
-        void valueForKey(const key_code&, const double&   );           //!< Set value for key
+        void valueForKey(const key_code&, const size_t&   );                                            //!< Set value for key
+        void valueForKey(const key_code&, const bool&     );                                            //!< Set value for key
+        void valueForKey(const key_code&, const float&    );                                            //!< Set value for key
+        void valueForKey(const key_code&, const double&   );                                            //!< Set value for key
+        void valueForKey(const key_code&, const uint8_t&  );                                            //!< Set value for key
+        void valueForKey(const key_code&, const uint16_t& );                                            //!< Set value for key
+        void valueForKey(const key_code&, const uint32_t& );                                            //!< Set value for key
+        void valueForKey(const key_code&, const uint64_t& );                                            //!< Set value for key
+        void valueForKey(const key_code&, const  int8_t&  );                                            //!< Set value for key
+        void valueForKey(const key_code&, const  int16_t& );                                            //!< Set value for key
+        void valueForKey(const key_code&, const  int32_t& );                                            //!< Set value for key
+        void valueForKey(const key_code&, const  int64_t& );                                            //!< Set value for key
         
         void deleteKey(const key_code&);
 
@@ -192,9 +206,6 @@ namespace DSL
 #pragma region  • Dump
         void Dump( std::ostream& ) const;               //!< Print out KEYWORD and their associated value and description.
         
-#pragma endregion
-#pragma region  • Static member
-        static bool debug;
 #pragma endregion
     };
 #pragma endregion

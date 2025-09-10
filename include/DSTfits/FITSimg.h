@@ -848,16 +848,14 @@ namespace DSL
     template<typename S>
     void FITSimg<T>::WriteData(const std::shared_ptr<fitsfile>& fptr, int DATA_TYPE)
     {
-        if(fptr == nullptr || fptr.use_count() < 1)
+        if (!fptr || fptr.use_count() < 1)
         {
             throw std::invalid_argument("\033[31m[FITSimg::WriteDataCube]\033[0mreceived nullptr");
-            return;
         }
-            
-        
-        if(mask.sum() > 0 && BLANK != std::numeric_limits<T>::quiet_NaN())
+
+        if (mask.sum() > 0 && BLANK != std::numeric_limits<T>::quiet_NaN())
         {
-            hdu->valueForKey("BLANK", BLANK );
+            hdu->valueForKey("BLANK", BLANK);
         }
         
         const long long    num_axis = static_cast<const long long>( Naxis.size() );
@@ -920,7 +918,7 @@ namespace DSL
         BZERO = tmp_bzero;
         
         //  • GET BLANCK
-        uint16_t tmp_blank = hdu->GetUIntValueForKey("BLANK");
+        uint16_t tmp_blank = hdu->GetUInt16ValueForKey("BLANK");
         if( tmp_blank == std::numeric_limits<uint16_t>::quiet_NaN() )
             tmp_blank = -1.*std::numeric_limits<uint16_t>::max();
         else
@@ -1143,6 +1141,8 @@ namespace DSL
         std::valarray<double> cpy_data = std::valarray<double>( data.size() );
 #if __cplusplus < 201103L
         cpy_data.resize(data.size());
+        mask.resize(img.mask.size(),0);
+        mask |= img.mask;
 #endif
         cpy_data += data;
         
@@ -1366,7 +1366,7 @@ namespace DSL
     /**
      *  @brief Assignement opperator
      *  @details Assign memory content of img to this
-     *  @param img: Input FITSimg to be copyed
+     *  @param img: FITS image to be copyed
      *
      *  @return this = img
      */
@@ -3335,7 +3335,7 @@ namespace DSL
         
 #if __cplusplus < 201103L
         for(size_t k = 1; k <= this->GetDimension(); k++)
-            if(pHDU().FindKey("CDELT"+
+            if(pHDU().Exists("CDELT"+
                               std::to_string(static_cast<long long>(k))))
                 copy->HDU()->valueForKey("CDELT"+std::to_string(static_cast<long long>(k)),
                                          this->pHDU().GetDoubleValueForKey("CDELT"+std::to_string(static_cast<long long>(k)))
@@ -3345,7 +3345,7 @@ namespace DSL
                                          static_cast<double>(Size(k)/copy->Size(k)),"");
         
         for(size_t k = 1; k <= this->GetDimension(); k++)
-            if(pHDU().FindKey("CRVAL"+std::to_string(static_cast<long long>(k))))
+            if(pHDU().Exists("CRVAL"+std::to_string(static_cast<long long>(k))))
                 copy->HDU()->valueForKey("CRVAL"+std::to_string(static_cast<long long>(k)),
                                          this->pHDU().GetDoubleValueForKey("CRVAL"+std::to_string(static_cast<long long>(k)))
                                          + static_cast<double>(Size(k)/copy->Size(k))/2.);
@@ -3354,7 +3354,7 @@ namespace DSL
                                          static_cast<double>(Size(k)/copy->Size(k))/2.);
 #else
         for(size_t k = 1; k <= this->GetDimension(); k++)
-            if(pHDU().FindKey("CDELT"+
+            if(pHDU().Exists("CDELT"+
                               std::to_string(k)))
                 copy->HDU()->valueForKey("CDELT"+std::to_string(k),
                                          this->pHDU().GetDoubleValueForKey("CDELT"+std::to_string(k))
@@ -3364,7 +3364,7 @@ namespace DSL
                                          static_cast<double>(Size(k)/copy->Size(k)),"");
         
         for(size_t k = 1; k <= this->GetDimension(); k++)
-            if(pHDU().FindKey("CRVAL"+std::to_string(k)))
+            if(pHDU().Exists("CRVAL"+std::to_string(k)))
                 copy->HDU()->valueForKey("CRVAL"+std::to_string(k),
                                          this->pHDU().GetDoubleValueForKey("CRVAL"+std::to_string(k))
                                          + static_cast<double>(Size(k)/copy->Size(k))/2.);

@@ -50,23 +50,24 @@ namespace DSL
         /**
          * @enum Possible type for FITS embeded data
          */
-        tsbyte   = TSBYTE,
-        tshort   = TSHORT,
-        tushort  = TUSHORT,
-        tint     = TINT,
-        tuint    = TUINT,
-        tlong    = TLONG,
-        tlonglong= TLONGLONG,
-        tulong   = TULONG,
-        tfloat   = TFLOAT,
-        tdouble  = TDOUBLE,
-        tstring  = TSTRING,
-        tlogical = TLOGICAL,
-        tbit     = TBIT,
-        tbyte    = TBYTE,
-        tcplx    = TCOMPLEX,
-        tdbcplx  = TDBLCOMPLEX,
-        tnone    = 666,
+        tsbyte     = TSBYTE,
+        tshort     = TSHORT,    // int8_t
+        tushort    = TUSHORT,   // uint8_t
+        tint       = TINT,      // int16_t
+        tuint      = TUINT,     // uint16_t
+        tlong      = TLONG,     // int32_t
+        tulong     = TULONG,    // uint32_t
+        tlonglong  = TLONGLONG, // int64_t
+        tulonglong = TULONGLONG,// uint64_t
+        tfloat     = TFLOAT,
+        tdouble    = TDOUBLE,
+        tstring    = TSTRING,
+        tlogical   = TLOGICAL,
+        tbit       = TBIT,
+        tbyte      = TBYTE,
+        tcplx      = TCOMPLEX,
+        tdbcplx    = TDBLCOMPLEX,
+        tnone      = 666,
     };
 
     enum key_type
@@ -75,19 +76,20 @@ namespace DSL
          *  @enum Possible type for FITS keywords
          *  @details key_type defines the base type of the FITS KEYWORD value.
          */
-        fChar    = TSTRING,       //!< string
-        fShort   = TSHORT ,       //!< short integer
-        fUShort  = TUSHORT ,       //!< short integer
-        fInt     = TINT   ,       //!< integer
-        fUInt    = TUINT   ,       //!< integer
-        fLong    = TLONG  ,       //!< long integer
-        fLongLong= TLONGLONG,     //!< long long integer
-        fULong   = TULONG,     //!< long long integer
-        fBool    = TLOGICAL,      //!< boolean
-        fFloat   = TFLOAT,        //!< floiting poind
-        fDouble  = TDOUBLE,       //!< double floiting point
-        fByte    = TBYTE,
-        fUndef,     //!< undefined
+        fChar     = TSTRING,       //!< string
+        fShort    = TSHORT ,       //!< int8_t
+        fUShort   = TUSHORT ,      //!< uint8_t
+        fInt      = TINT   ,       //!< int16_t
+        fUInt     = TUINT   ,      //!< uint16_t
+        fLong     = TLONG  ,       //!< int32_t
+        fULong    = TULONG  ,      //!< uint32_t
+        fLongLong = TLONGLONG,     //!< int64_t
+        fULongLong= TULONGLONG,        //!< uint64_t
+        fBool     = TLOGICAL,      //!< boolean
+        fFloat    = TFLOAT,        //!< floiting poind
+        fDouble   = TDOUBLE,       //!< double floiting point
+        fByte     = TBYTE,
+        fUndef,                   //!< undefined
     };
     
 }

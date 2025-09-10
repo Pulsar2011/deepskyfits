@@ -47,6 +47,7 @@
         "__config": "cpp",
         "__locale": "cpp",
         "valarray": "cpp",
-        "map": "cpp"
+        "map": "cpp",
+        "regex": "cpp"
     }
 }

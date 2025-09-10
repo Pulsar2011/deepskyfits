@@ -2,9 +2,9 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "make gTest_manager",
+            "label": "make gtest",
             "type": "shell",
-            "command": "make gTest_manager",
+            "command": "make gTest_manager gTest_hdu",
             "group": "build",
             "problemMatcher": []
         }

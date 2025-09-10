@@ -13,7 +13,18 @@
         "env": [],
         "cwd": "${workspaceRoot}",
         "MIMode": "lldb",
-        "preLaunchTask": "make gTest_manager"
+        "preLaunchTask": "make gtest"
+    },
+    {
+        "type": "cppdbg",
+        "request": "launch",
+        "name": "gTest_hdu (LLDB)",
+        "program": "${workspaceRoot}/build/exe/gTest_hdu",
+        "args": [],
+        "env": [],
+        "cwd": "${workspaceRoot}",
+        "MIMode": "lldb",
+        "preLaunchTask": "make gtest"
     },
     ]
 }
