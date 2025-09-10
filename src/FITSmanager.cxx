@@ -116,7 +116,7 @@ namespace DSL
     {
         fitsfile * fits = static_cast<fitsfile*>(fptr.get());
         
-        if(fits_open_file(&fits, fileName.c_str(), readOnly, &fits_status))
+        if(fits_open_file(&fits, fileName.c_str(), !readOnly, &fits_status))
         {
             fptr.reset();
             throw FITSexception(fits_status,"FITSmanager","ctor","FILE : "+fileName);
