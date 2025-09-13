@@ -75,7 +75,7 @@ namespace DSL
 #pragma endregion
 #pragma region • Accessing FITS file
         FITSmanager Open(const std::string&, bool readOnly = true);
-        FITSmanager Create(const std::string&, bool replace=false);
+        static FITSmanager Create(const std::string&, bool replace=false);
         void OpenFile(const std::string&, bool readOnly = true);
         
         void Close();

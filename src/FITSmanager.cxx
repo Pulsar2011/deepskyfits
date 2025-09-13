@@ -205,7 +205,9 @@ namespace DSL
         std::string fileName = fName;
         
         if(replace)
-            fileName.insert(0,"!");
+        {
+            fileName.insert(0,(fileName[0] == '!')?"":"!");
+        }
         else if(fileName[0] == '!')
         {
             fileName.erase(0,1);
@@ -381,9 +383,7 @@ namespace DSL
      *  @note It will return a NULL pointer if the header haven't been found or in case of errors while reading the FITS data
      */
      const std::shared_ptr<FITShdu> FITSmanager::GetHeaderAtIndex(const int& hdu_index)
-    {
-        FITShdu *hdu = NULL;
-        
+    {      
         if(fptr.use_count() == 0)
         {
             fits_status = SHARED_NULPTR;
@@ -393,10 +393,9 @@ namespace DSL
         MoveToHDU(hdu_index);
         
         if(fits_status)
-            return NULL;
-        hdu = new FITShdu(fptr);
+            throw FITSexception(fits_status,"FITSmanager","GetHeaderAtIndex","SOMETHING WENT WRONG IN ACCESSING HDU "+std::to_string(hdu_index));
 
-        return std::shared_ptr<FITShdu>(hdu);
+        return std::make_shared<FITShdu>(fptr);
     }
     
 #pragma endregion

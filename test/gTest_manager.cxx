@@ -287,4 +287,58 @@ TEST(FITSmanager, move_between_hdu)
     ffm.Close();
 }
 
+TEST(FITSmanager, create_fitsfile)
+{
+    const std::string testfile = "build/testdata/test_create_fitsfile.fits";
+    std::remove(testfile.c_str());
+
+    FITSmanager fm = FITSmanager::Create(testfile, false);
+    ASSERT_TRUE(fm.isOpen());
+    ASSERT_EQ(fm.NumberOfHeader(), 1);
+    ASSERT_EQ(fm.Status(), 0);
+    ASSERT_EQ(fm.GetFileName(), testfile);
+
+    const std::shared_ptr<fitsfile>& this_hdu = fm.CurrentHDU();
+    ASSERT_EQ(this_hdu.use_count(), 1);
+
+    const std::shared_ptr<FITShdu> hdu_w = fm.GetPrimaryHeader();
+    ASSERT_NE(hdu_w, nullptr);
+
+    ASSERT_NE(hdu_w->GetValueForKey("COMMENT").find(DSF::gGIT::version()),std::string::npos);
+
+    fm.Close();
+    
+    ASSERT_FALSE(fm.isOpen());
+    ASSERT_EQ(fm.NumberOfHeader(), 0);
+    ASSERT_EQ(fm.Status(), 0);
+    ASSERT_EQ(fm.GetFileName().size(), 0);
+    ASSERT_EQ(this_hdu.use_count(), 0);
+
+    // try to create again without replace
+    ASSERT_ANY_THROW(FITSmanager::Create(testfile, false));
+    ASSERT_FALSE(fm.isOpen());
+
+    // create again with replace
+    fm = FITSmanager::Create(testfile, true);
+    ASSERT_TRUE(fm.isOpen());
+    ASSERT_EQ(fm.NumberOfHeader(), 1);
+    ASSERT_EQ(fm.Status(), 0);
+    ASSERT_EQ(fm.GetFileName(), testfile);
+
+    const std::shared_ptr<FITShdu> hdu_w2 = fm.GetPrimaryHeader();
+    hdu_w2->valueForKey("OBSERVER", "UnitTest", fChar, "Created by UnitTest");
+    hdu_w2->Write(this_hdu);
+    fm.Close();
+    
+    FITSmanager fo = FITSmanager(testfile);
+    ASSERT_TRUE(fo.isOpen());
+    ASSERT_EQ(fo.NumberOfHeader(), 1);
+    ASSERT_EQ(fo.Status(), 0);
+
+    const std::shared_ptr<FITShdu> hdu_r = fo.GetPrimaryHeader();
+    ASSERT_TRUE(hdu_r->Exists("OBSERVER"));
+    ASSERT_EQ(hdu_r->GetValueForKey("OBSERVER"), "UnitTest");
+
+    fo.Close();
+}
 #pragma endregion
