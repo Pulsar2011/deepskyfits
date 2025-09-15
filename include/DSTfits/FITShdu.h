@@ -166,37 +166,37 @@ namespace DSL
 #pragma endregion
 #pragma region  • Modifier
 
-        void valueForKey(const key_code&, const std::string&, const key_type& tk);                      //!< Set value for key
-        void valueForKey(const key_code&, const std::string&, const key_type& tk, const std::string&);  //!< Set value for key
-        void valueForKey(const key_code&, const std::string&, const std::string&);                      //!< Set value for key
-        void valueForKey(const key_code&, const std::string&);                                          //!< Set value for key
-        void valueForKey(const key_code&, const size_t&     , const std::string&);                      //!< Set value for key
-        void valueForKey(const key_code&, const bool&       , const std::string&);                      //!< Set value for key
-        void valueForKey(const key_code&, const float&      , const std::string&);                      //!< Set value for key
-        void valueForKey(const key_code&, const double&     , const std::string&);                      //!< Set value for key
-        void valueForKey(const key_code&, const uint8_t&    , const std::string&);                      //!< Set value for key
-        void valueForKey(const key_code&, const uint16_t&   , const std::string&);                      //!< Set value for key
-        void valueForKey(const key_code&, const uint32_t&   , const std::string&);                      //!< Set value for key
-        void valueForKey(const key_code&, const uint64_t&   , const std::string&);                      //!< Set value for key
-        void valueForKey(const key_code&, const  int8_t&    , const std::string&);                      //!< Set value for key
-        void valueForKey(const key_code&, const  int16_t&   , const std::string&);                      //!< Set value for key
-        void valueForKey(const key_code&, const  int32_t&   , const std::string&);                      //!< Set value for key
-        void valueForKey(const key_code&, const  int64_t&   , const std::string&);                      //!< Set value for key
+        void ValueForKey(const key_code&, const std::string&, const key_type& tk);                      //!< Set value for key
+        void ValueForKey(const key_code&, const std::string&, const key_type& tk, const std::string&);  //!< Set value for key
+        void ValueForKey(const key_code&, const std::string&, const std::string&);                      //!< Set value for key
+        void ValueForKey(const key_code&, const std::string&);                                          //!< Set value for key
+        void ValueForKey(const key_code&, const size_t&     , const std::string&);                      //!< Set value for key
+        void ValueForKey(const key_code&, const bool&       , const std::string&);                      //!< Set value for key
+        void ValueForKey(const key_code&, const float&      , const std::string&);                      //!< Set value for key
+        void ValueForKey(const key_code&, const double&     , const std::string&);                      //!< Set value for key
+        void ValueForKey(const key_code&, const uint8_t&    , const std::string&);                      //!< Set value for key
+        void ValueForKey(const key_code&, const uint16_t&   , const std::string&);                      //!< Set value for key
+        void ValueForKey(const key_code&, const uint32_t&   , const std::string&);                      //!< Set value for key
+        void ValueForKey(const key_code&, const uint64_t&   , const std::string&);                      //!< Set value for key
+        void ValueForKey(const key_code&, const  int8_t&    , const std::string&);                      //!< Set value for key
+        void ValueForKey(const key_code&, const  int16_t&   , const std::string&);                      //!< Set value for key
+        void ValueForKey(const key_code&, const  int32_t&   , const std::string&);                      //!< Set value for key
+        void ValueForKey(const key_code&, const  int64_t&   , const std::string&);                      //!< Set value for key
        
-        void valueForKey(const key_code&, const size_t&   );                                            //!< Set value for key
-        void valueForKey(const key_code&, const bool&     );                                            //!< Set value for key
-        void valueForKey(const key_code&, const float&    );                                            //!< Set value for key
-        void valueForKey(const key_code&, const double&   );                                            //!< Set value for key
-        void valueForKey(const key_code&, const uint8_t&  );                                            //!< Set value for key
-        void valueForKey(const key_code&, const uint16_t& );                                            //!< Set value for key
-        void valueForKey(const key_code&, const uint32_t& );                                            //!< Set value for key
-        void valueForKey(const key_code&, const uint64_t& );                                            //!< Set value for key
-        void valueForKey(const key_code&, const  int8_t&  );                                            //!< Set value for key
-        void valueForKey(const key_code&, const  int16_t& );                                            //!< Set value for key
-        void valueForKey(const key_code&, const  int32_t& );                                            //!< Set value for key
-        void valueForKey(const key_code&, const  int64_t& );                                            //!< Set value for key
+        void ValueForKey(const key_code&, const size_t&   );                                            //!< Set value for key
+        void ValueForKey(const key_code&, const bool&     );                                            //!< Set value for key
+        void ValueForKey(const key_code&, const float&    );                                            //!< Set value for key
+        void ValueForKey(const key_code&, const double&   );                                            //!< Set value for key
+        void ValueForKey(const key_code&, const uint8_t&  );                                            //!< Set value for key
+        void ValueForKey(const key_code&, const uint16_t& );                                            //!< Set value for key
+        void ValueForKey(const key_code&, const uint32_t& );                                            //!< Set value for key
+        void ValueForKey(const key_code&, const uint64_t& );                                            //!< Set value for key
+        void ValueForKey(const key_code&, const  int8_t&  );                                            //!< Set value for key
+        void ValueForKey(const key_code&, const  int16_t& );                                            //!< Set value for key
+        void ValueForKey(const key_code&, const  int32_t& );                                            //!< Set value for key
+        void ValueForKey(const key_code&, const  int64_t& );                                            //!< Set value for key
         
-        void deleteKey(const key_code&);
+        void DeleteKey(const key_code&);
 
 #pragma endregion
 #pragma region  • I/O

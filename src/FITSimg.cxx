@@ -721,9 +721,9 @@ class FITSmanager;
         
         Naxis[n-1] = size;
 #if __cplusplus >= 201103L
-        hdu->valueForKey(std::string("NAXIS")+std::to_string(n),size);
+        hdu->ValueForKey(std::string("NAXIS")+std::to_string(n),size);
 #else
-        hdu->valueForKey(std::string("NAXIS")+std::to_string(static_cast<long long unsigned int>( n )),size);
+        hdu->ValueForKey(std::string("NAXIS")+std::to_string(static_cast<long long unsigned int>( n )),size);
 #endif
     }
     
@@ -736,12 +736,12 @@ class FITSmanager;
         Naxis.resize(Naxis.size()-1);
         
 #if __cplusplus >= 201103L
-        hdu->deleteKey(std::string("NAXIS")+std::to_string(nAxis));
+        hdu->DeleteKey(std::string("NAXIS")+std::to_string(nAxis));
 #else
-        hdu->deleteKey(std::string("NAXIS")+std::to_string(static_cast<long long unsigned int>( nAxis )));
+        hdu->DeleteKey(std::string("NAXIS")+std::to_string(static_cast<long long unsigned int>( nAxis )));
 #endif
         
-        hdu->valueForKey("NAXIS",Naxis.size());
+        hdu->ValueForKey("NAXIS",Naxis.size());
     }
     
     void FITScube::BitPerPixel(int _bit, int eq)
@@ -752,7 +752,7 @@ class FITSmanager;
         else
             eqBITPIX = eq;
         
-        hdu->valueForKey( "BITPIX" , static_cast<int long long>(BITPIX) );
+        hdu->ValueForKey( "BITPIX" , static_cast<int long long>(BITPIX) );
     }
     
     
@@ -762,7 +762,7 @@ class FITSmanager;
             name.clear();
         
         name += _name;
-        hdu->valueForKey("EXTNAME",name);
+        hdu->ValueForKey("EXTNAME",name);
     }
     
     /**

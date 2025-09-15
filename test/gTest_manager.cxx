@@ -326,7 +326,7 @@ TEST(FITSmanager, create_fitsfile)
     ASSERT_EQ(fm.GetFileName(), testfile);
 
     const std::shared_ptr<FITShdu> hdu_w2 = fm.GetPrimaryHeader();
-    hdu_w2->valueForKey("OBSERVER", "UnitTest", fChar, "Created by UnitTest");
+    hdu_w2->ValueForKey("OBSERVER", "UnitTest", fChar, "Created by UnitTest");
     hdu_w2->Write(this_hdu);
     fm.Close();
     

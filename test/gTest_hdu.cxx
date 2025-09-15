@@ -308,10 +308,10 @@ TEST(FITShdu_Constructor, DefaultAndCopy)
     FITShdu hdu;
 
     // set several keys using different overloads
-    hdu.valueForKey("TEST_INT", 42, std::string("an int"));
-    hdu.valueForKey("TEST_DBL", 3.14159, std::string("a double"));
-    hdu.valueForKey("TEST_STR", std::string("hello"), std::string("a string"));
-    hdu.valueForKey("TEST_BOOL", true, std::string("a bool"));
+    hdu.ValueForKey("TEST_INT", 42, std::string("an int"));
+    hdu.ValueForKey("TEST_DBL", 3.14159, std::string("a double"));
+    hdu.ValueForKey("TEST_STR", std::string("hello"), std::string("a string"));
+    hdu.ValueForKey("TEST_BOOL", true, std::string("a bool"));
 
     // copy construct and verify values are preserved
     FITShdu copy(hdu);
@@ -354,13 +354,13 @@ TEST(FITShdu_Accessors, NumericAndStringGetters)
 {
     FITShdu hdu;
 
-    hdu.valueForKey("IKEY", 7);
-    hdu.valueForKey("LKEY", static_cast<int32_t>(123456));
-    hdu.valueForKey("LLKEY", static_cast<int64_t>(-9876543210LL));
-    hdu.valueForKey("FKEY", 2.5f);
-    hdu.valueForKey("DKEY", 1.23456789);
-    hdu.valueForKey("SKEY", std::string("abc"));
-    hdu.valueForKey("BKEY", false);
+    hdu.ValueForKey("IKEY", 7);
+    hdu.ValueForKey("LKEY", static_cast<int32_t>(123456));
+    hdu.ValueForKey("LLKEY", static_cast<int64_t>(-9876543210LL));
+    hdu.ValueForKey("FKEY", 2.5f);
+    hdu.ValueForKey("DKEY", 1.23456789);
+    hdu.ValueForKey("SKEY", std::string("abc"));
+    hdu.ValueForKey("BKEY", false);
 
     EXPECT_EQ(hdu.GetInt8ValueForKey("IKEY"), 7);
     EXPECT_EQ(hdu.GetInt32ValueForKey("LKEY"), 123456L);
@@ -382,11 +382,11 @@ TEST(FITShdu_Setter, TypeConsistencyAndOverwrite)
 {
     FITShdu hdu;
     // set as integer
-    hdu.valueForKey("MYKEY", 10, std::string("int key"));
+    hdu.ValueForKey("MYKEY", 10, std::string("int key"));
     EXPECT_EQ(hdu.GetUInt8ValueForKey("MYKEY"), 10);
 
     // overwriting with same type should work
-    hdu.valueForKey("MYKEY", (uint8_t) 20);
+    hdu.ValueForKey("MYKEY", (uint8_t) 20);
     EXPECT_EQ(hdu.GetUInt8ValueForKey("MYKEY"), 20);
 
     // trying to set same keyword with a different base type should trigger FITSexception
@@ -395,7 +395,7 @@ TEST(FITShdu_Setter, TypeConsistencyAndOverwrite)
         bool exception_thrown = false;
         try
         {
-            hdu.valueForKey("MYKEY", std::string("not an int"), std::string("comment"));
+            hdu.ValueForKey("MYKEY", std::string("not an int"), std::string("comment"));
         }
         catch (const FITSexception&)
         {
@@ -414,9 +414,9 @@ TEST(FITShdu_Utilities, GetDimensionAndDeleteKey)
     FITShdu hdu;
 
     // define NAXIS1..NAXIS4
-    hdu.valueForKey("NAXIS1", 4);
-    hdu.valueForKey("NAXIS2", 5);
-    hdu.valueForKey("NAXIS3", 6);
+    hdu.ValueForKey("NAXIS1", 4);
+    hdu.ValueForKey("NAXIS2", 5);
+    hdu.ValueForKey("NAXIS3", 6);
 
     EXPECT_TRUE(hdu.Exists("NAXIS3"));
 
@@ -424,7 +424,7 @@ TEST(FITShdu_Utilities, GetDimensionAndDeleteKey)
     EXPECT_EQ(dim, 4LL * 5LL * 6LL);
 
     // Delete last axis and verify dimension updates
-    hdu.deleteKey("NAXIS3");
+    hdu.DeleteKey("NAXIS3");
     EXPECT_FALSE(hdu.Exists("NAXIS3"));
     long long dim2 = hdu.GetDimension();
     EXPECT_EQ(dim2, 4LL * 5LL);
@@ -437,8 +437,8 @@ TEST(FITShdu_Utilities, GetDimensionAndDeleteKey)
 TEST(FITShdu_Dump, NoCrash)
 {
     FITShdu hdu;
-    hdu.valueForKey("A", 1);
-    hdu.valueForKey("B", std::string("two"));
+    hdu.ValueForKey("A", 1);
+    hdu.ValueForKey("B", std::string("two"));
 
     // Ensure Dump doesn't throw and produces output to stream
     std::ostringstream oss;
@@ -472,17 +472,17 @@ TEST(FITShdu_Modifier, ModifyFitsHeader)
     FITShdu hdu(hdu_ref);
     
     // ADD NEW KEY TO THE HEADER
-    hdu.valueForKey("TESTF",3.14f, "a test float");
+    hdu.ValueForKey("TESTF",3.14f, "a test float");
     EXPECT_EQ(hdu.GetEntry("TESTF")->second.type(), key_type::fFloat);
 
-    hdu.valueForKey("TESTD",(double) 6.62607015e-34, "a test double");
+    hdu.ValueForKey("TESTD",(double) 6.62607015e-34, "a test double");
     EXPECT_EQ(hdu.GetEntry("TESTD")->second.type(), key_type::fDouble);
 
-    hdu.valueForKey("TESTUI16",(uint16_t)12345, "a test uint16_t");
+    hdu.ValueForKey("TESTUI16",(uint16_t)12345, "a test uint16_t");
     EXPECT_EQ(hdu.GetEntry("TESTUI16")->second.type(), key_type::fUInt);
 
     // MODIFY EXISTING KEY
-    hdu.valueForKey("BSCALE",2.0, "modified bscale");
+    hdu.ValueForKey("BSCALE",2.0, "modified bscale");
     EXPECT_NEAR(hdu.GetDoubleValueForKey("BSCALE"), 2.0 , 1e-10);
     EXPECT_EQ(hdu.GetEntry("BSCALE")->second.type(), key_type::fDouble);
 

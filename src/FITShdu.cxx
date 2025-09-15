@@ -1386,9 +1386,9 @@ namespace DSL
      *  @param kt    Base type of the keyword value.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(const key_code& keyword, const std::string& value, const key_type& kt)
+    void FITShdu::ValueForKey(const key_code& keyword, const std::string& value, const key_type& kt)
     {
-        valueForKey(keyword, value, kt, std::string());
+        ValueForKey(keyword, value, kt, std::string());
     }
     
     /**
@@ -1400,7 +1400,7 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(const key_code& keyword, const std::string& value, const key_type& kt, const std::string& cmt)
+    void FITShdu::ValueForKey(const key_code& keyword, const std::string& value, const key_type& kt, const std::string& cmt)
     {
         FITSDictionary::iterator it = hdu.find(keyword);
         if(it != hdu.end())
@@ -1415,7 +1415,7 @@ namespace DSL
                       <<"\033[34m"<<it->first<<std::flush;
                     it->second.Dump(ss);
                     
-                    throw FITSwarning("FITShdu","valueForKey",ss.str());
+                    throw FITSwarning("FITShdu","ValueForKey",ss.str());
                 }
             }
             catch(std::exception &e)
@@ -1442,9 +1442,9 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(const key_code& keyword, const std::string& value, const std::string& cmt)
+    void FITShdu::ValueForKey(const key_code& keyword, const std::string& value, const std::string& cmt)
     {
-        valueForKey(keyword, value, fChar, cmt);
+        ValueForKey(keyword, value, fChar, cmt);
     }
 
     /**
@@ -1454,9 +1454,9 @@ namespace DSL
      *  @param value Keyword value, has a string
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(const key_code& keyword, const std::string& value)
+    void FITShdu::ValueForKey(const key_code& keyword, const std::string& value)
     {
-        valueForKey(keyword, value, fChar, std::string());
+        ValueForKey(keyword, value, fChar, std::string());
     }
 
     /**
@@ -1467,14 +1467,14 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(const key_code& keyword, const int8_t& value, const std::string& cmt)
+    void FITShdu::ValueForKey(const key_code& keyword, const int8_t& value, const std::string& cmt)
     {
-        valueForKey(keyword, std::to_string(value), fShort,cmt);
+        ValueForKey(keyword, std::to_string(value), fShort,cmt);
     }
     
-    void FITShdu::valueForKey(const key_code& keyword, const int8_t& value)
+    void FITShdu::ValueForKey(const key_code& keyword, const int8_t& value)
     {
-        valueForKey(keyword, value, std::string());
+        ValueForKey(keyword, value, std::string());
     }
 
     /**
@@ -1485,14 +1485,14 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(const key_code& keyword, const int16_t& value, const std::string& cmt)
+    void FITShdu::ValueForKey(const key_code& keyword, const int16_t& value, const std::string& cmt)
     {
-        valueForKey(keyword, std::to_string(value), fInt ,cmt);
+        ValueForKey(keyword, std::to_string(value), fInt ,cmt);
     }
     
-    void FITShdu::valueForKey(const key_code& keyword, const int16_t& value)
+    void FITShdu::ValueForKey(const key_code& keyword, const int16_t& value)
     {
-        valueForKey(keyword, value, std::string());
+        ValueForKey(keyword, value, std::string());
     }
 
     /**
@@ -1503,14 +1503,14 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(const key_code& keyword, const int32_t& value, const std::string& cmt)
+    void FITShdu::ValueForKey(const key_code& keyword, const int32_t& value, const std::string& cmt)
     {
-        valueForKey(keyword, std::to_string(value), fLong,cmt);
+        ValueForKey(keyword, std::to_string(value), fLong,cmt);
     }
     
-    void FITShdu::valueForKey(const key_code& keyword, const int32_t& value)
+    void FITShdu::ValueForKey(const key_code& keyword, const int32_t& value)
     {
-        valueForKey(keyword, value, std::string());
+        ValueForKey(keyword, value, std::string());
     }
 
     /**
@@ -1521,15 +1521,15 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(const key_code& keyword, const int64_t& value, const std::string& cmt)
+    void FITShdu::ValueForKey(const key_code& keyword, const int64_t& value, const std::string& cmt)
     {
-        valueForKey(keyword, std::to_string(value), fLongLong,cmt);
+        ValueForKey(keyword, std::to_string(value), fLongLong,cmt);
         
     }
     
-    void FITShdu::valueForKey(const key_code& keyword, const int64_t& value)
+    void FITShdu::ValueForKey(const key_code& keyword, const int64_t& value)
     {
-        valueForKey(keyword, value, std::string());
+        ValueForKey(keyword, value, std::string());
     }
     
     /**
@@ -1540,32 +1540,14 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(const key_code& keyword, const size_t& value, const std::string& cmt)
+    void FITShdu::ValueForKey(const key_code& keyword, const size_t& value, const std::string& cmt)
     {
-        valueForKey(keyword, std::to_string(value), fLongLong,cmt);
+        ValueForKey(keyword, std::to_string(value), fLongLong,cmt);
     }
     
-    void FITShdu::valueForKey(const key_code& keyword, const size_t& value)
+    void FITShdu::ValueForKey(const key_code& keyword, const size_t& value)
     {
-        valueForKey(keyword, value, std::string());
-    }
-    
-    /**
-     *  Modify the value associated to a FITS keyword. If the keyword doesn't exists, a new filed is added to the disctionary with the given KEYWORD and its associated value.
-     *
-     *  @param keyword   Keyword name
-     *  @param value Keyword value, has a string
-     *  @param cmt commentair describing the keyword.
-     *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
-     */
-    void FITShdu::valueForKey(const key_code& keyword, const bool& value, const std::string& cmt)
-    {
-        valueForKey(keyword, std::to_string(value), fBool, cmt);
-    }
-    
-    void FITShdu::valueForKey(const key_code& keyword, const bool& value)
-    {
-        valueForKey(keyword, value, std::string());
+        ValueForKey(keyword, value, std::string());
     }
     
     /**
@@ -1576,21 +1558,39 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(const key_code& keyword, const float& value, const std::string& cmt)
+    void FITShdu::ValueForKey(const key_code& keyword, const bool& value, const std::string& cmt)
+    {
+        ValueForKey(keyword, std::to_string(value), fBool, cmt);
+    }
+    
+    void FITShdu::ValueForKey(const key_code& keyword, const bool& value)
+    {
+        ValueForKey(keyword, value, std::string());
+    }
+    
+    /**
+     *  Modify the value associated to a FITS keyword. If the keyword doesn't exists, a new filed is added to the disctionary with the given KEYWORD and its associated value.
+     *
+     *  @param keyword   Keyword name
+     *  @param value Keyword value, has a string
+     *  @param cmt commentair describing the keyword.
+     *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
+     */
+    void FITShdu::ValueForKey(const key_code& keyword, const float& value, const std::string& cmt)
     {
         if(std::fabs(value) > 1e-4 && std::fabs(value) < 1e4)
-            valueForKey(keyword, std::to_string(value), fFloat, cmt);
+            ValueForKey(keyword, std::to_string(value), fFloat, cmt);
         else
         {
             std::ostringstream oss;
             oss << std::setprecision(std::numeric_limits<float>::max_digits10) << std::scientific << value;
-            valueForKey(keyword, oss.str(), fFloat, cmt);
+            ValueForKey(keyword, oss.str(), fFloat, cmt);
         }
     }
     
-    void FITShdu::valueForKey(const key_code& keyword, const float& value)
+    void FITShdu::ValueForKey(const key_code& keyword, const float& value)
     {
-        valueForKey(keyword, value, std::string());
+        ValueForKey(keyword, value, std::string());
     }
 
     /**
@@ -1601,21 +1601,21 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(const key_code& keyword, const double& value, const std::string& cmt)
+    void FITShdu::ValueForKey(const key_code& keyword, const double& value, const std::string& cmt)
     {
         if(std::fabs(value) > 1e-4 && std::fabs(value) < 1e4)
-            valueForKey(keyword, std::to_string(value), fDouble, cmt);
+            ValueForKey(keyword, std::to_string(value), fDouble, cmt);
         else
         {
             std::ostringstream oss;
             oss << std::setprecision(std::numeric_limits<double>::max_digits10) << std::scientific << value;
-            valueForKey(keyword, oss.str(), fDouble, cmt);
+            ValueForKey(keyword, oss.str(), fDouble, cmt);
         }
     }
 
-    void FITShdu::valueForKey(const key_code& keyword, const double& value)
+    void FITShdu::ValueForKey(const key_code& keyword, const double& value)
     {
-        valueForKey(keyword, value, std::string());
+        ValueForKey(keyword, value, std::string());
     }
 
     /**
@@ -1626,14 +1626,14 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(const key_code& keyword, const uint8_t& value, const std::string& cmt)
+    void FITShdu::ValueForKey(const key_code& keyword, const uint8_t& value, const std::string& cmt)
     {
-        valueForKey(keyword, std::to_string(value), fUShort, cmt);
+        ValueForKey(keyword, std::to_string(value), fUShort, cmt);
     }
 
-    void FITShdu::valueForKey(const key_code& keyword, const uint8_t& value)
+    void FITShdu::ValueForKey(const key_code& keyword, const uint8_t& value)
     {
-        valueForKey(keyword, value, std::string());
+        ValueForKey(keyword, value, std::string());
     }
 
     /**
@@ -1644,14 +1644,14 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(const key_code& keyword, const uint16_t& value, const std::string& cmt)
+    void FITShdu::ValueForKey(const key_code& keyword, const uint16_t& value, const std::string& cmt)
     {
-        valueForKey(keyword, std::to_string(value), fUInt, cmt);
+        ValueForKey(keyword, std::to_string(value), fUInt, cmt);
     }
 
-    void FITShdu::valueForKey(const key_code& keyword, const uint16_t& value)
+    void FITShdu::ValueForKey(const key_code& keyword, const uint16_t& value)
     {
-        valueForKey(keyword, value, std::string());
+        ValueForKey(keyword, value, std::string());
     }
     
     /**
@@ -1662,14 +1662,14 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(const key_code& keyword, const uint32_t& value, const std::string& cmt)
+    void FITShdu::ValueForKey(const key_code& keyword, const uint32_t& value, const std::string& cmt)
     {
-        valueForKey(keyword, std::to_string(value), fULong, cmt);
+        ValueForKey(keyword, std::to_string(value), fULong, cmt);
     }
 
-    void FITShdu::valueForKey(const key_code& keyword, const uint32_t& value)
+    void FITShdu::ValueForKey(const key_code& keyword, const uint32_t& value)
     {
-        valueForKey(keyword, value, std::string());
+        ValueForKey(keyword, value, std::string());
     }
 
     /**
@@ -1680,14 +1680,14 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::valueForKey(const key_code& keyword, const uint64_t& value, const std::string& cmt)
+    void FITShdu::ValueForKey(const key_code& keyword, const uint64_t& value, const std::string& cmt)
     {
-        valueForKey(keyword, std::to_string(value), fULongLong, cmt);
+        ValueForKey(keyword, std::to_string(value), fULongLong, cmt);
     }
 
-    void FITShdu::valueForKey(const key_code& keyword, const uint64_t& value)
+    void FITShdu::ValueForKey(const key_code& keyword, const uint64_t& value)
     {
-        valueForKey(keyword, value, std::string());
+        ValueForKey(keyword, value, std::string());
     }
     
     
@@ -1695,7 +1695,7 @@ namespace DSL
      *  Remove Keyword from HDU
      *  @param keyword keyword to be removed
      */
-    void FITShdu::deleteKey(const key_code& keyword)
+    void FITShdu::DeleteKey(const key_code& keyword)
     {
         FITSDictionary::iterator it = hdu.find(keyword);
         

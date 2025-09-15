@@ -855,7 +855,7 @@ namespace DSL
 
         if (mask.sum() > 0 && BLANK != std::numeric_limits<T>::quiet_NaN())
         {
-            hdu->valueForKey("BLANK", BLANK);
+            hdu->ValueForKey("BLANK", BLANK);
         }
         
         const long long    num_axis = static_cast<const long long>( Naxis.size() );
@@ -981,10 +981,10 @@ namespace DSL
         for(unsigned int i = 0; i < img.data.size(); i++)
             data[i] = img.data[i];
         
-        hdu->valueForKey("BSCALE",BSCALE,"");
-        hdu->valueForKey("BZERO" ,BZERO  ,""  );
-        hdu->valueForKey("BLANK" ,BLANK  ,""  );
-        hdu->valueForKey("BITPIX",BITPIX,"");
+        hdu->ValueForKey("BSCALE",BSCALE,"");
+        hdu->ValueForKey("BZERO" ,BZERO  ,""  );
+        hdu->ValueForKey("BLANK" ,BLANK  ,""  );
+        hdu->ValueForKey("BITPIX",BITPIX,"");
 
     }
     
@@ -1016,13 +1016,13 @@ namespace DSL
         img_init();
 
         hdu = new FITShdu();
-        hdu->valueForKey("NAXIS",static_cast<int>(axis.size() ));
+        hdu->ValueForKey("NAXIS",static_cast<int>(axis.size() ));
         for(size_t i = 0; i < Naxis.size(); i++)
 	  {
 #if __cplusplus >= 201103L
-            hdu->valueForKey("NAXIS"+std::to_string(i+1),Naxis[i]);
+            hdu->ValueForKey("NAXIS"+std::to_string(i+1),Naxis[i]);
 #else
-            hdu->valueForKey("NAXIS"+std::to_string(static_cast<long long int>( i+1 )),Naxis[i]);
+            hdu->ValueForKey("NAXIS"+std::to_string(static_cast<long long int>( i+1 )),Naxis[i]);
 #endif
 	  }
         
@@ -1049,13 +1049,13 @@ namespace DSL
         img_init();
         
         hdu = new FITShdu();
-        hdu->valueForKey("NAXIS",static_cast<int>(_axis.size() ));
+        hdu->ValueForKey("NAXIS",static_cast<int>(_axis.size() ));
         for(size_t i = 0; i < Naxis.size(); i++)
         {
 #if __cplusplus >= 201103L
-            hdu->valueForKey("NAXIS"+std::to_string(i+1),Naxis[i]);
+            hdu->ValueForKey("NAXIS"+std::to_string(i+1),Naxis[i]);
 #else
-            hdu->valueForKey("NAXIS"+std::to_string(static_cast<long long int>( i+1 )),Naxis[i]);
+            hdu->ValueForKey("NAXIS"+std::to_string(static_cast<long long int>( i+1 )),Naxis[i]);
 #endif
         }
         
@@ -1076,21 +1076,21 @@ namespace DSL
     void FITSimg<T>::Bscale(double _bs )
     {
         BSCALE = _bs;
-        hdu->valueForKey("BSCALE",BSCALE);
+        hdu->ValueForKey("BSCALE",BSCALE);
     }
     
     template< typename T >
     void FITSimg<T>::Bzero (double _b0)
     {
         BZERO = _b0;
-        hdu->valueForKey("BZERO",BZERO);
+        hdu->ValueForKey("BZERO",BZERO);
     }
     
     template< typename T >
     void FITSimg<T>::Blank(uint16_t nanVal)
     {
         BLANK = nanVal;
-        hdu->valueForKey("BLANK",BLANK);
+        hdu->ValueForKey("BLANK",BLANK);
     }
     
     template< typename T >
@@ -1122,7 +1122,7 @@ namespace DSL
         if(Naxis.size() < 3)
         {
             Naxis.push_back(1);
-            hdu->valueForKey("NAXIS",Naxis.size());
+            hdu->ValueForKey("NAXIS",Naxis.size());
         }
         size_t nLayer = Naxis[2];
         
@@ -1135,7 +1135,7 @@ namespace DSL
             Naxis[2] ++;
         }
         
-        hdu->valueForKey("NAXIS3",Naxis[2]);
+        hdu->ValueForKey("NAXIS3",Naxis[2]);
         
         // Copy data array to avoid lost any data.
         std::valarray<double> cpy_data = std::valarray<double>( data.size() );
@@ -3220,8 +3220,8 @@ namespace DSL
         Naxis[0] = static_cast<unsigned long long>( xSize );
         Naxis[1] = static_cast<unsigned long long>( ySize );
         
-        hdu->valueForKey("NAXIS1",static_cast<long long>(Naxis[0]));
-        hdu->valueForKey("NAXIS2",static_cast<long long>(Naxis[1]));
+        hdu->ValueForKey("NAXIS1",static_cast<long long>(Naxis[0]));
+        hdu->ValueForKey("NAXIS2",static_cast<long long>(Naxis[1]));
         
         size_t n = 0;
 
@@ -3229,19 +3229,19 @@ namespace DSL
         auto pixels_pos   = std::bind( static_cast<std::vector<unsigned long long>(FITScube::*)(size_t) const>(&FITScube::PixelCoordinates), this,std::placeholders::_1);
         auto pixels_coo   = std::bind( static_cast<std::vector<double>(FITScube::*)(std::vector<unsigned long long>) const>(&FITScube::WorldCoordinates), this,std::placeholders::_1);
         
-        hdu->valueForKey("CRPIX1",static_cast<double>( 0 ));
-        hdu->valueForKey("CRPIX2",static_cast<double>( 0 ));
+        hdu->ValueForKey("CRPIX1",static_cast<double>( 0 ));
+        hdu->ValueForKey("CRPIX2",static_cast<double>( 0 ));
         
-        hdu->valueForKey("CRVAL1",static_cast<double>( pixels_coo(pixels_pos(n))[0] ));
-        hdu->valueForKey("CRVAL2",static_cast<double>( pixels_coo(pixels_pos(n))[1] ));
+        hdu->ValueForKey("CRVAL1",static_cast<double>( pixels_coo(pixels_pos(n))[0] ));
+        hdu->ValueForKey("CRVAL2",static_cast<double>( pixels_coo(pixels_pos(n))[1] ));
         
 #else
         
-        hdu->valueForKey("CRPIX1",static_cast<double>( PixelCoordinates(n)[0] ));
-        hdu->valueForKey("CRPIX2",static_cast<double>( PixelCoordinates(n)[1] ));
+        hdu->ValueForKey("CRPIX1",static_cast<double>( PixelCoordinates(n)[0] ));
+        hdu->ValueForKey("CRPIX2",static_cast<double>( PixelCoordinates(n)[1] ));
         
-        hdu->valueForKey("CRVAL1",static_cast<double>( WorldCoordinates(PixelCoordinates(n))[0] ));
-        hdu->valueForKey("CRVAL2",static_cast<double>( WorldCoordinates(PixelCoordinates(n))[1] ));
+        hdu->ValueForKey("CRVAL1",static_cast<double>( WorldCoordinates(PixelCoordinates(n))[0] ));
+        hdu->ValueForKey("CRVAL2",static_cast<double>( WorldCoordinates(PixelCoordinates(n))[1] ));
 #endif
         
     }
@@ -3337,39 +3337,39 @@ namespace DSL
         for(size_t k = 1; k <= this->GetDimension(); k++)
             if(pHDU().Exists("CDELT"+
                               std::to_string(static_cast<long long>(k))))
-                copy->HDU()->valueForKey("CDELT"+std::to_string(static_cast<long long>(k)),
+                copy->HDU()->ValueForKey("CDELT"+std::to_string(static_cast<long long>(k)),
                                          this->pHDU().GetDoubleValueForKey("CDELT"+std::to_string(static_cast<long long>(k)))
                                          * static_cast<double>(Size(k)/copy->Size(k)));
             else
-                copy->HDU()->valueForKey("CDELT"+std::to_string(static_cast<long long>(k)),
+                copy->HDU()->ValueForKey("CDELT"+std::to_string(static_cast<long long>(k)),
                                          static_cast<double>(Size(k)/copy->Size(k)),"");
         
         for(size_t k = 1; k <= this->GetDimension(); k++)
             if(pHDU().Exists("CRVAL"+std::to_string(static_cast<long long>(k))))
-                copy->HDU()->valueForKey("CRVAL"+std::to_string(static_cast<long long>(k)),
+                copy->HDU()->ValueForKey("CRVAL"+std::to_string(static_cast<long long>(k)),
                                          this->pHDU().GetDoubleValueForKey("CRVAL"+std::to_string(static_cast<long long>(k)))
                                          + static_cast<double>(Size(k)/copy->Size(k))/2.);
             else
-                copy->HDU()->valueForKey("CRVAL"+std::to_string(static_cast<long long>(k)),
+                copy->HDU()->ValueForKey("CRVAL"+std::to_string(static_cast<long long>(k)),
                                          static_cast<double>(Size(k)/copy->Size(k))/2.);
 #else
         for(size_t k = 1; k <= this->GetDimension(); k++)
             if(pHDU().Exists("CDELT"+
                               std::to_string(k)))
-                copy->HDU()->valueForKey("CDELT"+std::to_string(k),
+                copy->HDU()->ValueForKey("CDELT"+std::to_string(k),
                                          this->pHDU().GetDoubleValueForKey("CDELT"+std::to_string(k))
                                          * static_cast<double>(Size(k)/copy->Size(k)));
             else
-                copy->HDU()->valueForKey("CDELT"+std::to_string(k),
+                copy->HDU()->ValueForKey("CDELT"+std::to_string(k),
                                          static_cast<double>(Size(k)/copy->Size(k)),"");
         
         for(size_t k = 1; k <= this->GetDimension(); k++)
             if(pHDU().Exists("CRVAL"+std::to_string(k)))
-                copy->HDU()->valueForKey("CRVAL"+std::to_string(k),
+                copy->HDU()->ValueForKey("CRVAL"+std::to_string(k),
                                          this->pHDU().GetDoubleValueForKey("CRVAL"+std::to_string(k))
                                          + static_cast<double>(Size(k)/copy->Size(k))/2.);
             else
-                copy->HDU()->valueForKey("CRVAL"+std::to_string(k),
+                copy->HDU()->ValueForKey("CRVAL"+std::to_string(k),
                                          static_cast<double>(Size(k)/copy->Size(k))/2.);
 #endif
         
