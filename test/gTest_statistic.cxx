@@ -613,3 +613,5 @@ TEST(PercentilTest, FloatParallelEval)
     EXPECT_NEAR(min84.UserState().Params()[0],  0.994458, 0.1);
     EXPECT_NEAR(p.Eval(min84.UserState().Params()[0]), 0.84, 0.05);
 }
+
+#pragma endregion
