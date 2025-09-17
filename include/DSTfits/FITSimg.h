@@ -19,9 +19,11 @@
 #include <limits>
 #include <stdexcept>
 #include <functional>
+#include <algorithm> // <-- added for std::min
+
 #include <thread>
 #include <mutex>
-#include <algorithm> // <-- added for std::min
+#include <future>
 
 #include <Minuit2/FCNBase.h>
 #include <Minuit2/MinimumBuilder.h>
@@ -36,196 +38,11 @@
 
 #include "FITShdu.h"
 #include "FITSexception.h"
+#include "FITSstatistic.h"
 
 namespace DSL
 {
     typedef std::valarray<bool> pxMask;
-
-    namespace stat
-    {
-        class Percentil: public ROOT::Minuit2::FCNBase
-        {
-        private:
-            const std::valarray<double> val;
-            double fpp;
-            double sum;
-
-            // helper: sequential sum for a range
-            static double partial_sum(const std::valarray<double>& v, size_t start, size_t end)
-            {
-                double s = 0.0;
-                for (size_t i = start; i < end; ++i) s += v[i];
-                return s;
-            }
-
-            void summation()
-            {
-                unsigned int threads = std::thread::hardware_concurrency();
-
-                const size_t n = val.size();
-                if (n == 0)
-                {
-                    sum = 0.0;
-                    return;
-                }
-
-                unsigned int t = (threads == 0) ? 1 : threads;
-
-                // do not spawn more threads than elements
-                if (static_cast<size_t>(t) > n) t = static_cast<unsigned int>(n);
-
-                const size_t chunk = (n + t - 1) / t;
-                
-                std::vector<std::thread> workers;
-                std::vector<double> partials(t, 0.0);
-
-                for (unsigned int i = 0; i < t; ++i)
-                {
-                    const size_t start = i * chunk;
-                    const size_t end = std::min(n, start + chunk);
-                    if (start >= end) continue;
-                    // capture index by value to avoid race on i
-                    workers.emplace_back([this, start, end, &partials, idx = i]() {
-                        partials[idx] = partial_sum(this->val, start, end);
-                    });
-                }
-
-                for (auto &th : workers)
-                {
-                    if (th.joinable())
-                        throw std::runtime_error("internal error: expected joinable worker thread (detached or moved)");
-                    th.join();
-                }
-
-                for (std::vector<double>::const_iterator i = partials.cbegin(); i != partials.cend(); ++i) sum += (*i);
-            }
-
-        public:
-            
-            Percentil(const std::valarray<double>& array): val(array), fpp(0.5), sum(0.0)
-            {
-                summation();
-            }
-
-            Percentil(const std::vector<double>& array): val(array.data(), array.size()), fpp(0.5), sum(0.0)
-            {
-                summation();
-            }
-
-            Percentil(const std::vector<double>& array, const double& pp): val(array.data(), array.size()), fpp(pp), sum(0.0)
-            {
-                summation();
-            }
-
-            // proper move constructor
-            Percentil(const Percentil& other) noexcept : val(other.val), fpp(other.fpp), sum(other.sum)
-            {
-                summation();
-            }
-
-            // Accept integer vectors by converting to vector<double> and delegating
-            Percentil(const std::vector<uint16_t>& array)
-                : Percentil(std::vector<double>(array.begin(), array.end()))
-            {}
-
-            Percentil(const std::vector<uint16_t>& array, const double& pp)
-                : Percentil(std::vector<double>(array.begin(), array.end()), pp)
-            {}
-
-            Percentil(const std::vector<uint32_t>& array)
-                : Percentil(std::vector<double>(array.begin(), array.end()))
-            {}
-
-            Percentil(const std::vector<uint32_t>& array, const double& pp)
-                : Percentil(std::vector<double>(array.begin(), array.end()), pp)
-            {}
-
-            Percentil(const std::vector<int16_t>& array)
-                : Percentil(std::vector<double>(array.begin(), array.end()))
-            {}
-
-            Percentil(const std::vector<int16_t>& array, const double& pp)
-                : Percentil(std::vector<double>(array.begin(), array.end()), pp)
-            {}
-
-            Percentil(const std::vector<int32_t>& array)
-                : Percentil(std::vector<double>(array.begin(), array.end()))
-            {}
-
-            Percentil(const std::vector<int32_t>& array, const double& pp)
-                : Percentil(std::vector<double>(array.begin(), array.end()), pp)
-            {}
-
-            Percentil(const std::vector<float>& array)
-                : Percentil(std::vector<double>(array.begin(), array.end()))
-            {}
-
-            Percentil(const std::vector<float>& array, const double& pp)
-                : Percentil(std::vector<double>(array.begin(), array.end()), pp)
-            {}
-
-            // Accept valarray<uint16_t> by delegating via a temporary vector<double>
-            Percentil(const std::valarray<uint16_t>& array)
-                : Percentil(std::vector<double>(std::begin(array), std::end(array)))
-            {}
-
-            Percentil(const std::valarray<uint16_t>& array, const double& pp)
-                : Percentil(std::vector<double>(std::begin(array), std::end(array)), pp)
-            {}
-
-            // Accept valarray<uint32_t> by delegating via a temporary vector<double>
-            Percentil(const std::valarray<uint32_t>& array)
-                : Percentil(std::vector<double>(std::begin(array), std::end(array)))
-            {}
-
-            Percentil(const std::valarray<uint32_t>& array, const double& pp)
-                : Percentil(std::vector<double>(std::begin(array), std::end(array)), pp)
-            {}
-
-            // Accept valarray<uint32_t> by delegating via a temporary vector<double>
-            Percentil(const std::valarray<int16_t>& array)
-                : Percentil(std::vector<double>(std::begin(array), std::end(array)))
-            {}
-
-            Percentil(const std::valarray<int16_t>& array, const double& pp)
-                : Percentil(std::vector<double>(std::begin(array), std::end(array)), pp)
-            {}
-
-            // Accept valarray<int32_t> by delegating via a temporary vector<double>
-            Percentil(const std::valarray<int32_t>& array)
-                : Percentil(std::vector<double>(std::begin(array), std::end(array)))
-            {}
-
-            Percentil(const std::valarray<int32_t>& array, const double& pp)
-                : Percentil(std::vector<double>(std::begin(array), std::end(array)), pp)
-            {}
-
-            // Accept valarray<float> by delegating via a temporary vector<double>
-            Percentil(const std::valarray<float>& array)
-                : Percentil(std::vector<double>(std::begin(array), std::end(array)))
-            {}
-
-            Percentil(const std::valarray<float>& array, const double& pp)
-                : Percentil(std::vector<double>(std::begin(array), std::end(array)), pp)
-            {}
-
-            ~Percentil() {}
-
-            void SetPercentil(double pp) { fpp = pp; }
-
-            double operator()(const std::vector<double>& param) const
-            {
-    	        return pow(  static_cast<double>((val[ val <= param[0] ]).size())  / static_cast<double>(val.size()) - fpp, 2.) ;
-            }
-
-            double Eval(double th) const
-            {
-    	        return  static_cast<double>( (val[ val <= th ]).size() ) / static_cast<double>(val.size()) ;
-            }
-
-            virtual double Up() const { return 4; }
-        };
-    }
     
 #pragma mark - FITScube class definition
     class FITScube
@@ -3337,7 +3154,7 @@ namespace DSL
         for(size_t k = 1; k <= this->GetDimension(); k++)
             if(pHDU().Exists("CDELT"+
                               std::to_string(static_cast<long long>(k))))
-                copy->HDU()->ValueForKey("CDELT"+std::to_string(static_cast<long long>(k)),
+                copy->HDU()->ValueForKey("CDELT"+std::to_string(static_cast<long long>(k)))
                                          this->pHDU().GetDoubleValueForKey("CDELT"+std::to_string(static_cast<long long>(k)))
                                          * static_cast<double>(Size(k)/copy->Size(k)));
             else
@@ -3346,7 +3163,7 @@ namespace DSL
         
         for(size_t k = 1; k <= this->GetDimension(); k++)
             if(pHDU().Exists("CRVAL"+std::to_string(static_cast<long long>(k))))
-                copy->HDU()->ValueForKey("CRVAL"+std::to_string(static_cast<long long>(k)),
+                copy->HDU()->ValueForKey("CRVAL"+std::to_string(static_cast<long long>(k)))
                                          this->pHDU().GetDoubleValueForKey("CRVAL"+std::to_string(static_cast<long long>(k)))
                                          + static_cast<double>(Size(k)/copy->Size(k))/2.);
             else

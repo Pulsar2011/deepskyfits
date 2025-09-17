@@ -270,9 +270,9 @@ foreach( test_source_file ${TEST_SRC} )
     add_dependencies(${tSRC} download_testdata)
 
     if(COMPILER_SUPPORTS_CXX17)
-        target_link_libraries( ${tSRC} DSTfits gtest gtest_main)
+        target_link_libraries( ${tSRC} DSTfits Minuit2 gtest gtest_main)
     else(COMPILER_SUPPORTS_CXX17)
-        target_link_libraries( ${tSRC} DSTfits ${Boost_LIBRARIES} gtest gtest_main)
+        target_link_libraries( ${tSRC} DSTfits Minuit2 ${Boost_LIBRARIES} gtest gtest_main)
     endif(COMPILER_SUPPORTS_CXX17)
 
 
