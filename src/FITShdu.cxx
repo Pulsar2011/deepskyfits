@@ -500,6 +500,11 @@ namespace DSL
             hdu.clear();
     }
 
+    void FITShdu::swap(FITShdu& other) noexcept
+    {
+        hdu.swap(other.hdu);
+    }
+
 #pragma mark • Processing
     /**
      *  @details Read FITS header and extract value for each KEYWORD.

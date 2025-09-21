@@ -73,6 +73,13 @@
         "streambuf": "cpp",
         "system_error": "cpp",
         "ostream": "cpp",
-        "future": "cpp"
+        "future": "cpp",
+        "typeindex": "cpp",
+        "functional": "cpp",
+        "thread": "cpp",
+        "list": "cpp",
+        "unordered_set": "cpp",
+        "chrono": "cpp",
+        "format": "cpp"
     }
 }

@@ -24,11 +24,11 @@ namespace DSL
 {
 class FITSmanager;
 
-#pragma mark - FITScube class implementation
+#pragma region - FITScube class implementation
     
     bool FITScube::debug = false;
 
-#pragma mark • protected member function
+#pragma region • protected member function
     
     /**
      *  @brief construct NAXIS size std::vector for n dimension
@@ -37,7 +37,7 @@ class FITSmanager;
      *  @param naxes Size of each dimension
      *  @return A std::vector of ndim size for wich each value represents the length of the axis
      */
-    std::vector<size_t> FITScube::Build_axis(unsigned int ndim, size_t _iaxis0, va_list argptr)
+    std::vector<size_t> FITScube::Build_axis(const size_t& ndim, const size_t& _iaxis0, va_list argptr)
     {
         std::vector<size_t> axis = {_iaxis0};
         size_t _iaxis;
@@ -50,24 +50,26 @@ class FITSmanager;
         
         return axis;
     }
-    
-#pragma mark • Initialization
+
+#pragma endregion
+#pragma region • Initialization
 
     void FITScube::init()
     {
-        hdu = NULL;
+        hdu=FITShdu();
         
         //mask = pxMask();
         
         BITPIX  = 0;
         eqBITPIX= 0;
         
-        Naxis = std::vector<size_t>();
-        name = std::string();
+        Naxis      = std::vector<size_t>();
+        name       = std::string();
         img_status = 0;
     }
     
-#pragma mark • ctor/dtor
+#pragma endregion
+#pragma region • ctor/dtor
     /**
      *  @details Create a new empty FITS cube
      */
@@ -103,11 +105,12 @@ class FITSmanager;
             throw FITSexception(img_status,"FITScube","ctor","Current HDU isn't an FITS image");
         }
         
-        hdu = new FITShdu(fptr);
+        FITShdu tmp(fptr);
+        hdu.swap(tmp);
         
         //- GET BASIC INFORMATION RELATED TO THE IMAGE
         //  • GET NUMBER OF AXIS
-        uint64_t number_axis = hdu->GetUInt64ValueForKey("NAXIS");
+        uint64_t number_axis = hdu.GetUInt64ValueForKey("NAXIS");
         
         if( number_axis < 1 )
         {
@@ -117,11 +120,7 @@ class FITSmanager;
         
         //  • GET AXIS DIMENSSION
         for(long long unsigned int iAxe = 1; iAxe <= number_axis; iAxe++)
-#if __cplusplus < 201103L
-            Naxis.push_back(static_cast<size_t>( hdu->GetIntValueForKey("NAXIS"+std::to_string(static_cast<long long>(iAxe)))));
-#else
-            Naxis.push_back(static_cast<size_t>( hdu->GetUInt64ValueForKey("NAXIS"+std::to_string(iAxe))));
-#endif
+            Naxis.push_back(static_cast<size_t>( hdu.GetUInt64ValueForKey("NAXIS"+std::to_string(iAxe))));
         
         if(Naxis.size() < 1)
         {
@@ -141,15 +140,11 @@ class FITSmanager;
         }
         
         //  • GET EXTENSION NAME
-        name = hdu->GetValueForKey("EXTNAME");
+        name = hdu.GetValueForKey("EXTNAME");
         if(name.size() < 1)
             name += "PRIMARY";
         
         mask = pxMask(static_cast<size_t>( Nelements() ));
-        
-#if __cplusplus < 201103L
-        mask.resize(static_cast<size_t>( Nelements() ),0);
-#endif
         
         if( mask.size() == 0 )
         {
@@ -168,30 +163,22 @@ class FITSmanager;
             mask.~valarray<bool>();
         
         mask = cube.mask;
+        hdu = FITShdu(cube.hdu);
         
-        hdu = new FITShdu(*(cube.hdu));
-        
-        BITPIX = cube.BITPIX;
+        BITPIX   = cube.BITPIX;
         eqBITPIX = cube.eqBITPIX;
-        name   = cube.name;
+        name     = cube.name;
         img_status = 0;
         
-        Naxis = std::vector<size_t>(cube.Naxis.size());
-        for(size_t n = 0; n < Naxis.size(); n++)
-            Naxis[n] = cube.Naxis[n];
+        Naxis = std::vector<size_t>(cube.Naxis);
     }
     
     /**
      *  @details Destructor
      */
     FITScube::~FITScube()
-    {
-        if(hdu != NULL)
-            delete hdu;
-        
-#if __cplusplus >= 201103L
+    {        
         mask.resize(0);
-#endif
         Naxis.clear();
         name.clear();
     }
@@ -407,7 +394,8 @@ class FITSmanager;
         return img;
     }
     
-#pragma mark • accessor
+#pragma endregion
+#pragma region • accessor
     
     /**
      *  Obtain the number of pixel along one of the dimension of the FITS datacube
@@ -415,9 +403,9 @@ class FITSmanager;
      *  @return The number of pixel along the ith axis.
      *  @note If i = 0, on get the total number of pixels in the FITS datacube
      */
-    unsigned long long FITScube::Size(unsigned int i) const
+    size_t FITScube::Size(const size_t& i) const
     {
-        unsigned long long size = 0;
+        size_t size = 0;
         if(i == 0)
             size = Nelements();
         else if(i > Naxis.size())
@@ -435,9 +423,9 @@ class FITSmanager;
     size_t FITScube::Nelements() const
     {
         size_t nElements = 1;
-        for(size_t iAxe = 0; iAxe < Naxis.size(); iAxe++)
+        for(std::vector<size_t>::const_iterator iAxe = Naxis.cbegin(); iAxe != Naxis.cend(); iAxe++)
         {
-            nElements *= Naxis[iAxe];
+            nElements *= *(iAxe);
         }
         
         return nElements;
@@ -475,17 +463,10 @@ class FITSmanager;
         std::vector<double> wcs = std::vector<double>(pixel.size());
         for(size_t i = 0; i < pixel.size(); i++)
         {
-#if __cplusplus < 201103L
-            double crval = (pHDU().Exists("CRVAL"+std::to_string(static_cast<long long>(i+1))))? pHDU().GetDoubleValueForKey("CRVAL"+std::to_string(static_cast<long long>(i+1))) : 0.;
-            double cdelt = (pHDU().Exists("CDELT"+std::to_string(static_cast<long long>(i+1))))? pHDU().GetDoubleValueForKey("CDELT"+std::to_string(static_cast<long long>(i+1))) : 1.;
-            double crpix = (pHDU().Exists("CRPIX"+std::to_string(static_cast<long long>(i+1))))? pHDU().GetDoubleValueForKey("CRPIX"+std::to_string(static_cast<long long>(i+1))) : 0.;
+            double crval = (hdu.Exists("CRVAL"+std::to_string(i+1)))? hdu.GetDoubleValueForKey("CRVAL"+std::to_string(i+1)) : 0.;
+            double cdelt = (hdu.Exists("CDELT"+std::to_string(i+1)))? hdu.GetDoubleValueForKey("CDELT"+std::to_string(i+1)) : 1.;
+            double crpix = (hdu.Exists("CRPIX"+std::to_string(i+1)))? hdu.GetDoubleValueForKey("CRPIX"+std::to_string(i+1)) : 0.;
 
-#else
-            double crval = (pHDU().Exists("CRVAL"+std::to_string(i+1)))? pHDU().GetDoubleValueForKey("CRVAL"+std::to_string(i+1)) : 0.;
-            double cdelt = (pHDU().Exists("CDELT"+std::to_string(i+1)))? pHDU().GetDoubleValueForKey("CDELT"+std::to_string(i+1)) : 1.;
-            double crpix = (pHDU().Exists("CRPIX"+std::to_string(i+1)))? pHDU().GetDoubleValueForKey("CRPIX"+std::to_string(i+1)) : 0.;
-#endif
-            
             wcs[i] = (pixel[i] - crpix) * cdelt + crval;
         }
         
@@ -529,16 +510,9 @@ class FITSmanager;
         for(size_t i = 0; i < xPixel.size(); i++)
         {
             //std::cout<<xPixel[i]<<"  ->  ";
-#if __cplusplus < 201103L
-            double crval = (pHDU().Exists("CRVAL"+std::to_string(static_cast<long long>(i+1))))? pHDU().GetDoubleValueForKey("CRVAL"+std::to_string(static_cast<long long>(i+1))) : 0.;
-            double cdelt = (pHDU().Exists("CDELT"+std::to_string(static_cast<long long>(i+1))))? pHDU().GetDoubleValueForKey("CDELT"+std::to_string(static_cast<long long>(i+1))) : 1.;
-            double crpix = (pHDU().Exists("CRPIX"+std::to_string(static_cast<long long>(i+1))))? pHDU().GetDoubleValueForKey("CRPIX"+std::to_string(static_cast<long long>(i+1))) : 0.;
-
-#else
-            double crval = (pHDU().Exists("CRVAL"+std::to_string(i+1)))? pHDU().GetDoubleValueForKey("CRVAL"+std::to_string(i+1)) : 0.;
-            double cdelt = (pHDU().Exists("CDELT"+std::to_string(i+1)))? pHDU().GetDoubleValueForKey("CDELT"+std::to_string(i+1)) : 1.;
-            double crpix = (pHDU().Exists("CRPIX"+std::to_string(i+1)))? pHDU().GetDoubleValueForKey("CRPIX"+std::to_string(i+1)) : 0.;
-#endif
+            double crval = (hdu.Exists("CRVAL"+std::to_string(i+1)))? hdu.GetDoubleValueForKey("CRVAL"+std::to_string(i+1)) : 0.;
+            double cdelt = (hdu.Exists("CDELT"+std::to_string(i+1)))? hdu.GetDoubleValueForKey("CDELT"+std::to_string(i+1)) : 1.;
+            double crpix = (hdu.Exists("CRPIX"+std::to_string(i+1)))? hdu.GetDoubleValueForKey("CRPIX"+std::to_string(i+1)) : 0.;
             
             xPixel[i] -= crval;
             xPixel[i] /= cdelt;
@@ -550,7 +524,7 @@ class FITSmanager;
         return xPixel;
     }
     
-    size_t FITScube::PixelIndex(std::vector<unsigned long long> iPx) const
+    size_t FITScube::PixelIndex(const std::vector<size_t>& iPx) const
     {
         size_t index = 0;
         size_t arg   = 0;
@@ -565,7 +539,7 @@ class FITSmanager;
                 return Nelements();
             }
             
-            arg = static_cast<size_t>( iPx[naxe] );
+            arg = iPx[naxe];
             
             for(size_t iX = 0; iX < naxe; iX++)
                 arg *= Naxis[iX];
@@ -576,35 +550,22 @@ class FITSmanager;
         return (index < Nelements())? index : Nelements();
     }
     
-    size_t FITScube::PixelIndex(std::vector<double> Px) const
+    size_t FITScube::PixelIndex(const std::vector<double>& Px) const
     {
-        std::vector<unsigned long long> pix_index;
+        std::vector<size_t> pix_index;
         for(size_t k = 0; k < Px.size(); k++ )
-        {
-            /*
-             if( ( Px[k] + 0.5 ) <= -1*std::numeric_limits<double>::min() )
-               return Nelements();
-            
-            if( (Px[k] - 0.5) >= static_cast<double>( Size(k+1) ) + std::numeric_limits<double>::min() )
-                return Nelements();
-            */
-            
-            unsigned long long px = static_cast<unsigned long long>( Px[k] );
-            
-            if( Px[k] - static_cast<double>(px) >= 0.5)
-                px++;
-            
-            pix_index.push_back(px);
+        {            
+            pix_index.push_back(static_cast<size_t>( Px[k]+0.5 ));
         }
 
         size_t index = PixelIndex(pix_index);
-        
         pix_index.clear();
         
         return index;
     }
     
-#pragma mark • I/O
+#pragma endregion
+#pragma region • I/O
     
     /**
      *  @details Write DataCube to the current HDU of a fits file
@@ -617,7 +578,7 @@ class FITSmanager;
             throw FITSexception(NULL_INPUT_PTR,"FITScube","Write","received nullptr");
         }
         
-        hdu->Write(fptr);
+        hdu.Write(fptr);
         WriteDataCube(fptr);
     }
     
@@ -686,10 +647,10 @@ class FITSmanager;
         fptr.reset();
 
     }
-    
   
     
-#pragma mark • Modifier
+#pragma endregion
+#pragma region • Modifier
     
     /**
      *  Modify the pixel length of an axis of a FITS datacube. To be used with care and only when images are croped.
@@ -721,9 +682,9 @@ class FITSmanager;
         
         Naxis[n-1] = size;
 #if __cplusplus >= 201103L
-        hdu->ValueForKey(std::string("NAXIS")+std::to_string(n),size);
+        hdu.ValueForKey(std::string("NAXIS")+std::to_string(n),size);
 #else
-        hdu->ValueForKey(std::string("NAXIS")+std::to_string(static_cast<long long unsigned int>( n )),size);
+        hdu.ValueForKey(std::string("NAXIS")+std::to_string(static_cast<long long unsigned int>( n )),size);
 #endif
     }
     
@@ -736,12 +697,12 @@ class FITSmanager;
         Naxis.resize(Naxis.size()-1);
         
 #if __cplusplus >= 201103L
-        hdu->DeleteKey(std::string("NAXIS")+std::to_string(nAxis));
+        hdu.DeleteKey(std::string("NAXIS")+std::to_string(nAxis));
 #else
-        hdu->DeleteKey(std::string("NAXIS")+std::to_string(static_cast<long long unsigned int>( nAxis )));
+        hdu.DeleteKey(std::string("NAXIS")+std::to_string(static_cast<long long unsigned int>( nAxis )));
 #endif
         
-        hdu->ValueForKey("NAXIS",Naxis.size());
+        hdu.ValueForKey("NAXIS",Naxis.size());
     }
     
     void FITScube::BitPerPixel(int _bit, int eq)
@@ -752,7 +713,7 @@ class FITSmanager;
         else
             eqBITPIX = eq;
         
-        hdu->ValueForKey( "BITPIX" , static_cast<int long long>(BITPIX) );
+        hdu.ValueForKey( "BITPIX" , static_cast<int long long>(BITPIX) );
     }
     
     
@@ -762,7 +723,7 @@ class FITSmanager;
             name.clear();
         
         name += _name;
-        hdu->ValueForKey("EXTNAME",name);
+        hdu.ValueForKey("EXTNAME",name);
     }
     
     /**
@@ -770,71 +731,29 @@ class FITSmanager;
      *  @param iPx Pixel coordinates of the pixel
      * @return true if the pixel is masked
      */
-    bool FITScube::Masked(unsigned long long iPx, ...) const
+    bool FITScube::Masked(const std::initializer_list<size_t>& _l) const
     {
-        unsigned long long arg = iPx;
-        std::vector<unsigned long long> pix_index;
-        pix_index.push_back(arg);
+        std::vector<size_t> pix_index;
+        for (size_t idx : _l)
+            pix_index.push_back( idx );
         
-        va_list ap;
-        va_start(ap, iPx);
-        
-        for(size_t naxe = 1; naxe < Naxis.size(); naxe++)
-        {
-            arg = va_arg(ap, unsigned long long);
-            
-            if(arg == 0)
-                break;
-            
-            pix_index.push_back(arg);
-        }
-        va_end(ap);
-        
-        size_t index = PixelIndex(pix_index);
-        
-        return Masked(index);
+        return Masked(pix_index);
         
     }
     
+    bool FITScube::Masked(const std::vector<size_t>& _v) const
+    {
+        size_t index = PixelIndex(_v);
+        
+        return Masked(index);
+    }
+
     bool FITScube::Masked(size_t idx) const
     {
         if(idx >= mask.size())
-            return true;
+            throw std::out_of_range("FITSimg::Masked - index out of range");
         
         return mask[idx];
-    }
-    
-    /**
-     *  @details Mask a single pixel
-     *  @param iPx coordinates of the pixel to mask
-     */
-    void FITScube::MaskPixel(unsigned long long iPx, ...)
-    {
-        unsigned long long arg = iPx;
-        std::vector<unsigned long long> pix_index;
-        pix_index.push_back(arg);
-        
-        va_list ap;
-        va_start(ap, iPx);
-        
-        for(size_t naxe = 1; naxe < Naxis.size(); naxe++)
-        {
-            arg = va_arg(ap, unsigned long long);
-            
-            if(arg == 0)
-                break;
-            
-            pix_index.push_back(arg);
-        }
-        va_end(ap);
-        
-        unsigned long long index = PixelIndex(pix_index);
-        
-        if(index >= Nelements())
-            return;
-        
-        mask[index] |= true;
-        
     }
     
     /**
@@ -842,8 +761,27 @@ class FITSmanager;
      *  @param _map pixel mask map
      *  @Note : Pixel already masked are not unmasked
      */
-    void FITScube::MaskPixel(const std::valarray<bool> _m)
+    void FITScube::MaskPixels(const std::initializer_list<size_t>& _l)
     {
+        for (size_t idx : _l)
+        {
+            if (idx < mask.size())
+                mask[idx] |= true;
+            else 
+                throw std::out_of_range("FITSimg::MaskPixel - index out of range");
+        }
+    }
+
+    /**
+     *  @details Mask pixels according to a mask map
+     *  @param _map pixel mask map
+     *  @Note : Pixel already masked are not unmasked
+     */
+    void FITScube::MaskPixels(const std::valarray<bool>& _m)
+    {
+        if (_m.size() != mask.size())
+            throw std::length_error("FITSimg::MaskPixels - mask size mismatch");
+
         mask |= _m;
     }
     
@@ -851,31 +789,15 @@ class FITSmanager;
      *  @details Unmask a single pixel
      *  @param iPx coordinates of the pixel to unmask
      */
-    void FITScube::UnmaskPixel(unsigned long long iPx, ...)
+    void FITScube::UnmaskPixels(const std::initializer_list<size_t>& _l)
     {
-        unsigned long long arg = iPx;
-        std::vector<unsigned long long> pix_index;
-        pix_index.push_back(arg);
-        
-        va_list ap;
-        va_start(ap, iPx);
-        
-        for(size_t naxe = 1; naxe < Naxis.size(); naxe++)
+        for (size_t idx : _l)
         {
-            arg = va_arg(ap, unsigned long long);
-            
-            if(arg == 0)
-                break;
-            
-            pix_index.push_back(arg);
+            if (idx < mask.size())
+                mask[idx] &= false;
+            else 
+                throw std::out_of_range("FITSimg::UnmaskPixels - index out of range");
         }
-        va_end(ap);
-        
-        unsigned long long index = PixelIndex(pix_index);
-        if(index >= Nelements())
-            return;
-        
-        mask[index] &= false;
         
     }
     
@@ -884,8 +806,11 @@ class FITSmanager;
      *  @param _map pixel map of pixel to unmask
      *  @note : The pixel map should be set at 'true' for each pixel that need to be unmasked. The resulting pixel mask will be set as mask &= (!_m)
      */
-    void FITScube::UnmaskPixel(const std::valarray<bool> _m)
+    void FITScube::UnmaskPixels(const std::valarray<bool>& _m)
     {
+        if (_m.size() != mask.size())
+            throw std::length_error("FITSimg::MaskPixels - mask size mismatch");
+
         mask &= (!_m) ;
     }
 
@@ -965,6 +890,28 @@ class FITSmanager;
         Bscale(1. );
         Bzero (0. );
     }
+
+    /**
+     * @details Initialize type uint64_t FITS variable.
+     */
+    template< >
+    void FITSimg<uint64_t>::template_init()
+    {
+        BitPerPixel(static_cast<int>(64));
+        Bscale(1. );
+        Bzero (0. );
+    }
+
+    /**
+     * @details Initialize type uint64_t FITS variable.
+     */
+    template< >
+    void FITSimg<size_t>::template_init()
+    {
+        BitPerPixel(static_cast<int>(64));
+        Bscale(1. );
+        Bzero (0. );
+    }
     
     /**
      * @details Initialize type uint8_t FITS variable.
@@ -989,7 +936,365 @@ class FITSmanager;
         Bzero (0. );
         
     }
+#pragma endregion
+
+#pragma region • Data operation
+
+    /**
+     *  @details Compute the sum of all unmasked pixel values
+     *  @return Sum of all unmasked pixel values
+     */
+    double FITScube::GetSum() const
+    {
+        if(!data)
+            return 0.0;
     
+        double sum = 0.0;
+        bool handled = false;
+
+        // fast typed paths (add the types you commonly use)
+        handled = WithTypedData<int8_t>([&](const std::valarray<int8_t>& arr){ sum += static_cast<double>( arr[!mask].sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<uint8_t>([&](const std::valarray<uint8_t>& arr){ sum += static_cast<double>( arr[!mask].sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<int16_t>([&](const std::valarray<int16_t>& arr){ sum += static_cast<double>( arr[!mask].sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<uint16_t>([&](const std::valarray<uint16_t>& arr){ sum += static_cast<double>( arr[!mask].sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<int32_t>([&](const std::valarray<int32_t>& arr){ sum += static_cast<double>( arr[!mask].sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<uint32_t>([&](const std::valarray<uint32_t>& arr){ sum += static_cast<double>( arr[!mask].sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<int64_t>([&](const std::valarray<int64_t>& arr){ sum += static_cast<double>( arr[!mask].sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<uint64_t>([&](const std::valarray<uint64_t>& arr){ sum += static_cast<double>( arr[!mask].sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<size_t>([&](const std::valarray<size_t>& arr){ sum += static_cast<double>( arr[!mask].sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<float>([&](const std::valarray<float>& arr){ sum += static_cast<double>( arr[!mask].sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<double>([&](const std::valarray<double>& arr){ sum += arr[!mask].sum(); });
+        if(handled) return sum;
+
+       // fallback generic per-element access via FitsArrayBase::get()
+        for(size_t i = 0; i < data->size(); ++i)
+        {
+            if(i < mask.size() && mask[i]) continue;
+            sum += static_cast<double>(data->get(i));
+        }
+
+        return sum;
+    }
+
+    /**
+     *  @details Compute the mean of all unmasked pixel values
+     *  @return Average of all unmasked pixel values
+     */
+    double FITScube::GetMean() const
+    {
+        if(!data)
+            return 0.0;
+    
+        double sum = GetSum();
+        size_t nPix = mask[!mask].size();
+
+        return (nPix > 0) ? sum /= static_cast<double>(nPix) : 0;
+    }
+
+    /**
+     *  @details Compute the mean of all unmasked pixel values
+     *  @return Average of all unmasked pixel values
+     */
+    double FITScube::GetQuadraticMean() const
+    {
+        size_t nPix = mask[!mask].size();
+
+        if(!data || nPix < 1)
+            return 0.0;
+
+        double sum = 0.0;
+        bool handled = false;
+
+        // fast typed paths (add the types you commonly use)
+        handled = WithTypedData<int8_t>([&](const std::valarray<int8_t>& arr){ sum += static_cast<double>( pow(arr[!mask],2).sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<uint8_t>([&](const std::valarray<uint8_t>& arr){ sum += static_cast<double>( pow(arr[!mask],2).sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<int16_t>([&](const std::valarray<int16_t>& arr){ sum += static_cast<double>( pow(arr[!mask],2).sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<uint16_t>([&](const std::valarray<uint16_t>& arr){ sum += static_cast<double>( pow(arr[!mask],2).sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<int32_t>([&](const std::valarray<int32_t>& arr){ sum += static_cast<double>( pow(arr[!mask],2).sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<uint32_t>([&](const std::valarray<uint32_t>& arr){ sum += static_cast<double>( pow(arr[!mask],2).sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<int64_t>([&](const std::valarray<int64_t>& arr){ sum += static_cast<double>( pow(arr[!mask],2).sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<uint64_t>([&](const std::valarray<uint64_t>& arr){ sum += static_cast<double>( pow(arr[!mask],2).sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<size_t>([&](const std::valarray<size_t>& arr){ sum += static_cast<double>( pow(arr[!mask],2).sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<float>([&](const std::valarray<float>& arr){ sum += static_cast<double>( pow(arr[!mask],2).sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<double>([&](const std::valarray<double>& arr){ sum += pow(arr[!mask],2).sum(); });
+        if(handled) return sum;
+
+       // fallback generic per-element access via FitsArrayBase::get()
+        for(size_t i = 0; i < data->size(); ++i)
+        {
+            if(i < mask.size() && mask[i]) continue;
+            sum += pow(static_cast<double>(data->get(i)),2.);
+        }
+
+        return (nPix > 0) ? sum /= static_cast<double>(nPix) : 0;
+    }
+
+    /**
+     *  @details Compute the mean of all unmasked pixel values
+     *  @return Average of all unmasked pixel values
+     */
+    double FITScube::GetVariance() const
+    {
+        size_t nPix = mask[!mask].size();
+
+        if(!data || nPix < 1)
+            return 0.0;
+
+        double sum = 0.0;
+        bool handled = false;
+
+        // fast typed paths (add the types you commonly use)
+        handled = WithTypedData<int8_t>([&](const std::valarray<int8_t>& arr){ sum += static_cast<double>( pow(arr[!mask]-static_cast<int8_t>(GetMean()+0.5),2).sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<uint8_t>([&](const std::valarray<uint8_t>& arr){ sum += static_cast<double>( pow(arr[!mask]-static_cast<uint8_t>(GetMean()+0.5),2).sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<int16_t>([&](const std::valarray<int16_t>& arr){ sum += static_cast<double>( pow(arr[!mask]-static_cast<int16_t>(GetMean()+0.5),2).sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<uint16_t>([&](const std::valarray<uint16_t>& arr){ sum += static_cast<double>( pow(arr[!mask]-static_cast<uint16_t>(GetMean()+0.5),2).sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<int32_t>([&](const std::valarray<int32_t>& arr){ sum += static_cast<double>( pow(arr[!mask]-static_cast<int32_t>(GetMean()+0.5),2).sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<uint32_t>([&](const std::valarray<uint32_t>& arr){ sum += static_cast<double>( pow(arr[!mask]-static_cast<uint32_t>(GetMean()+0.5),2).sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<int64_t>([&](const std::valarray<int64_t>& arr){ sum += static_cast<double>( pow(arr[!mask]-static_cast<int64_t>(GetMean()+0.5),2).sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<uint64_t>([&](const std::valarray<uint64_t>& arr){ sum += static_cast<double>( pow(arr[!mask]-static_cast<uint64_t>(GetMean()+0.5),2).sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<size_t>([&](const std::valarray<size_t>& arr){ sum += static_cast<double>( pow(arr[!mask]-static_cast<size_t>(GetMean()+0.5),2).sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<float>([&](const std::valarray<float>& arr){ sum += static_cast<double>( pow(arr[!mask]-static_cast<float>(GetMean()),2).sum() ); });
+        if(handled) return sum;
+
+        handled = WithTypedData<double>([&](const std::valarray<double>& arr){ sum += pow(arr[!mask]-GetMean(),2).sum(); });
+        if(handled) return sum;
+
+       // fallback generic per-element access via FitsArrayBase::get()
+        for(size_t i = 0; i < data->size(); ++i)
+        {
+            if(i < mask.size() && mask[i]) continue;
+            sum += pow(static_cast<double>(data->get(i)) - GetMean(),2.);
+        }
+
+        return (nPix > 0) ? sum /= static_cast<double>(nPix) : 0;
+    }
+
+    double FITScube::Getpercentil(double fpp) const
+    {
+        if(fpp < 0. || fpp > 1.)
+            throw FITSexception(BAD_OPTION,"FITScube","Getpercentil","fpp should be in the range [0,1]");
+
+        if(data == nullptr || data->size() < 1)
+            throw FITSexception(BAD_OPTION,"FITScube","Getpercentil","Empty data array, invalid data");
+
+        std::vector<double> sorted;
+        for(size_t i = 0; i < data->size(); i++)
+            if(!mask[i] && std::abs(static_cast<double>(data->get(i))) > std::numeric_limits<double>::min()) sorted.push_back( static_cast<double>( data->get(i) ));
+        
+        std::sort(sorted.begin(), sorted.end());
+
+        double pos = fpp * (sorted.size() - 1);
+        std::size_t idx = static_cast<std::size_t>(pos);
+        double frac = pos - static_cast<double>(idx);
+        double pp_value = 0.0;
+
+        if (idx + 1 < sorted.size())
+            pp_value = sorted[idx] * (1.0 - frac) + sorted[idx + 1] * frac;
+        else
+            pp_value = sorted[idx];
+        
+        return pp_value;
+    }
+
+    double FITScube::GetMedian() const
+    {        
+        return Getpercentil(0.5);
+    }
+    
+    double FITScube::Get5thpercentil() const
+    {
+        return Getpercentil(0.05);
+    }
+
+    double FITScube::Get25thpercentil() const
+    {
+        return Getpercentil(0.25);
+    }
+
+    double FITScube::Get75thpercentil() const
+    {
+        return Getpercentil(0.75);
+    }
+
+    double FITScube::Get95thpercentil() const
+    {
+        return Getpercentil(0.95);
+    }
+
+    /**
+     *  @details Compute the minimum of all unmasked pixel values
+     *  @return Minimum value of all unmasked pixel values
+     */
+    double FITScube::GetMinimum() const
+    {
+        if(!data)
+            throw FITSexception(NOT_IMAGE,"FITScube","GetMinimum","No data available");
+    
+        bool handled = false;
+        double minVal = std::numeric_limits<double>::max();
+
+        // fast typed paths (add the types you commonly use)
+        handled = WithTypedData<int8_t>([&](const std::valarray<int8_t>& arr){ minVal += static_cast<double>( arr[!mask].min() ); });
+        if(handled) return minVal;
+
+        handled = WithTypedData<uint8_t>([&](const std::valarray<uint8_t>& arr){ minVal += static_cast<double>( arr[!mask].min() ); });
+        if(handled) return minVal;
+
+        handled = WithTypedData<int16_t>([&](const std::valarray<int16_t>& arr){ minVal += static_cast<double>( arr[!mask].min() ); });
+        if(handled) return minVal;
+
+        handled = WithTypedData<uint16_t>([&](const std::valarray<uint16_t>& arr){ minVal += static_cast<double>( arr[!mask].min() ); });
+        if(handled) return minVal;
+
+        handled = WithTypedData<int32_t>([&](const std::valarray<int32_t>& arr){ minVal += static_cast<double>( arr[!mask].min() ); });
+        if(handled) return minVal;
+
+        handled = WithTypedData<uint32_t>([&](const std::valarray<uint32_t>& arr){ minVal += static_cast<double>( arr[!mask].min() ); });
+        if(handled) return minVal;
+
+        handled = WithTypedData<int64_t>([&](const std::valarray<int64_t>& arr){ minVal += static_cast<double>( arr[!mask].min() ); });
+        if(handled) return minVal;
+
+        handled = WithTypedData<uint64_t>([&](const std::valarray<uint64_t>& arr){ minVal += static_cast<double>( arr[!mask].min() ); });
+        if(handled) return minVal;
+
+        handled = WithTypedData<size_t>([&](const std::valarray<size_t>& arr){ minVal += static_cast<double>( arr[!mask].min() ); });
+        if(handled) return minVal;
+
+        handled = WithTypedData<float>([&](const std::valarray<float>& arr){ minVal += static_cast<double>( arr[!mask].min() ); });
+        if(handled) return minVal;
+
+        handled = WithTypedData<double>([&](const std::valarray<double>& arr){ minVal += arr[!mask].min(); });
+        if(handled) return minVal;
+
+       // fallback generic per-element access via FitsArrayBase::get()
+        for(size_t i = 0; i < data->size(); ++i)
+        {
+            if(i < mask.size() && mask[i]) continue;
+            minVal = (static_cast<double>(data->get(i)) < minVal) ? static_cast<double>(data->get(i)) : minVal;
+        }
+
+        return minVal;
+    }
+
+    /**
+     *  @details Compute the maximum of all unmasked pixel values
+     *  @return Maximum value of all unmasked pixel values
+     */
+    double FITScube::GetMaximum() const
+    {
+        if(!data)
+            throw FITSexception(NOT_IMAGE,"FITScube","GetMinimum","No data available");
+    
+        bool handled = false;
+        double maxVal = std::numeric_limits<double>::min();
+
+        // fast typed paths (add the types you commonly use)
+        handled = WithTypedData<int8_t>([&](const std::valarray<int8_t>& arr){ maxVal += static_cast<double>( arr[!mask].max() ); });
+        if(handled) return maxVal;
+
+        handled = WithTypedData<uint8_t>([&](const std::valarray<uint8_t>& arr){ maxVal += static_cast<double>( arr[!mask].max() ); });
+        if(handled) return maxVal;
+
+        handled = WithTypedData<int16_t>([&](const std::valarray<int16_t>& arr){ maxVal += static_cast<double>( arr[!mask].max() ); });
+        if(handled) return maxVal;
+
+        handled = WithTypedData<uint16_t>([&](const std::valarray<uint16_t>& arr){ maxVal += static_cast<double>( arr[!mask].max() ); });
+        if(handled) return maxVal;
+
+        handled = WithTypedData<int32_t>([&](const std::valarray<int32_t>& arr){ maxVal += static_cast<double>( arr[!mask].max() ); });
+        if(handled) return maxVal;
+
+        handled = WithTypedData<uint32_t>([&](const std::valarray<uint32_t>& arr){ maxVal += static_cast<double>( arr[!mask].max() ); });
+        if(handled) return maxVal;
+
+        handled = WithTypedData<int64_t>([&](const std::valarray<int64_t>& arr){ maxVal += static_cast<double>( arr[!mask].max() ); });
+        if(handled) return maxVal;
+
+        handled = WithTypedData<uint64_t>([&](const std::valarray<uint64_t>& arr){ maxVal += static_cast<double>( arr[!mask].max() ); });
+        if(handled) return maxVal;
+
+        handled = WithTypedData<size_t>([&](const std::valarray<size_t>& arr){ maxVal += static_cast<double>( arr[!mask].max() ); });
+        if(handled) return maxVal;
+
+        handled = WithTypedData<float>([&](const std::valarray<float>& arr){ maxVal += static_cast<double>( arr[!mask].max() ); });
+        if(handled) return maxVal;
+
+        handled = WithTypedData<double>([&](const std::valarray<double>& arr){ maxVal += arr[!mask].max(); });
+        if(handled) return maxVal;
+
+       // fallback generic per-element access via FitsArrayBase::get()
+        for(size_t i = 0; i < data->size(); ++i)
+        {
+            if(i < mask.size() && mask[i]) continue;
+            maxVal = (static_cast<double>(data->get(i)) > maxVal) ? static_cast<double>(data->get(i)) : maxVal;
+        }
+
+        return maxVal;
+    }
+
+#pragma endregion
+#pragma endregion
+
+#pragma region Class template instantiation
 template class FITSimg<uint8_t>;
 template class FITSimg<int8_t>;
 template class FITSimg<int16_t>;
@@ -997,7 +1302,10 @@ template class FITSimg<uint16_t>;
 template class FITSimg<int32_t>;
 template class FITSimg<uint32_t>;
 template class FITSimg<int64_t>;
+template class FITSimg<uint64_t>;
+template class FITSimg<size_t>;
 template class FITSimg<float>;
 template class FITSimg<double>;
+#pragma endregion
     
 }

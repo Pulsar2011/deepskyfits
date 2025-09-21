@@ -137,6 +137,8 @@ namespace DSL
         FITShdu(const std::shared_ptr<fitsfile>& fptr);         //!< Construct from fitsfile
         FITShdu(const FITShdu &);                               //!< Copy constructor
         virtual ~FITShdu();                                     //!< Destructor
+
+        void swap(FITShdu& other) noexcept;                        //!< Swap content of two FITShdu objects
         
 #pragma endregion
 #pragma region  • Accessor
@@ -209,6 +211,13 @@ namespace DSL
 #pragma endregion
     };
 #pragma endregion
+
+// add non-member swap so ADL will find it (works with std::swap customization pattern)
+inline void swap(FITShdu& a, FITShdu& b) noexcept
+{
+    a.swap(b);
+}
+
 }
 
 #endif /* defined(__FitsExtractor__FITShdu__) */

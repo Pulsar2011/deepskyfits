@@ -503,4 +503,41 @@ TEST(FITShdu_Modifier, ModifyFitsHeader)
    
 }
 
+TEST(FITShdu_swap, swapBetweenHdu)
+{
+    FITShdu hdu1;
+    hdu1.ValueForKey("KEY1", 1, "first key");
+    hdu1.ValueForKey("KEY2", 2.0, "second key");
+
+    FITShdu hdu2;
+    hdu2.ValueForKey("KEYA", std::string("A"), "key A");
+    hdu2.ValueForKey("KEYB", false);
+    hdu2.ValueForKey("KEYC", 3.14f);
+
+    // Swap contents
+    hdu1.swap(hdu2);
+
+    // Verify hdu1 now has hdu2's keys
+    EXPECT_TRUE (hdu1.Exists("KEYA"));
+    EXPECT_TRUE (hdu1.Exists("KEYB"));
+    EXPECT_TRUE (hdu1.Exists("KEYC"));
+    EXPECT_FALSE(hdu1.Exists("KEY1"));
+    EXPECT_FALSE(hdu1.Exists("KEY2"));
+
+    EXPECT_EQ   (hdu1.GetValueForKey("KEYA"), std::string("A"));
+    EXPECT_FALSE(hdu1.GetBoolValueForKey("KEYB"));
+    EXPECT_NEAR (hdu1.GetFloatValueForKey("KEYC"), 3.14f, 1e-6f);
+    
+    
+    // Verify hdu2 now has hdu1's keys
+    EXPECT_TRUE (hdu2.Exists("KEY1"));
+    EXPECT_TRUE (hdu2.Exists("KEY2"));
+    EXPECT_FALSE(hdu2.Exists("KEYA"));
+    EXPECT_FALSE(hdu2.Exists("KEYB"));
+    EXPECT_FALSE(hdu2.Exists("KEYC"));
+
+    EXPECT_EQ   (hdu2.GetInt8ValueForKey("KEY1"), 1);
+    EXPECT_NEAR (hdu2.GetDoubleValueForKey("KEY2"), 2.0, 1e-10);
+}   
+
 #pragma endregion

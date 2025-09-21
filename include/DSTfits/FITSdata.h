@@ -11,6 +11,8 @@
 #define _DSL_FITSdata_
 
 #include <fitsio.h>
+#include <cmath>
+#include <limits>
 
 namespace DSL
 {
@@ -91,7 +93,116 @@ namespace DSL
         fByte     = TBYTE,
         fUndef,                   //!< undefined
     };
-    
-}
 
+}
 #endif
+
+#ifndef DSL_DATAARRAY_H
+#define DSL_DATAARRAY_H
+
+#include <valarray>
+#include <memory>
+#include <functional>
+#include <typeindex>
+#include <cstddef>
+#include <type_traits>
+
+namespace DSL {
+
+    // forward declaration of template derived class used by applyIfType
+    template<typename T>
+    struct FitsArray;
+
+
+    struct FitsArrayBase
+    {
+        virtual ~FitsArrayBase() = default;
+        virtual size_t size() const = 0;
+        virtual double get(const size_t& idx) const = 0;
+        virtual void   set(const size_t& idx, double v) = 0;
+        virtual std::type_index type() const = 0;
+        
+        // attempt to execute fn with the typed valarray<T>&; returns true if successful
+        template<typename T, typename Fn>
+        bool applyIfType(Fn &&fn)
+        {
+            if(type() != std::type_index(typeid(T))) return false;
+            auto *d = static_cast< FitsArray<T>* >(this);
+            fn(d->ref());
+            return true;
+        }
+    };
+
+    template<typename T>
+    struct FitsArray : FitsArrayBase
+    {
+        std::valarray<T> arr;
+        FitsArray() = default;
+        FitsArray(size_t n) : arr(static_cast<std::size_t>(n)) {}
+        FitsArray(const std::valarray<T>& v) : arr(v) {}
+        
+        size_t size() const override { return arr.size(); }
+        double get(const size_t& idx) const override { return static_cast<double>( arr[ idx ] ); }
+        void   set(const size_t& idx, double v) override { arr[ idx ] = static_cast<T>( v ); }
+        std::type_index type() const override { return std::type_index(typeid(T)); }
+        std::valarray<T>& ref() { return arr; }
+        const std::valarray<T>& ref() const { return arr; }
+    };
+
+    template<typename U>
+    constexpr bool is_allowed_storage_type_v =
+        std::is_same_v<U,uint8_t> || std::is_same_v<U,int8_t> ||
+        std::is_same_v<U,uint16_t> || std::is_same_v<U,int16_t> ||
+        std::is_same_v<U,uint32_t> || std::is_same_v<U,int32_t> ||
+        std::is_same_v<U,uint64_t> || std::is_same_v<U,int64_t> ||
+        std::is_same_v<U,size_t>  ||
+        std::is_same_v<U,float>   || std::is_same_v<U,double> ;
+
+    template<typename S, typename T>
+    inline bool safe_cast_check_scalar(const S &v) noexcept
+    {
+
+        if(!is_allowed_storage_type_v<T> || !is_allowed_storage_type_v<S>)
+            return false;
+
+        if constexpr (!std::is_convertible_v<S, T>)
+            return false;
+
+        if constexpr (std::is_floating_point_v<S> && std::is_integral_v<T>)
+        {
+            // no NaN/inf, in-range and integer-valued
+            if (!std::isfinite(static_cast<long double>(v)))
+                return false;
+                
+            long double ld = static_cast<long double>(v);
+
+            if (ld < static_cast<long double>(std::numeric_limits<T>::lowest()) ||
+                ld > static_cast<long double>(std::numeric_limits<T>::max()))
+                return false;
+            
+            // reject fractional part (avoid silent truncation)
+            return std::floor(ld) == ld;
+        }
+        else if constexpr (std::is_integral_v<S> && std::is_integral_v<T>)
+        {
+            // check range (signed/unsigned differences handled by numeric_limits)
+            long double ld = static_cast<long double>(v);
+            return (ld >= static_cast<long double>(std::numeric_limits<T>::lowest()) &&
+                    ld <= static_cast<long double>(std::numeric_limits<T>::max()));
+        }
+        else if constexpr (std::is_floating_point_v<S> && std::is_floating_point_v<T>)
+        {
+            // only check for finite values
+            return std::isfinite(static_cast<long double>(v));
+        } else
+        {
+            // other conversions (e.g. integral->float) are generally safe
+            return true;
+        }
+
+        return true;
+    }
+
+} // namespace DSL
+
+#endif // DSL_DATAARRAY_H
