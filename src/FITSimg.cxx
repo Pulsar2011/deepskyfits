@@ -37,17 +37,25 @@ class FITSmanager;
      *  @param naxes Size of each dimension
      *  @return A std::vector of ndim size for wich each value represents the length of the axis
      */
-    std::vector<size_t> FITScube::Build_axis(const size_t& ndim, const size_t& _iaxis0, va_list argptr)
+    std::vector<size_t> FITScube::Build_axis(const size_t& ndim, const std::initializer_list<size_t>& _iaxis)
     {
-        std::vector<size_t> axis = {_iaxis0};
-        size_t _iaxis;
+        if(ndim < 1)
+            throw std::invalid_argument("FITSimg::Build_axis: ndim must be >= 1");
         
-        while(axis.size() < ndim)
+        if(_iaxis.size() < ndim)
+            throw std::invalid_argument("FITSimg::Build_axis: number of axis size must be == ndim");
+        
+        std::vector<size_t> axis;
+        axis.reserve(ndim);
+
+        auto it = _iaxis.begin();
+        for (size_t i = 0; i < ndim; ++i, ++it)
         {
-            _iaxis = va_arg(argptr, size_t);
-            axis.push_back(_iaxis);
+            if (*it == 0)
+                throw std::invalid_argument("FITScube::Build_axis: axis sizes must be >= 1");
+            axis.push_back(*it);
         }
-        
+
         return axis;
     }
 
@@ -183,19 +191,13 @@ class FITSmanager;
         name.clear();
     }
     
-    FITScube* FITScube::UByteFITSimg(unsigned int _naxis, size_t _iaxis, ...)
-    {
-        va_list argptr;
-        va_start(argptr,_iaxis);
-        
-        std::vector<size_t> axis = Build_axis(_naxis, _iaxis, argptr);
-        
-        va_end(argptr);
-       
+    FITScube* FITScube::UByteFITSimg(const size_t& _naxis, const std::initializer_list<size_t>& _iaxis)
+    {       
+        std::vector<size_t> axis = Build_axis(_naxis, _iaxis);
         return UByteFITSimg(axis);
     }
     
-    FITScube* FITScube::UByteFITSimg(std::vector<size_t> axis)
+    FITScube* FITScube::UByteFITSimg(const std::vector<size_t>& axis)
     {
         FITScube *img = NULL;
         img = new FITSimg<uint8_t>(axis);
@@ -203,20 +205,14 @@ class FITSmanager;
         
     }
     
-    FITScube* FITScube::ByteFITSimg(unsigned int _naxis, size_t _iaxis, ...)
-    {
-        va_list argptr;
-        va_start(argptr,_iaxis);
-        
-        std::vector<size_t> axis =Build_axis(_naxis, _iaxis, argptr);
-        
-        va_end(argptr);
-        
+    FITScube* FITScube::ByteFITSimg(const size_t& _naxis, const std::initializer_list<size_t>& _iaxis)
+    {       
+        std::vector<size_t> axis = Build_axis(_naxis, _iaxis);
         return ByteFITSimg(axis);
         
     }
     
-    FITScube* FITScube::ByteFITSimg(std::vector<size_t> axis)
+    FITScube* FITScube::ByteFITSimg(const std::vector<size_t>& axis)
     {
         FITScube *img = NULL;
         img = new FITSimg<int8_t>(axis);
@@ -224,55 +220,39 @@ class FITSmanager;
         return img;
     }
     
-    FITScube* FITScube::UShortFITSimg(unsigned int _naxis, size_t _iaxis, ...)
-    {
-        va_list argptr;
-        va_start(argptr,_iaxis);
-        
-        std::vector<size_t> axis =Build_axis(_naxis, _iaxis, argptr);
-        
-        va_end(argptr);
+    FITScube* FITScube::UShortFITSimg(const size_t& _naxis, const std::initializer_list<size_t>& _iaxis)
+    {       
+        std::vector<size_t> axis = Build_axis(_naxis, _iaxis);
         return UShortFITSimg(axis);
     }
     
-    FITScube* FITScube::UShortFITSimg(std::vector<size_t> axis)
+    FITScube* FITScube::UShortFITSimg(const std::vector<size_t>& axis)
     {
         FITScube *img = NULL;
         img = new FITSimg<uint16_t>(axis);
         return img;
     }
     
-    FITScube* FITScube::ShortFITSimg(unsigned int _naxis, size_t _iaxis, ...)
-    {
-        va_list argptr;
-        va_start(argptr,_iaxis);
-        
-        std::vector<size_t> axis =Build_axis(_naxis, _iaxis, argptr);
-        
-        va_end(argptr);
-        
+    FITScube* FITScube::ShortFITSimg(const size_t& _naxis, const std::initializer_list<size_t>& _iaxis)
+    {       
+        std::vector<size_t> axis = Build_axis(_naxis, _iaxis);
         return ShortFITSimg(axis);
     }
     
-    FITScube* FITScube::ShortFITSimg(std::vector<size_t> axis)
+    FITScube* FITScube::ShortFITSimg(const std::vector<size_t>& axis)
     {
         FITScube *img = NULL;
         img = new FITSimg<int16_t>(axis);
         return img;
     }
     
-    FITScube* FITScube::UIntFITSimg(unsigned int _naxis, size_t _iaxis, ...)
-    {
-        va_list argptr;
-        va_start(argptr,_iaxis);
-        
-        std::vector<size_t> axis =Build_axis(_naxis, _iaxis, argptr);
-        
-        va_end(argptr);
+    FITScube* FITScube::UIntFITSimg(const size_t& _naxis, const std::initializer_list<size_t>& _iaxis)
+    {       
+        std::vector<size_t> axis = Build_axis(_naxis, _iaxis);
         return UIntFITSimg(axis);
     }
     
-    FITScube* FITScube::UIntFITSimg(std::vector<size_t> axis)
+    FITScube* FITScube::UIntFITSimg(const std::vector<size_t>& axis)
     {
         FITScube *img = NULL;
         img = new FITSimg<uint32_t>(axis);
@@ -280,18 +260,13 @@ class FITSmanager;
         return img;
     }
     
-    FITScube* FITScube::IntFITSimg(unsigned int _naxis, size_t _iaxis, ...)
-    {
-        va_list argptr;
-        va_start(argptr,_iaxis);
-        
-        std::vector<size_t> axis =Build_axis(_naxis, _iaxis, argptr);
-        
-        va_end(argptr);
+    FITScube* FITScube::IntFITSimg(const size_t& _naxis, const std::initializer_list<size_t>& _iaxis)
+    {       
+        std::vector<size_t> axis = Build_axis(_naxis, _iaxis);
         return IntFITSimg(axis);
     }
     
-    FITScube* FITScube::IntFITSimg(std::vector<size_t> axis)
+    FITScube* FITScube::IntFITSimg(const std::vector<size_t>& axis)
     {
         FITScube *img = NULL;
         img = new FITSimg<int32_t>(axis);
@@ -299,95 +274,65 @@ class FITSmanager;
         return img;
     }
     
-    FITScube* FITScube::LongFITSimg(unsigned int _naxis, size_t _iaxis, ...)
-    {
-        va_list argptr;
-        va_start(argptr,_iaxis);
-        
-        std::vector<size_t> axis =Build_axis(_naxis, _iaxis, argptr);
-
-        va_end(argptr);
-        
+    FITScube* FITScube::LongFITSimg(const size_t& _naxis, const std::initializer_list<size_t>& _iaxis)
+    {       
+        std::vector<size_t> axis = Build_axis(_naxis, _iaxis);
         return LongFITSimg(axis);
     }
     
-    FITScube* FITScube::LongFITSimg(std::vector<size_t> axis)
+    FITScube* FITScube::LongFITSimg(const std::vector<size_t>& axis)
     {
         FITScube *img = NULL;
         img = new FITSimg<int32_t>(axis);
         return img;
     }
     
-    FITScube* FITScube::ULongFITSimg(unsigned int _naxis, size_t _iaxis, ...)
-    {
-        va_list argptr;
-        va_start(argptr,_iaxis);
-        
-        std::vector<size_t> axis =Build_axis(_naxis, _iaxis, argptr);
-        
-        va_end(argptr);
-        
+    FITScube* FITScube::ULongFITSimg(const size_t& _naxis, const std::initializer_list<size_t>& _iaxis)
+    {       
+        std::vector<size_t> axis = Build_axis(_naxis, _iaxis);
         return ULongFITSimg(axis);
     }
     
-    FITScube* FITScube::ULongFITSimg(std::vector<size_t> axis)
+    FITScube* FITScube::ULongFITSimg(const std::vector<size_t>& axis)
     {
         FITScube *img = NULL;
         img = new FITSimg<uint32_t>(axis);
         return img;
     }
     
-    FITScube* FITScube::LongLongFITSimg(unsigned int _naxis, size_t _iaxis, ...)
-    {
-        va_list argptr;
-        va_start(argptr,_iaxis);
-        
-        std::vector<size_t> axis =Build_axis(_naxis, _iaxis, argptr);
-        
-        va_end(argptr);
-        
+    FITScube* FITScube::LongLongFITSimg(const size_t& _naxis, const std::initializer_list<size_t>& _iaxis)
+    {       
+        std::vector<size_t> axis = Build_axis(_naxis, _iaxis);
         return LongLongFITSimg(axis);
     }
     
-    FITScube* FITScube::LongLongFITSimg(std::vector<size_t> axis)
+    FITScube* FITScube::LongLongFITSimg(const std::vector<size_t>& axis)
     {
         FITScube *img = NULL;
         img = new FITSimg<int64_t>(axis);
         return img;
     }
     
-    FITScube* FITScube::FloatFITSimg(unsigned int _naxis, size_t _iaxis, ...)
-    {
-        va_list argptr;
-        va_start(argptr,_iaxis);
-        
-        std::vector<size_t> axis =Build_axis(_naxis, _iaxis, argptr);
-        
-        va_end(argptr);
-        
+    FITScube* FITScube::FloatFITSimg(const size_t& _naxis, const std::initializer_list<size_t>& _iaxis)
+    {       
+        std::vector<size_t> axis = Build_axis(_naxis, _iaxis);
         return FloatFITSimg(axis);
     }
     
-    FITScube* FITScube::FloatFITSimg(std::vector<size_t> axis)
+    FITScube* FITScube::FloatFITSimg(const std::vector<size_t>& axis)
     {
         FITScube *img = NULL;
         img = new FITSimg<float>(axis);
         return img;
     }
     
-    FITScube* FITScube::DoubleFITSimg(unsigned int _naxis, size_t _iaxis, ...)
-    {
-        va_list argptr;
-        va_start(argptr,_iaxis);
-        
-        std::vector<size_t> axis =Build_axis(_naxis, _iaxis, argptr);
-
-        va_end(argptr);
-        
+    FITScube* FITScube::DoubleFITSimg(const size_t& _naxis, const std::initializer_list<size_t>& _iaxis)
+    {       
+        std::vector<size_t> axis = Build_axis(_naxis, _iaxis);
         return DoubleFITSimg(axis);
     }
     
-    FITScube* FITScube::DoubleFITSimg(std::vector<size_t> axis)
+    FITScube* FITScube::DoubleFITSimg(const std::vector<size_t>& axis)
     {
         FITScube *img = NULL;
         img = new FITSimg<double>(axis);
@@ -436,17 +381,13 @@ class FITSmanager;
      *  @param size_t pixel index position in the pixel array
      *  @return pixel world coordinate
      */
-    std::vector<double> FITScube::WorldCoordinates(size_t k) const
+    std::vector<double> FITScube::WorldCoordinates(const size_t& k) const
     {
-#if __cplusplus >= 199711L
         auto pixels_coo = std::bind( &FITScube::PixelCoordinates, this,std::placeholders::_1);
         return WorldCoordinates(pixels_coo(k));
-#else
-        return WorldCoordinates(PixelCoordinates(k));
-#endif
     }
     
-    std::vector<double> FITScube::WorldCoordinates(std::vector<unsigned long long> pixel) const
+    std::vector<double> FITScube::WorldCoordinates(const std::vector<size_t>& pixel) const
     {
         std::vector<double> dbl_px = std::vector<double>(pixel.size());
         for(size_t i = 0; i < pixel.size(); i++)
@@ -458,7 +399,7 @@ class FITSmanager;
         return wcs;
     }
     
-    std::vector<double> FITScube::WorldCoordinates(std::vector<double> pixel) const
+    std::vector<double> FITScube::WorldCoordinates(const std::vector<double>& pixel) const
     {
         std::vector<double> wcs = std::vector<double>(pixel.size());
         for(size_t i = 0; i < pixel.size(); i++)
@@ -478,21 +419,21 @@ class FITSmanager;
      *  @param k: 1D pixel index
      *  @return Pixel coordinates on each dimension of the FITS datacube
      */
-    std::vector<unsigned long long> FITScube::PixelCoordinates(size_t k) const
+    std::vector<size_t> FITScube::PixelCoordinates(const size_t& k) const
     {
-        std::vector<unsigned long long> xPixel = std::vector<unsigned long long>(Naxis.size());
+        std::vector<size_t> xPixel = std::vector<size_t>(Naxis.size());
         
-        unsigned long long size = 1;
+        size_t size = 1;
         
         for(size_t i = 0; i < Naxis.size(); i++)
         {
             size = 1;
             for(size_t l = 0; l < i; l++)
             {
-                size *= static_cast<unsigned long long>( Naxis[l] );
+                size *=  Naxis[l] ;
             }
             
-            xPixel[i] = static_cast<unsigned long long>( k/size % Naxis[i] );
+            xPixel[i] =  k/size % Naxis[i] ;
         }
         
         return xPixel;
@@ -503,7 +444,7 @@ class FITSmanager;
      *  @param coo: 1D pixel index
      *  @return Pixel coordinates on each dimension of the FITS datacube
      */
-    std::vector<double> FITScube::World2Pixel(std::vector<double> coo) const
+    std::vector<double> FITScube::World2Pixel(const std::vector<double>& coo) const
     {
         std::vector<double> xPixel = std::vector<double>(coo);
         
@@ -658,34 +599,23 @@ class FITSmanager;
      *  @param n    Identification of the axis
      *  @param size New size, in pixel, of the axis
      */
-    void FITScube::SetAxisLength(unsigned long int n, long long size)
+    void FITScube::SetAxisLength(const size_t& n, const size_t& size)
     {
-        try
+        if(n-1 >= Naxis.size())
         {
-            if(n-1 >= Naxis.size())
-            {
-                img_status = BAD_NAXIS;
-                throw FITSexception(img_status,"FITScube","ctor","AXIS SIZE OUT OF SCOPE");
-            }
+            img_status = BAD_NAXIS;
+            throw FITSexception(img_status,"FITScube","ctor","AXIS SIZE OUT OF SCOPE");
+        }
         
-            if(size < 0)
-            {
-                img_status = BAD_NAXIS;
-                throw FITSexception(img_status,"FITScube","ctor","AXIS SIZE CAN'T BE NEGATIVE");
-            }
-        }
-        catch(std::exception& e)
+        if(size < 0)
         {
-            std::cerr<<e.what()<<std::flush;
-            return;
+            img_status = BAD_NAXIS;
+            throw FITSexception(img_status,"FITScube","ctor","AXIS SIZE CAN'T BE NEGATIVE");
         }
+        
         
         Naxis[n-1] = size;
-#if __cplusplus >= 201103L
         hdu.ValueForKey(std::string("NAXIS")+std::to_string(n),size);
-#else
-        hdu.ValueForKey(std::string("NAXIS")+std::to_string(static_cast<long long unsigned int>( n )),size);
-#endif
     }
     
     /**
@@ -696,16 +626,12 @@ class FITSmanager;
         size_t nAxis = Naxis.size();
         Naxis.resize(Naxis.size()-1);
         
-#if __cplusplus >= 201103L
         hdu.DeleteKey(std::string("NAXIS")+std::to_string(nAxis));
-#else
-        hdu.DeleteKey(std::string("NAXIS")+std::to_string(static_cast<long long unsigned int>( nAxis )));
-#endif
         
         hdu.ValueForKey("NAXIS",Naxis.size());
     }
     
-    void FITScube::BitPerPixel(int _bit, int eq)
+    void FITScube::BitPerPixel(const int& _bit, const int& eq)
     {
         BITPIX = _bit;
         if(eq == 0)
@@ -717,7 +643,7 @@ class FITSmanager;
     }
     
     
-    void FITScube::SetName(std::string _name)
+    void FITScube::SetName(const std::string& _name)
     {
         if(name.size() > 1)
             name.clear();

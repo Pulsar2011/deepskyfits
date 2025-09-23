@@ -203,6 +203,8 @@ namespace DSL {
         return true;
     }
 
+    template<typename> inline constexpr bool always_false_v = false;
+
 } // namespace DSL
 
 #endif // DSL_DATAARRAY_H

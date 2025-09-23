@@ -78,7 +78,7 @@ namespace DSL
 
 #pragma endregion
 #pragma region • Protected member function
-        static std::vector<size_t> Build_axis(const size_t&, const size_t&, va_list args);
+        static std::vector<size_t> Build_axis(const size_t&, const std::initializer_list<size_t>&);
         
     private:
 #pragma endregion
@@ -104,30 +104,30 @@ namespace DSL
         
         virtual void Resize(const size_t&, const size_t&, const size_t&, const size_t&) = 0;
         
-        static FITScube* UByteFITSimg      (unsigned int, size_t, ...);
-        static FITScube* ByteFITSimg       (unsigned int, size_t, ...);
-        static FITScube* UShortFITSimg     (unsigned int, size_t, ...);
-        static FITScube* ShortFITSimg      (unsigned int, size_t, ...);
-        static FITScube* IntFITSimg        (unsigned int, size_t, ...);
-        static FITScube* UIntFITSimg       (unsigned int, size_t, ...);
-        static FITScube* LongFITSimg       (unsigned int, size_t, ...);
-        static FITScube* ULongFITSimg      (unsigned int, size_t, ...);
-        static FITScube* LongLongFITSimg   (unsigned int, size_t, ...);
-        static FITScube* FloatFITSimg      (unsigned int, size_t, ...);
-        static FITScube* DoubleFITSimg     (unsigned int, size_t, ...);
+        static FITScube* UByteFITSimg      (const size_t&, const std::initializer_list<size_t>& );
+        static FITScube* ByteFITSimg       (const size_t&, const std::initializer_list<size_t>& );
+        static FITScube* UShortFITSimg     (const size_t&, const std::initializer_list<size_t>& );
+        static FITScube* ShortFITSimg      (const size_t&, const std::initializer_list<size_t>& );
+        static FITScube* IntFITSimg        (const size_t&, const std::initializer_list<size_t>& );
+        static FITScube* UIntFITSimg       (const size_t&, const std::initializer_list<size_t>& );
+        static FITScube* LongFITSimg       (const size_t&, const std::initializer_list<size_t>& );
+        static FITScube* ULongFITSimg      (const size_t&, const std::initializer_list<size_t>& );
+        static FITScube* LongLongFITSimg   (const size_t&, const std::initializer_list<size_t>& );
+        static FITScube* FloatFITSimg      (const size_t&, const std::initializer_list<size_t>& );
+        static FITScube* DoubleFITSimg     (const size_t&, const std::initializer_list<size_t>& );
         
-        static FITScube* UByteFITSimg       (std::vector<size_t>);
-        static FITScube* ByteFITSimg        (std::vector<size_t>);
-        static FITScube* UShortFITSimg      (std::vector<size_t>);
-        static FITScube* ShortFITSimg       (std::vector<size_t>);
-        static FITScube* IntFITSimg         (std::vector<size_t>);
-        static FITScube* UIntFITSimg        (std::vector<size_t>);
-        static FITScube* LongFITSimg        (std::vector<size_t>);
-        static FITScube* ULongFITSimg       (std::vector<size_t>);
-        static FITScube* LongLongFITSimg    (std::vector<size_t>);
-        static FITScube* FloatFITSimg       (std::vector<size_t>);
-        static FITScube* DoubleFITSimg      (std::vector<size_t>);
-        
+        static FITScube* UByteFITSimg      (const std::vector<size_t>& );
+        static FITScube* ByteFITSimg       (const std::vector<size_t>& );
+        static FITScube* UShortFITSimg     (const std::vector<size_t>& );
+        static FITScube* ShortFITSimg      (const std::vector<size_t>& );
+        static FITScube* IntFITSimg        (const std::vector<size_t>& );
+        static FITScube* UIntFITSimg       (const std::vector<size_t>& );
+        static FITScube* LongFITSimg       (const std::vector<size_t>& );
+        static FITScube* ULongFITSimg      (const std::vector<size_t>& );
+        static FITScube* LongLongFITSimg   (const std::vector<size_t>& );
+        static FITScube* FloatFITSimg      (const std::vector<size_t>& );
+        static FITScube* DoubleFITSimg     (const std::vector<size_t>& );
+
 #pragma endregion
 #pragma region • Static member
         static bool debug;
@@ -153,13 +153,13 @@ namespace DSL
             fSQRT,  ///< Squared root scale
         };
         
-        std::vector<double>                     WorldCoordinates(size_t) const; //!< Get world coordinates
-        virtual std::vector<double>             WorldCoordinates(std::vector<unsigned long long>) const; //!< Get world coordinates
-        virtual std::vector<double>             WorldCoordinates(std::vector<double>) const; //!< Get world coordinates
+        std::vector<double>                     WorldCoordinates(const size_t&) const; //!< Get world coordinates
+        virtual std::vector<double>             WorldCoordinates(const std::vector<size_t>&) const; //!< Get world coordinates
+        virtual std::vector<double>             WorldCoordinates(const std::vector<double>&) const; //!< Get world coordinates
         
-        virtual std::vector<double> World2Pixel( std::vector<double> ) const; //!< Get pixel coordinates based on WCS
+        virtual std::vector<double> World2Pixel( const std::vector<double>& ) const; //!< Get pixel coordinates based on WCS
         
-        virtual std::vector<unsigned long long> PixelCoordinates(size_t) const; //!< Get pixel coordinates
+        virtual std::vector<size_t> PixelCoordinates(const size_t&) const; //!< Get pixel coordinates
         
         /**
          *  Obtain the pixel index from the 1D FITS datacube based on the cartesian coordinate of the pixel
@@ -167,35 +167,31 @@ namespace DSL
          *  @return Pixel index in the 1D FITS datacube
          */
         template<typename T>
-        size_t PixelIndex(T iPx, ...) const           //!< Get pixel index
+        size_t PixelIndex(const std::initializer_list<T>& arg) const           //!< Get pixel index
         {
-            T arg = iPx;
-            std::vector<size_t> pix_index;
-            pix_index.push_back(arg);
-            
-            va_list ap;
-            va_start(ap, iPx);
-            
-            for(size_t naxe = 1; naxe < Naxis.size(); naxe++)
+
+            // fast path when caller already passes size_t coordinates
+            if constexpr (std::is_same_v<T, size_t>)
             {
-                arg = va_arg(ap, T);
-                
-                if(arg == 0)
-                    break;
-                
-                pix_index.push_back(static_cast<size_t>(arg));
-                
-                if(static_cast<double>(arg) - static_cast<double>(pix_index[pix_index.size()-1]) >= 0.5)
-                    pix_index[pix_index.size()-1]++;
+                // direct construct vector from initializer_list (one allocation)
+                std::vector<size_t> pix_index(arg.begin(), arg.end());
+                return PixelIndex(pix_index);
             }
-            va_end(ap);
+            else
+            {
+                // reserve to avoid repeated reallocations
+                std::vector<size_t> pix_index;
+                pix_index.reserve(arg.size());
             
-            auto the_index =  std::bind(static_cast<size_t(FITScube::*)(const std::vector<size_t>&)const>(&FITScube::PixelIndex), this,std::placeholders::_1);
-            size_t index = the_index(pix_index);
-            
-            pix_index.clear();
-            
-            return index;
+                if constexpr (std::is_floating_point_v<T>)
+                    for (T v : arg) pix_index.push_back(static_cast<size_t>(std::llround(v)));
+                else if constexpr (std::is_integral_v<T>)
+                    for (T v : arg) pix_index.push_back(static_cast<size_t>(v));
+                else
+                    static_assert(always_false_v<T>, "PixelIndex initializer_list must hold integral or floating types convertible to size_t");
+
+                return PixelIndex(pix_index);
+            }
         }
         
         /**
@@ -204,35 +200,31 @@ namespace DSL
          *  @return Pixel index in the 1D FITS datacube
          */
         template<typename T>
-        std::vector<double> World2Pixel(T iPx, ...) const           //!< Get pixel index
+        std::vector<double> World2Pixel(const std::initializer_list<T>& arg) const           //!< Get pixel index
         {
-            T arg = iPx;
-            std::vector<double> pix_coo;
-            
-            pix_coo.push_back(static_cast<double>( arg ));
-            
-            va_list ap;
-            va_start(ap, iPx);
-            
-            for(size_t naxe = 1; naxe < Naxis.size(); naxe++)
-            {
-                arg = va_arg(ap, T);
-                
-                if(arg == 0)
-                    break;
-                
-                pix_coo.push_back(static_cast<double>(arg));
-            }
-            va_end(ap);
-            
-            
-            auto the_index =  std::bind(static_cast< std::vector<double>(FITScube::*)(std::vector<double>) const>( &FITScube::World2Pixel ), this,std::placeholders::_1);
-            std::vector<double> coo = the_index(pix_coo);
 
+            // fast path when caller already passes size_t coordinates
+            if constexpr (std::is_same_v<T, double>)
+            {
+                // direct construct vector from initializer_list (one allocation)
+                std::vector<double> pix_index(arg.begin(), arg.end());
+                return WorldCoordinates(pix_index);
+            }
+            else
+            {
+                // reserve to avoid repeated reallocations
+                std::vector<double> pix_coo;
+                pix_coo.reserve(arg.size());
             
-            pix_coo.clear();
-            
-            return coo;
+                if constexpr (std::is_floating_point_v<T>)
+                    for (T v : arg) pix_coo.push_back(static_cast<double>(v));
+                else if constexpr (std::is_integral_v<T>)
+                    for (T v : arg) pix_coo.push_back(static_cast<double>(v));
+                else
+                    static_assert(always_false_v<T>, "World2Pixel initializer_list must hold integral or floating types convertible to double");
+
+                return World2Pixel(pix_coo);
+            }
         }
         
         virtual size_t PixelIndex(const std::vector<size_t>&) const;           //!< Get pixel index
@@ -256,28 +248,30 @@ namespace DSL
         
         inline std::valarray<bool> GetMask() const {return mask;}
         
-        virtual uint8_t      UByteValueAtPixel(size_t)             const {return 0;}
-        virtual uint8_t      UByteValueAtPixel(unsigned long long) const {return 0;}
-        virtual int8_t       ByteValueAtPixel(size_t)              const {return 0;}
-        virtual int8_t       ByteValueAtPixel(unsigned long long)  const {return 0;}
-        virtual uint16_t     UShortValueAtPixel(size_t)            const {return 0;}
-        virtual uint16_t     UShortValueAtPixel(unsigned long long)const {return 0;}
-        virtual int16_t      ShortValueAtPixel(size_t)             const {return 0;}
-        virtual int16_t      ShortValueAtPixel(unsigned long long) const {return 0;}
-        virtual unsigned int UIntValueAtPixel(size_t)              const {return 0;}
-        virtual unsigned int UIntValueAtPixel(unsigned long long)  const {return 0;}
-        virtual int          IntValueAtPixel(size_t)               const {return 0;}
-        virtual int          IntValueAtPixel(unsigned long long)   const {return 0;}
-        virtual uint32_t     ULongValueAtPixel(size_t)             const {return 0;}
-        virtual uint32_t     ULongValueAtPixel(unsigned long long) const {return 0;}
-        virtual int32_t      LongValueAtPixel(size_t)              const {return 0;}
-        virtual int32_t      LongValueAtPixel(unsigned long long)  const {return 0;}
-        virtual int64_t      LongLongValueAtPixel(size_t)          const {return 0;}
-        virtual int64_t      LongLongValueAtPixel(unsigned long long)const {return 0;}
-        virtual float        FloatValueAtPixel( size_t )           const {return 0;}
-        virtual float        FloatValueAtPixel(unsigned long long) const {return 0;}
-        virtual double       DoubleValueAtPixel( size_t )          const {return 0;}
-        virtual double       DoubleValueAtPixel(unsigned long long)const {return 0;}
+        virtual uint8_t      UByteValueAtPixel   (const size_t&) const =0;
+        virtual int8_t       ByteValueAtPixel    (const size_t&) const =0;
+        virtual uint16_t     UShortValueAtPixel  (const size_t&) const =0;
+        virtual int16_t      ShortValueAtPixel   (const size_t&) const =0;
+        virtual unsigned int UIntValueAtPixel    (const size_t&) const =0;
+        virtual int          IntValueAtPixel     (const size_t&) const =0;
+        virtual uint32_t     ULongValueAtPixel   (const size_t&) const =0;
+        virtual int32_t      LongValueAtPixel    (const size_t&) const =0;
+        virtual int64_t      LongLongValueAtPixel(const size_t&) const =0;
+        virtual float        FloatValueAtPixel   (const size_t&) const =0;
+        virtual double       DoubleValueAtPixel  (const size_t&) const =0;
+
+
+        uint8_t      UByteValueAtPixel   (const std::initializer_list<size_t>&) const ;
+        int8_t       ByteValueAtPixel    (const std::initializer_list<size_t>&) const ;
+        uint16_t     UShortValueAtPixel  (const std::initializer_list<size_t>&) const ;
+        int16_t      ShortValueAtPixel   (const std::initializer_list<size_t>&) const ;
+        unsigned int UIntValueAtPixel    (const std::initializer_list<size_t>&) const ;
+        int          IntValueAtPixel     (const std::initializer_list<size_t>&) const ;
+        uint32_t     ULongValueAtPixel   (const std::initializer_list<size_t>&) const ;
+        int32_t      LongValueAtPixel    (const std::initializer_list<size_t>&) const ;
+        int64_t      LongLongValueAtPixel(const std::initializer_list<size_t>&) const ;
+        float        FloatValueAtPixel   (const std::initializer_list<size_t>&) const ;
+        double       DoubleValueAtPixel  (const std::initializer_list<size_t>&) const ;
         
 
         // Typed accessors: return pointer to the internal typed valarray<T> managed by FitsArray<T>.
@@ -309,10 +303,11 @@ namespace DSL
         
 #pragma endregion
 #pragma region • Modifier
-        void SetAxisLength(unsigned long int n, long long size);
+        void SetAxisLength(const size_t& n, const size_t& size);
         void DeleteLastAxis();
-        void BitPerPixel(int, int eq = 0);
-        void SetName    (std::string);
+        void BitPerPixel(const int& n) {BitPerPixel(n,0);}
+        void BitPerPixel(const int&, const int& eq);
+        void SetName    (const std::string&);
 
         virtual void SetPixelValue(const  uint8_t&, const std::vector<size_t>&) =0;
         virtual void SetPixelValue(const   int8_t&, const std::vector<size_t>&) =0;
@@ -523,17 +518,6 @@ namespace DSL
         
         
 #endif
-
-#ifdef _HAS_ROOT_
-#pragma endregion
-#pragma region – ROOT export capability
-        virtual void PixelToTH1(TH1&, unsigned int) const {};
-        virtual void PixelToTH2(TH2&) const {};
-        virtual void PixelToTH3(TH3&) const {};
-        virtual void PixelToTree(TTree&)  const {};
-        virtual void PixelDistribution(TH1&) const {};
-#pragma endregion
-#endif
         
     };
 
@@ -571,7 +555,7 @@ namespace DSL
         
         FITSimg(const std::shared_ptr<fitsfile>& fptr  );      //!< Default constructor
         FITSimg(const FITSimg<T>&);     //!< Copy constructor
-        FITSimg(unsigned int, size_t, ...);
+        FITSimg(const size_t&, const std::initializer_list<size_t>&);
         FITSimg(std::vector<size_t>);
         virtual ~FITSimg();             //!< Destructor
         
@@ -628,28 +612,29 @@ namespace DSL
         const T operator [](const size_t&) const;  ///< Get pixel content
               T operator [](const size_t&);	      ///< Get pixel content
         
-        virtual uint8_t      UByteValueAtPixel(size_t)             const;
-        virtual uint8_t      UByteValueAtPixel(unsigned long long) const;
-        virtual int8_t       ByteValueAtPixel(size_t)             const;
-        virtual int8_t       ByteValueAtPixel(unsigned long long) const;
-        virtual uint16_t     UShortValueAtPixel(size_t)             const;
-        virtual uint16_t     UShortValueAtPixel(unsigned long long) const;
-        virtual int16_t      ShortValueAtPixel(size_t)             const;
-        virtual int16_t      ShortValueAtPixel(unsigned long long) const;
-        virtual unsigned int UIntValueAtPixel(size_t)             const;
-        virtual unsigned int UIntValueAtPixel(unsigned long long) const;
-        virtual int          IntValueAtPixel(size_t)             const;
-        virtual int          IntValueAtPixel(unsigned long long) const;
-        virtual uint32_t     ULongValueAtPixel(size_t)             const;
-        virtual uint32_t     ULongValueAtPixel(unsigned long long) const;
-        virtual int32_t      LongValueAtPixel(size_t)             const;
-        virtual int32_t      LongValueAtPixel(unsigned long long) const;
-        virtual int64_t      LongLongValueAtPixel(size_t)             const;
-        virtual int64_t      LongLongValueAtPixel(unsigned long long) const;
-        virtual float        FloatValueAtPixel( size_t )           const;
-        virtual float        FloatValueAtPixel(unsigned long long) const;
-        virtual double       DoubleValueAtPixel( size_t )           const;
-        virtual double       DoubleValueAtPixel(unsigned long long) const;
+        uint8_t      UByteValueAtPixel   (const size_t&) const;
+        int8_t       ByteValueAtPixel    (const size_t&) const;
+        uint16_t     UShortValueAtPixel  (const size_t&) const;
+        int16_t      ShortValueAtPixel   (const size_t&) const;
+        unsigned int UIntValueAtPixel    (const size_t&) const;
+        int          IntValueAtPixel     (const size_t&) const;
+        uint32_t     ULongValueAtPixel   (const size_t&) const;
+        int32_t      LongValueAtPixel    (const size_t&) const;
+        int64_t      LongLongValueAtPixel(const size_t&) const;
+        float        FloatValueAtPixel   (const size_t&) const;
+        double       DoubleValueAtPixel  (const size_t&) const;
+
+        uint8_t      UByteValueAtPixel   (const std::initializer_list<size_t>&) const ;
+        int8_t       ByteValueAtPixel    (const std::initializer_list<size_t>&) const ;
+        uint16_t     UShortValueAtPixel  (const std::initializer_list<size_t>&) const ;
+        int16_t      ShortValueAtPixel   (const std::initializer_list<size_t>&) const ;
+        unsigned int UIntValueAtPixel    (const std::initializer_list<size_t>&) const ;
+        int          IntValueAtPixel     (const std::initializer_list<size_t>&) const ;
+        uint32_t     ULongValueAtPixel   (const std::initializer_list<size_t>&) const ;
+        int32_t      LongValueAtPixel    (const std::initializer_list<size_t>&) const ;
+        int64_t      LongLongValueAtPixel(const std::initializer_list<size_t>&) const ;
+        float        FloatValueAtPixel   (const std::initializer_list<size_t>&) const ;
+        double       DoubleValueAtPixel  (const std::initializer_list<size_t>&) const ;
 
 #pragma region — Operator +=
         template<typename S>
@@ -1067,18 +1052,13 @@ namespace DSL
      *  @param _iaxis: Number of pixel in the \f$i^{\rm ieme}\f$ dimension
      */
     template< typename T>
-    FITSimg<T>::FITSimg(unsigned int _naxis, size_t _iaxis, ...) : FITScube()
-    {
+    FITSimg<T>::FITSimg(const size_t& ndim, const std::initializer_list<size_t>& _iaxis) : FITScube()
+    {        
+        std::vector<size_t> axis = Build_axis(ndim, _iaxis);
         
-        va_list argptr;
-        va_start(argptr,_iaxis);
         
-        std::vector<size_t> axis = Build_axis(_naxis, _iaxis, argptr);
-        
-        va_end(argptr);
-        
-	for(size_t i = 0; i < axis.size(); i++)
-	  Naxis.push_back(axis[i]);
+	    for(size_t i = 0; i < axis.size(); i++)
+	      Naxis.push_back(axis[i]);
 
         mask = pxMask(static_cast<size_t>( Nelements() ));
 
@@ -1087,12 +1067,12 @@ namespace DSL
         hdu = FITShdu();
         hdu.ValueForKey("NAXIS",static_cast<int>(axis.size() ));
         for(size_t i = 0; i < Naxis.size(); i++)
-	  {
+	    {
             hdu.ValueForKey("NAXIS"+std::to_string(i+1),Naxis[i]);
-	  }
-        
+	    }
+
         template_init();
-        
+
     }
     
     /**
@@ -1716,138 +1696,258 @@ namespace DSL
     }
     
     template< typename T >
-    uint8_t FITSimg<T>::UByteValueAtPixel(size_t iPx) const
+    uint8_t FITSimg<T>::UByteValueAtPixel(const size_t& iPx) const
     {
-        return UByteValueAtPixel(static_cast<unsigned long long>( iPx ));
+        T val=0;
+
+        WithTypedData<T>([&](const std::valarray<T>& arr)
+        {
+            if(iPx >= arr.size())
+                throw FITSexception(BAD_DIMEN,"FITSimg","UByteValueAtPixel","pixel index out of range");
+            val = arr[iPx];
+        });
+
+        return static_cast<uint8_t>(val);
     }
     
     template< typename T >
-    uint8_t FITSimg<T>::UByteValueAtPixel(unsigned long long iPx) const
+    uint8_t FITSimg<T>::UByteValueAtPixel(const std::initializer_list<size_t>& iCoo) const
     {
-        return static_cast<uint8_t>(this->operator[](iPx));
+        size_t iPx = this->PixelIndex(iCoo);
+
+        return UByteValueAtPixel(iPx);
     }
     
     template< typename T >
-    int8_t FITSimg<T>::ByteValueAtPixel(size_t iPx) const
+    int8_t FITSimg<T>::ByteValueAtPixel(const size_t& iPx) const
     {
-        return ByteValueAtPixel(static_cast<unsigned long long>( iPx ));
+        T val=0;
+
+        WithTypedData<T>([&](const std::valarray<T>& arr)
+        {
+            if(iPx >= arr.size())
+                throw FITSexception(BAD_DIMEN,"FITSimg","ByteValueAtPixel","pixel index out of range");
+            val = arr[iPx];
+        });
+
+        return static_cast<int8_t>(val);
     }
     
     template< typename T >
-    int8_t FITSimg<T>::ByteValueAtPixel(unsigned long long iPx) const
+    int8_t FITSimg<T>::ByteValueAtPixel(const std::initializer_list<size_t>& iCoo) const
     {
-        return static_cast<int8_t>(this->operator[](iPx));
+        size_t iPx = this->PixelIndex(iCoo);
+
+        return ByteValueAtPixel(iPx);
     }
     
     template< typename T >
-    uint16_t FITSimg<T>::UShortValueAtPixel(size_t iPx) const
+    uint16_t FITSimg<T>::UShortValueAtPixel(const size_t& iPx) const
     {
-        return UShortValueAtPixel(static_cast<unsigned long long>( iPx ));
+        T val=0;
+
+        WithTypedData<T>([&](const std::valarray<T>& arr)
+        {
+            if(iPx >= arr.size())
+                throw FITSexception(BAD_DIMEN,"FITSimg","UShortValueAtPixel","pixel index out of range");
+            val = arr[iPx];
+        });
+
+        return static_cast<uint16_t>(val);
     }
     
     template< typename T >
-    uint16_t FITSimg<T>::UShortValueAtPixel(unsigned long long iPx) const
+    uint16_t FITSimg<T>::UShortValueAtPixel(const std::initializer_list<size_t>& iCoo) const
     {
-        return static_cast<uint16_t>(this->operator[](iPx));
+        size_t iPx = this->PixelIndex(iCoo);
+
+        return UShortValueAtPixel(iPx);
     }
     
     template< typename T >
-    int16_t FITSimg<T>::ShortValueAtPixel(size_t iPx) const
+    int16_t FITSimg<T>::ShortValueAtPixel(const size_t& iPx) const
     {
-        return ShortValueAtPixel(static_cast<unsigned long long>( iPx ));
+        T val=0;
+
+        WithTypedData<T>([&](const std::valarray<T>& arr)
+        {
+            if(iPx >= arr.size())
+                throw FITSexception(BAD_DIMEN,"FITSimg","ShortValueAtPixel","pixel index out of range");
+            val = arr[iPx];
+        });
+
+        return static_cast<int16_t>(val);
     }
     
     template< typename T >
-    int16_t FITSimg<T>::ShortValueAtPixel(unsigned long long iPx) const
+    int16_t FITSimg<T>::ShortValueAtPixel(const std::initializer_list<size_t>& iCoo) const
     {
-        return static_cast<int16_t>(this->operator[](iPx));
+        size_t iPx = this->PixelIndex(iCoo);
+        
+        return ShortValueAtPixel(iPx);
     }
 
     template< typename T >
-    unsigned int FITSimg<T>::UIntValueAtPixel(size_t iPx) const
+    unsigned int FITSimg<T>::UIntValueAtPixel(const size_t& iPx) const
     {
-        return UIntValueAtPixel(static_cast<unsigned long long>( iPx ));
+        T val=0;
+
+        WithTypedData<T>([&](const std::valarray<T>& arr)
+        {
+            if(iPx >= arr.size())
+                throw FITSexception(BAD_DIMEN,"FITSimg","UIntValueAtPixel","pixel index out of range");
+            val = arr[iPx];
+        });
+
+        return static_cast<unsigned int>(val);
     }
     
     template< typename T >
-    unsigned int FITSimg<T>::UIntValueAtPixel(unsigned long long iPx) const
+    unsigned int FITSimg<T>::UIntValueAtPixel(const std::initializer_list<size_t>& iCoo) const
     {
-        return static_cast<int>(this->operator[](iPx));
+        size_t iPx = this->PixelIndex(iCoo);
+
+        return UIntValueAtPixel(iPx);
     }
     
     template< typename T >
-    int FITSimg<T>::IntValueAtPixel(size_t iPx) const
+    int FITSimg<T>::IntValueAtPixel(const size_t& iPx) const
     {
-        return IntValueAtPixel(static_cast<unsigned long long>( iPx ));
+        T val=0;
+
+        WithTypedData<T>([&](const std::valarray<T>& arr)
+        {
+            if(iPx >= arr.size())
+                throw FITSexception(BAD_DIMEN,"FITSimg","IntValueAtPixel","pixel index out of range");
+            val = arr[iPx];
+        });
+
+        return static_cast<int>(val);
     }
     
     template< typename T >
-    int FITSimg<T>::IntValueAtPixel(unsigned long long iPx) const
+    int FITSimg<T>::IntValueAtPixel(const std::initializer_list<size_t>& iCoo) const
     {
-        return static_cast<int>(this->operator[](iPx));
+        size_t iPx = this->PixelIndex(iCoo);
+
+        return IntValueAtPixel(iPx);
     }
     
     
     template< typename T >
-    uint32_t FITSimg<T>::ULongValueAtPixel(size_t iPx) const
+    uint32_t FITSimg<T>::ULongValueAtPixel(const size_t& iPx) const
     {
-        return ULongValueAtPixel(static_cast<unsigned long long>( iPx ));
+        T val=0;
+
+        WithTypedData<T>([&](const std::valarray<T>& arr)
+        {
+            if(iPx >= arr.size())
+                throw FITSexception(BAD_DIMEN,"FITSimg","ULongValueAtPixel","pixel index out of range");
+            val = arr[iPx];
+        });
+
+        return static_cast<uint32_t>(val);
     }
     
     template< typename T >
-    uint32_t FITSimg<T>::ULongValueAtPixel(unsigned long long iPx) const
+    uint32_t FITSimg<T>::ULongValueAtPixel(const std::initializer_list<size_t>& iCoo) const
     {
-        return static_cast<uint32_t>(this->operator[](iPx));
+        size_t iPx = this->PixelIndex(iCoo);
+
+        return ULongValueAtPixel(iPx);
     }
     
     template< typename T >
-    int32_t FITSimg<T>::LongValueAtPixel(size_t iPx) const
+    int32_t FITSimg<T>::LongValueAtPixel(const size_t& iPx) const
     {
-        return LongValueAtPixel(static_cast<unsigned long long>( iPx ));
+        T val=0;
+
+        WithTypedData<T>([&](const std::valarray<T>& arr)
+        {
+            if(iPx >= arr.size())
+                throw FITSexception(BAD_DIMEN,"FITSimg","LongValueAtPixel","pixel index out of range");
+            val = arr[iPx];
+        });
+
+        return static_cast<int32_t>(val);
     }
     
     template< typename T >
-    int32_t FITSimg<T>::LongValueAtPixel(unsigned long long iPx) const
+    int32_t FITSimg<T>::LongValueAtPixel(const std::initializer_list<size_t>& iCoo) const
     {
-        return static_cast<uint32_t>(this->operator[](iPx));
+        size_t iPx = this->PixelIndex(iCoo);
+
+        return LongValueAtPixel(iPx);
     }
     
     template< typename T >
-    int64_t FITSimg<T>::LongLongValueAtPixel(size_t iPx) const
+    int64_t FITSimg<T>::LongLongValueAtPixel(const size_t& iPx) const
     {
-        return LongLongValueAtPixel(static_cast<unsigned long long>( iPx ));
+        T val=0;
+
+        WithTypedData<T>([&](const std::valarray<T>& arr)
+        {
+            if(iPx >= arr.size())
+                throw FITSexception(BAD_DIMEN,"FITSimg","LongLongValueAtPixel","pixel index out of range");
+            val = arr[iPx];
+        });
+
+        return static_cast<int64_t>(val);
     }
     
     template< typename T >
-    int64_t FITSimg<T>::LongLongValueAtPixel(unsigned long long iPx) const
+    int64_t FITSimg<T>::LongLongValueAtPixel(const std::initializer_list<size_t>& iCoo) const
     {
-        return static_cast<uint64_t>(this->operator[](iPx));
+        size_t iPx = this->PixelIndex(iCoo);
+
+        return LongLongValueAtPixel(iPx);
     }
     
     template< typename T >
-    float FITSimg<T>::FloatValueAtPixel(size_t iPx) const
+    float FITSimg<T>::FloatValueAtPixel(const size_t& iPx) const
     {
-        return FloatValueAtPixel(static_cast<unsigned long long>( iPx ));
+        T val=0;
+
+        WithTypedData<T>([&](const std::valarray<T>& arr)
+        {
+            if(iPx >= arr.size())
+                throw FITSexception(BAD_DIMEN,"FITSimg","FloatValueAtPixel","pixel index out of range");
+            val = arr[iPx];
+        });
+
+        return static_cast<float>(val);
     }
     
     template< typename T >
-    float FITSimg<T>::FloatValueAtPixel(unsigned long long iPx) const
+    float FITSimg<T>::FloatValueAtPixel(const std::initializer_list<size_t>& iCoo) const
     {
-        return static_cast<float>(this->operator[](iPx));
+        size_t iPx = this->PixelIndex(iCoo);
+
+        return FloatValueAtPixel(iPx);
     }
 
     
     template< typename T >
-    double FITSimg<T>::DoubleValueAtPixel(size_t iPx) const
+    double FITSimg<T>::DoubleValueAtPixel(const size_t& iPx) const
     {
-        return DoubleValueAtPixel(static_cast<unsigned long long>( iPx ));
+        T val=0;
+
+        WithTypedData<T>([&](const std::valarray<T>& arr)
+        {
+            if(iPx >= arr.size())
+                throw FITSexception(BAD_DIMEN,"FITSimg","DoubleValueAtPixel","pixel index out of range");
+            val = arr[iPx];
+        });
+
+        return static_cast<float>(val);
     }
     
     template< typename T >
-    double FITSimg<T>::DoubleValueAtPixel(unsigned long long iPx) const
+    double FITSimg<T>::DoubleValueAtPixel(const std::initializer_list<size_t>& iCoo) const
     {
-        return static_cast<double>(this->operator[](iPx));
-        //return this->operator[](iPx);
+        size_t iPx = this->PixelIndex(iCoo);
+        
+        return DoubleValueAtPixel(iPx);
     }
     
     /**
@@ -2397,7 +2497,7 @@ namespace DSL
 #pragma region • Display methods
 #ifdef _HAS_Qt4_
 
-#pragma region – Qt display capability
+#pragma region - Qt display capability
     /**
      *  Display FITS 2D images onto the scrren.
      *  @param OPTION: Optional parameters used to customize the plot:
@@ -2718,250 +2818,6 @@ namespace DSL
 #pragma endregion
 
 #pragma region • Data export methods
-#ifdef _HAS_ROOT_
-#pragma region – ROOT export capability
-    /**
-     *  Project the 2D FITS image onto one of its primary axis and convert the resulting histograms into a ROOT:TH1 Histograms
-     *  @param hin: Upon return ROOT::TH1 histograms.
-     *  @param xAxes: FITS axes one whish to project the data
-     */
-    template< typename T >
-    void FITSimg<T>::PixelToTH1(TH1& hin, unsigned int xAxes) const
-    {
-        
-        if(FITScube::debug)
-            std::cout<<"\033[33m>>>>> [FITSimg::PixelToTH2]: \033[32mExport FITS data cube to 1D Histogram.\033[0m"<<std::endl;
-        
-        if(xAxes > Naxis.size())
-        {
-            std::cerr<<"\033[1;35;47m*** [FITSimg::PixelToTH1]: Errors *** "
-                     <<"DATA CUBE HAS LESS DIMENSION THAN "<<xAxes<<"\033[0m"<<std::endl;
-            return;
-        }
-        
-        std::vector<unsigned long long> xPixel;
-        
-        for(unsigned int k = 0; k < data->size(); k++)
-        {
-            if(mask[k])
-                continue;
-            
-            if(data[k] == 0)
-                continue;
-            
-            xPixel.clear();
-            xPixel = PixelCoordinates(k);
-            
-            if(hin.InheritsFrom("TH1I"))
-                hin.Fill( xPixel[xAxes], static_cast<int>( data[k] ));
-            else if(hin.InheritsFrom("TH1F"))
-                hin.Fill( xPixel[xAxes], static_cast<float>( data[k] ));
-            else if(hin.InheritsFrom("TH1D"))
-                hin.Fill( xPixel[xAxes], static_cast<double>( data[k] ));
-            else if(hin.InheritsFrom("TH1C"))
-                hin.Fill( xPixel[xAxes], static_cast<int8_t>( data[k] ));
-            else if(hin.InheritsFrom("TH1S"))
-                hin.Fill( xPixel[xAxes], static_cast<short>( data[k] ));
-            else
-                hin.Fill( xPixel[xAxes], data[k]);
-        }
-        
-        xPixel.clear();
-        
-        if(FITScube::debug)
-            std::cout<<"\033[33m<<<<< [FITSimg::PixelToTH1]:\033[32m DONE.\033[34m"<<std::endl;
-    }
-    
-    /**
-     *  Convert 2D FITS image into a ROOT:TH2 Histograms
-     *  @param hin: Upon return ROOT::TH2 histograms.
-     */
-    template< typename T >
-    void FITSimg<T>::PixelToTH2(TH2& hin) const
-    {
-        
-        double xMin = hin.GetXaxis()->GetBinLowEdge(1);
-        double xMax = hin.GetXaxis()->GetBinUpEdge(hin.GetNbinsX());
-        
-        double yMin = hin.GetYaxis()->GetBinLowEdge(1);
-        double yMax = hin.GetYaxis()->GetBinUpEdge(hin.GetNbinsY());
-        
-        if(FITScube::debug)
-            std::cout<<"\033[33m>>>>> [FITSimg::PixelToTH2]: \033[32mExport FITS data cube to 2D Histogram.\033[0m"<<std::endl;
-        
-        std::vector<unsigned long long> xPixel;
-        
-        for(unsigned int k = 0; k < data->size(); k++)
-        {
-            if(mask[k])
-                continue;
-    
-            if(data[k] == 0)
-                continue;
-            
-            xPixel.clear();
-            xPixel = PixelCoordinates(k);
-            
-            if(xPixel[0] < xMin || xPixel[0] > xMax)
-                continue;
-            
-            if(xPixel[1] < yMin || xPixel[1] > yMax)
-                continue;
-            
-            if(hin.InheritsFrom("TH2I"))
-                hin.Fill( xPixel[0], xPixel[1], static_cast<int>( data[k] ));
-            else if(hin.InheritsFrom("TH2F"))
-                hin.Fill( xPixel[0], xPixel[1], static_cast<float>( data[k] ));
-            else if(hin.InheritsFrom("TH2D"))
-                hin.Fill( xPixel[0], xPixel[1], static_cast<double>( data[k] ));
-            else if(hin.InheritsFrom("TH2C"))
-                hin.Fill( xPixel[0], xPixel[1], static_cast<int8_t>( data[k] ));
-            else if(hin.InheritsFrom("TH2S"))
-                hin.Fill( xPixel[0], xPixel[1], static_cast<short>( data[k] ));
-            else
-                hin.Fill( xPixel[0], xPixel[1], data[k]);
-        }
-        
-        if(FITScube::debug)
-            std::cout<<"\033[33m<<<<< [FITSimg::PixelToTH2]:\033[32m DONE.\033[34m"<<std::endl;
-    }
-    
-    /**
-     *  Convert nD FITS data cube  into a ROOT:TH3 Histograms
-     *  @param hin: Upon return ROOT::TH3 histograms.
-     */
-    template< typename T >
-    void FITSimg<T>::PixelToTH3(TH3& hin) const
-    {
-        
-        if(FITScube::debug)
-            std::cout<<"\033[33m>>>>> [FITSimg::PixelToTH3]: \033[32mExport FITS data cube to 2D Histogram.\033[0m"<<std::endl;
-        
-        if(Naxis.size() < 3)
-        {
-            std::cerr<<"\033[1;35;47m*** [FITSimg::PixelToTH3]: Errors *** "
-                     <<"CAN'T EXPORT 2D IMAGE to ROOT::TH3 3D HISTOGRAMS\033[0m"<<std::endl;
-            return;
-        }
-        
-        std::vector<unsigned long long> xPixel;
-        
-        for(unsigned int k = 0; k < data->size(); k++)
-        {
-            if(mask[k])
-                continue;
-            
-            if(data[k] == 0)
-                continue;
-            
-            xPixel.clear();
-            xPixel = PixelCoordinates(k);
-            
-            if(hin.InheritsFrom("TH3I"))
-                hin.Fill( xPixel[0], xPixel[1], xPixel[2], static_cast<int>( data[k] ));
-            else if(hin.InheritsFrom("TH3F"))
-                hin.Fill( xPixel[0], xPixel[1], xPixel[2], static_cast<float>( data[k] ));
-            else if(hin.InheritsFrom("TH3D"))
-                hin.Fill( xPixel[0], xPixel[1], xPixel[2], static_cast<double>( data[k] ));
-            else if(hin.InheritsFrom("TH3C"))
-                hin.Fill( xPixel[0], xPixel[1], xPixel[2], static_cast<int8_t>( data[k] ));
-            else if(hin.InheritsFrom("TH3S"))
-                hin.Fill( xPixel[0], xPixel[1], xPixel[2], static_cast<short>( data[k] ));
-            else
-                hin.Fill( xPixel[0], xPixel[1], xPixel[2], data[k]);
-        }
-        
-        if(FITScube::debug)
-            std::cout<<"\033[33m<<<<< [FITSimg::PixelToTH3]:\033[32m DONE.\033[34m"<<std::endl;
-    }
-    
-    /**
-     *  Convert FITS data cube into ROOT tree.
-     *
-     *  @param outTree: The tree that will be used to store FITS data after conversion to TTree.
-     */
-    template< typename T >
-    void FITSimg<T>::PixelToTree(TTree &outTree) const
-    {
-        double Val = 0;
-        
-        std::vector<unsigned int> pxAxis(Naxis.size());
-        //std::vector<double>       WCS(Naxis.size());
-        
-        if(outTree.FindBranch("PIXEL"))
-            outTree.SetBranchAddress("PIXEL",&Val);
-        else
-            outTree.Branch("PIXEL", &Val, "PIXEL/D");
-        
-        for(unsigned int k = 0; k < pxAxis.size(); k++ )
-        {
-            if(outTree.FindBranch(Form("NAXIS%i",k+1)))
-                outTree.SetBranchAddress(Form("NAXIS%i",k+1),&pxAxis[k]);
-            else
-                outTree.Branch(Form("NAXIS%i",k+1), &pxAxis[k],	Form("NAXIS%i/i",k+1));
-        }
-        
-        /*
-         for(unsigned int k = 0; k < pxAxis.size(); k++ )
-        {
-            if(outTree.FindBranch(Form("WCS%i",k+1)))
-                outTree.SetBranchAddress(Form("WCS%i",k+1),&WCS[k]);
-            else
-                outTree.Branch(Form("WCS%i",k+1), &WCS[k],	Form("WCS%i/D",k+1));
-        }
-         */
-        
-        for(unsigned int nPx = 0; nPx < data->size(); nPx++)
-        {
-            for(unsigned int iX = 1; iX < pxAxis.size(); iX++ )
-            {
-                pxAxis[iX] = PixelCoordinates(nPx)[iX];
-                //WCS   [iX] = Axis[iX]->PixelCenter(pxAxis[iX]);
-            }
-            
-            Val = data[nPx];
-            
-            outTree.Fill();
-        }
-        
-        pxAxis.clear();
-        //WCS.clear();
-        
-    }
-    
-    template< typename T >
-    void FITSimg<T>::PixelDistribution(TH1& hin) const
-    {
-        if(FITScube::debug)
-            std::cout<<"\033[33m>>>>> [FITSimg::PixelDistribution]\033[0m"<<std::endl;
-        
-        for(unsigned int k = 0; k < data->size(); k++)
-        {
-            if(mask[k])
-                continue;
-            
-            if(data[k] == 0)
-                continue;
-            
-            if(hin.InheritsFrom("TH1I"))
-                hin.Fill( static_cast<int>( data[k] ));
-            else if(hin.InheritsFrom("TH1F"))
-                hin.Fill( static_cast<float>( data[k] ));
-            else if(hin.InheritsFrom("TH1D"))
-                hin.Fill( static_cast<double>( data[k] ));
-            else if(hin.InheritsFrom("TH1C"))
-                hin.Fill( static_cast<int8_t>( data[k] ));
-            else if(hin.InheritsFrom("TH1S"))
-                hin.Fill( static_cast<short>( data[k] ));
-            else
-                hin.Fill( data[k]);
-        }
-        
-        if(FITScube::debug)
-            std::cout<<"\033[33m<<<<< [FITSimg::PixelDistribution]\033[0m"<<std::endl;
-    }
-    
-#endif
 
 #pragma endregion
 #pragma endregion
@@ -3125,8 +2981,9 @@ namespace DSL
         
         size_t n = 0;
 
-        auto pixels_pos   = std::bind( static_cast<std::vector<unsigned long long>(FITScube::*)(size_t) const>(&FITScube::PixelCoordinates), this,std::placeholders::_1);
-        auto pixels_coo   = std::bind( static_cast<std::vector<double>(FITScube::*)(std::vector<unsigned long long>) const>(&FITScube::WorldCoordinates), this,std::placeholders::_1);
+        // use lightweight lambdas to avoid incorrect function-pointer casts and overload issues
+        auto pixels_pos = [this](size_t idx) -> std::vector<size_t> { return this->PixelCoordinates(idx); };
+        auto pixels_coo = [this](const std::vector<size_t>& v) -> std::vector<double> { return this->WorldCoordinates(v); };
         
         hdu.ValueForKey("CRPIX1",static_cast<double>( 0 ));
         hdu.ValueForKey("CRPIX2",static_cast<double>( 0 ));
