@@ -127,9 +127,9 @@ TEST(FITSimg, Create_SHORT)
 
 TEST(FITSimg, Create_LONG)
 {
-    verbose = verboseLevel::VERBOSE_DEBUG;
+    verbose = verboseLevel::VERBOSE_NONE;
 
-    size_t N = 25;
+    size_t N = 256;
     FITSimg<int32_t> img(2,{N,N});
     EXPECT_EQ(img.Size(1), N);
     EXPECT_EQ(img.Size(2), N);
@@ -191,7 +191,7 @@ TEST(FITSimg, Create_LONGLONG)
 {
     verbose = verboseLevel::VERBOSE_NONE;
 
-    size_t N = 25;
+    size_t N = 256;
     FITSimg<int64_t> img(2,{N,N});
     EXPECT_EQ(img.Size(1), N);
     EXPECT_EQ(img.Size(2), N);
