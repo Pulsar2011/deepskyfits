@@ -958,6 +958,12 @@ namespace DSL
             
             if( it->first == "HISTORY")
                 continue;
+
+            if( it->first == "BSCALE" && std::abs(std::stod(it->second.value())-1) <= std::numeric_limits<double>::epsilon() )
+                continue;
+
+            if( it->first == "BZERO" && std::abs(std::stod(it->second.value())) <= std::numeric_limits<double>::epsilon() )
+                continue;
             
             switch(it->second.type())
             {

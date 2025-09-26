@@ -430,23 +430,26 @@ namespace DSL
         
             FITScube *img = NULL;
         
-            int BITPIX = 0;
+            int eqBITPIX = 0;
         
-            if(fits_get_img_equivtype(fptr.get(), &BITPIX, &fits_status))
+            if(fits_get_img_equivtype(fptr.get(), &eqBITPIX, &fits_status))
             {
                 throw FITSexception(fits_status,"FITSmanager","GetImageAtIndex");
             }
+
+            if((verbose & verboseLevel::VERBOSE_IMG)== verboseLevel::VERBOSE_IMG)
+                std::cout<<"FITS image eqBITPIX = "<<eqBITPIX<<std::endl;
         
-            switch (BITPIX)
+            switch (eqBITPIX)
             {
                 case 8:
                     img = new FITSimg<uint8_t>(fptr);
                     break;
-            
+                
                 case 10:
                     img = new FITSimg<int8_t>(fptr);
                     break;
-                
+
                 case 16:
                     img = new FITSimg<int16_t>(fptr);
                     break;
@@ -467,6 +470,10 @@ namespace DSL
                     img = new FITSimg<int64_t>(fptr);
                     break;
                 
+                case 80:
+                    img = new FITSimg<uint64_t>(fptr);
+                    break;
+                
                 case -32:
                     img = new FITSimg<float>(fptr);
                     break;
@@ -477,7 +484,7 @@ namespace DSL
                 
                 default:
                     fits_status = BAD_BITPIX;
-                    throw FITSexception(fits_status,"FITSmanager","GetImageAtIndex","CAN'T GET IMAGES, DATA TYPE "+std::to_string(BITPIX)+" IS UNKNOWN");
+                    throw FITSexception(fits_status,"FITSmanager","GetImageAtIndex","CAN'T GET IMAGES, DATA TYPE "+std::to_string(eqBITPIX)+" IS UNKNOWN");
             }
         
                 fits_status = img->Status();

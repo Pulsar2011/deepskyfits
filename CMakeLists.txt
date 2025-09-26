@@ -243,6 +243,8 @@ file(MAKE_DIRECTORY ${TESTDATA_DIR})
 set(SAMPLE_FITS_URL
     "https://heasarc.gsfc.nasa.gov/FTP/fits_info/sample_files/images/rosat_pspc_rdf2_3_bk1.fits"
     "https://heasarc.gsfc.nasa.gov/FTP/fits_info/sample_files/images/rosat_pspc_rdf2_3_im2.fits"
+    "http://fits.gsfc.nasa.gov/samples/testkeys.fits"
+    "https://fits.gsfc.nasa.gov/nrao_data/samples/image/vogtstar_awt.fits"
 )
 
 set(SAMPLE_FITS_FILE "")

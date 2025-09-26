@@ -80,6 +80,13 @@
         "list": "cpp",
         "unordered_set": "cpp",
         "chrono": "cpp",
-        "format": "cpp"
+        "format": "cpp",
+        "codecvt": "cpp",
+        "complex": "cpp",
+        "csignal": "cpp",
+        "fstream": "cpp",
+        "numbers": "cpp",
+        "semaphore": "cpp",
+        "shared_mutex": "cpp"
     }
 }

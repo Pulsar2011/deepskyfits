@@ -37,5 +37,16 @@
         "MIMode": "lldb",
         "preLaunchTask": "make gtest"
     },
+    {
+        "type": "cppdbg",
+        "request": "launch",
+        "name": "gTest_FitsImage (LLDB)",
+        "program": "${workspaceRoot}/build/exe/gTest_FitsImage",
+        "args": [],
+        "env": [],
+        "cwd": "${workspaceRoot}",
+        "MIMode": "lldb",
+        "preLaunchTask": "make gtest"
+    },
     ]
 }

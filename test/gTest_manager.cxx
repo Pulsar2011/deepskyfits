@@ -341,4 +341,23 @@ TEST(FITSmanager, create_fitsfile)
 
     fo.Close();
 }
+
+TEST(FITSmanager, ReadingImage)
+{    
+    std::string src = "build/testdata/rosat_pspc_rdf2_3_bk1_copy.fits";
+
+    // Use the copied file for all operations
+    FITSmanager ff(src);
+    EXPECT_TRUE(ff.isOpen());
+
+    std::shared_ptr<FITScube> img = ff.GetPrimary();
+    EXPECT_NE(img, nullptr);
+    EXPECT_EQ(img->Size(1), 512);
+    EXPECT_EQ(img->Size(2), 512);
+
+    img.reset();
+    ff.Close();
+    EXPECT_FALSE(ff.isOpen());         
+
+}
 #pragma endregion

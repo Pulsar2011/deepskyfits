@@ -233,8 +233,8 @@ namespace DSL
         inline const FITShdu& HDU() const {return hdu;}
         inline       FITShdu& HDU() {return hdu;}
         
-        virtual double GetSum ()                  const;
-        virtual double GetMean()                  const;
+        virtual double GetSum ()                  const = 0;
+        virtual double GetMean()                  const = 0;
         virtual double GetQuadraticMean()         const;
         virtual double GetVariance()              const;
         virtual double GetMedian()                const;
@@ -261,17 +261,17 @@ namespace DSL
         virtual double       DoubleValueAtPixel  (const size_t&) const =0;
 
 
-        uint8_t      UByteValueAtPixel   (const std::initializer_list<size_t>&) const ;
-        int8_t       ByteValueAtPixel    (const std::initializer_list<size_t>&) const ;
-        uint16_t     UShortValueAtPixel  (const std::initializer_list<size_t>&) const ;
-        int16_t      ShortValueAtPixel   (const std::initializer_list<size_t>&) const ;
-        unsigned int UIntValueAtPixel    (const std::initializer_list<size_t>&) const ;
-        int          IntValueAtPixel     (const std::initializer_list<size_t>&) const ;
-        uint32_t     ULongValueAtPixel   (const std::initializer_list<size_t>&) const ;
-        int32_t      LongValueAtPixel    (const std::initializer_list<size_t>&) const ;
-        int64_t      LongLongValueAtPixel(const std::initializer_list<size_t>&) const ;
-        float        FloatValueAtPixel   (const std::initializer_list<size_t>&) const ;
-        double       DoubleValueAtPixel  (const std::initializer_list<size_t>&) const ;
+        virtual uint8_t      UByteValueAtPixel   (const std::initializer_list<size_t>&) const = 0;
+        virtual int8_t       ByteValueAtPixel    (const std::initializer_list<size_t>&) const = 0;
+        virtual uint16_t     UShortValueAtPixel  (const std::initializer_list<size_t>&) const = 0;
+        virtual int16_t      ShortValueAtPixel   (const std::initializer_list<size_t>&) const = 0;
+        virtual unsigned int UIntValueAtPixel    (const std::initializer_list<size_t>&) const = 0;
+        virtual int          IntValueAtPixel     (const std::initializer_list<size_t>&) const = 0;
+        virtual uint32_t     ULongValueAtPixel   (const std::initializer_list<size_t>&) const = 0;
+        virtual int32_t      LongValueAtPixel    (const std::initializer_list<size_t>&) const = 0;
+        virtual int64_t      LongLongValueAtPixel(const std::initializer_list<size_t>&) const = 0;
+        virtual float        FloatValueAtPixel   (const std::initializer_list<size_t>&) const = 0;
+        virtual double       DoubleValueAtPixel  (const std::initializer_list<size_t>&) const = 0;
         
 
         // Typed accessors: return pointer to the internal typed valarray<T> managed by FitsArray<T>.
@@ -500,15 +500,15 @@ namespace DSL
 #pragma endregion
 #pragma region • Pure virtual methods
         
-        virtual FITScube *Layer(unsigned int) const  {return NULL;}
-        virtual FITScube *Window (size_t, size_t, size_t, size_t) const {return const_cast<FITScube *>(this);}
-        virtual FITScube *Rebin  (std::vector<size_t> ) const {return const_cast<FITScube *>(this);}
+        virtual std::shared_ptr<FITScube> Layer(unsigned int) const  =0;
+        virtual std::shared_ptr<FITScube> Window (size_t, size_t, size_t, size_t) const =0;
+        virtual std::shared_ptr<FITScube> Rebin  (std::vector<size_t> ) const =0;
         
         virtual void Print() const {};
         
 #ifdef _HAS_Qt4_
 #pragma endregion
-#pragma region – Qt display capability
+#pragma region - Qt display capability
         virtual QCustomPlot* QtDisplay(std::string OPTION = "") const { return NULL;}
         virtual QCustomPlot* QtDisplay(unsigned int iMin, unsigned int iMax, std::string OPTION="") const { return NULL;}
         virtual QCustomPlot* QtDisplayLayer(unsigned int iLayer, std::string OPTION="") const {return NULL;}
@@ -600,7 +600,24 @@ namespace DSL
         void AddLayer(const FITSimg<T>&);
 
 #pragma endregion
+
+#pragma region • Statistical property
+        double GetSum ()                  const;
+        double GetMean()                  const;
+        //double GetQuadraticMean()         const;
+        //double GetVariance()              const;
+        //double GetMedian()                const;
+        //double GetMinimum()               const;
+        //double GetMaximum()               const;
+        //double Getpercentil(double)       const;
+        //double Get5thpercentil()          const;
+        //double Get25thpercentil()         const;
+        //double Get75thpercentil()         const;
+        //double Get95thpercentil()         const;
+
+#pragma endregion
 #pragma region • data operation
+
         
     private:
         template< typename S > void ReadArray(const std::shared_ptr<fitsfile>& fptr); //!< Read and interpret FITS BINARY data
@@ -825,9 +842,9 @@ namespace DSL
         
 #pragma endregion
 #pragma region • Extraction method
-        FITScube *Layer(unsigned int) const;
-        FITScube *Window (size_t, size_t, size_t, size_t) const;
-        FITScube *Rebin  (std::vector<size_t> ) const;
+        std::shared_ptr<FITScube> Layer(unsigned int) const;
+        std::shared_ptr<FITScube> Window (size_t, size_t, size_t, size_t) const;
+        std::shared_ptr<FITScube> Rebin  (std::vector<size_t> ) const;
         
         void Resize(const size_t&, const size_t&, const size_t&, const size_t&);
         
@@ -839,6 +856,78 @@ namespace DSL
 #pragma region - FITSimg class implementation
     
 #pragma region • Initialization
+
+    template< typename T >
+    void FITSimg<T>::template_init()
+    {
+        BSCALE = static_cast<T>(1);
+        BZERO  = static_cast<T>(0);
+        
+        if constexpr (std::is_floating_point_v<T>)
+            BLANK = std::numeric_limits<T>::quiet_NaN();
+        else
+            BLANK = std::numeric_limits<T>::min();
+
+                if constexpr (std::is_floating_point_v<T>)
+            BLANK = std::numeric_limits<T>::quiet_NaN();
+        else
+            BLANK = std::numeric_limits<T>::min();
+
+        // type-specific FITS parameters
+        if constexpr (std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>)
+        {
+            BitPerPixel(8);
+            Bscale(static_cast<T>(1));
+            Bzero (static_cast<T>(0));
+        }
+        else if constexpr (std::is_same_v<T, int16_t>)
+        {
+            BitPerPixel(16); // unsigned 16 uses BITPIX=16, equiv 20
+            Bscale(static_cast<T>(1));
+            Bzero (static_cast<T>(0));
+        }
+        else if constexpr (std::is_same_v<T, uint16_t>)
+        {
+            BitPerPixel(16,20);
+            Bscale(static_cast<T>(1));
+            Bzero (static_cast<T>(32768));
+        }
+        else if constexpr (std::is_same_v<T, int32_t>)
+        {
+            BitPerPixel(32);
+            Bscale(static_cast<T>(1));
+            Bzero (static_cast<T>(0));
+        }
+        else if constexpr (std::is_same_v<T, uint32_t>)
+        {
+            BitPerPixel(32, 40); // unsigned 32 uses equiv 40
+            Bscale(static_cast<T>(1));
+            Bzero (static_cast<T>((T)2147483648));
+        }
+        else if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, uint64_t> || std::is_same_v<T, size_t>)
+        {
+            BitPerPixel(64);
+            Bscale(static_cast<T>(1));
+            Bzero (static_cast<T>(0));
+        }
+        else if constexpr (std::is_same_v<T, float>)
+        {
+            BitPerPixel(-32);
+            Bscale(static_cast<T>(1));
+            Bzero (static_cast<T>(0));
+        }
+        else if constexpr (std::is_same_v<T, double>)
+        {
+            BitPerPixel(-64);
+            Bscale(static_cast<T>(1));
+            Bzero (static_cast<T>(0));
+        }
+        else
+        {
+            // fallback: keep defaults but mark BITPIX neutral (0)
+            BitPerPixel(0);
+        }
+    }
     
     /**
      * @details Initialize private variable to decent default value.
@@ -878,11 +967,11 @@ namespace DSL
                 break;
                 
             case 32:
-                WriteData<int32_t>(fptr, TLONG);
+                WriteData<int32_t>(fptr, TINT);
                 break;
                 
             case 64:
-                WriteData<uint64_t>(fptr, TLONGLONG);
+                WriteData<int64_t>(fptr, TLONGLONG);
                 break;
                 
             case -32:
@@ -910,7 +999,7 @@ namespace DSL
             throw std::invalid_argument("\033[31m[FITSimg::WriteDataCube]\033[0mreceived nullptr");
         }
 
-        if (mask.sum() > 0 && BLANK != std::numeric_limits<T>::quiet_NaN())
+        if (mask.sum() > 0 && !(std::is_floating_point_v<T> ? std::isnan(static_cast<long double>(BLANK)) : false))
         {
             hdu.ValueForKey("BLANK", BLANK);
         }
@@ -918,38 +1007,63 @@ namespace DSL
         const long long    num_axis = static_cast<const long long>( Naxis.size() );
         const long long array_size  = static_cast<const long long>( Nelements() );
     
-        long long *fpixel;
-        fpixel     = new long long[num_axis];
-        for(long long i=0; i < num_axis; i++)
-            fpixel[i]    = 1;
-        
-        S *array;
-        std::valarray<T>* _data= this->template GetData<T>();
-        if(!_data)
-            throw std::runtime_error("\033[31m[FITSimg::WriteDataCube]\033[0m no data to write");
+        std::vector<long long> fpixel(static_cast<size_t>(num_axis));
+        for(long long i=0; i < num_axis; ++i) fpixel[i] = 1;
 
-        array      = new S[array_size];
-        for(long long i=0; i < array_size; i++)
-            array[i]      = static_cast<S>( (mask[i]) ? ((BLANK != std::numeric_limits<T>::quiet_NaN())?BLANK:std::numeric_limits<S>::min()): ((*_data)[i] - BZERO)/BSCALE );
+        // prepare contiguous output buffer using std::vector (safer than new/delete[])
+        std::vector<S> outbuf(static_cast<size_t>(array_size));
+
+        // try to get typed storage pointer (zero-copy fast path)
+        std::valarray<T>* _data = this->template GetData<T>();
         
-        std::cout<<"\033[31m[FITSimg::WriteDataCube]\033[0m"<<std::endl
-                 <<"        \033[31m|- BITPIX       : \033[0m"<<BITPIX<<std::endl
-                 <<"        \033[31m|- EQV BITPIX   : \033[0m"<<eqBITPIX<<std::endl
-                 <<"        \033[31m|- DATA_TYPE    : \033[0m"<<DATA_TYPE<<std::endl
-                 <<"        \033[31m|- BLANK        : \033[0m"<<BLANK<<std::endl
-                 <<"        \033[31m`- Number of pix: \033[0m"<<Nelements()<<std::endl;
-        for(size_t i = 0; i < Naxis.size()-1; i++)
-            std::cout<<"             \033[34m|- Axis "<<i<<"    : \033[0m"<<Naxis[i]<<std::endl;
-        std::cout<<"             \033[34m`- Axis "<<Naxis.size()-1<<"    : \033[0m"<<Naxis[Naxis.size()-1]<<std::endl;
+        if((verbose & verboseLevel::VERBOSE_DETAIL) == verboseLevel::VERBOSE_DETAIL||
+           (verbose & verboseLevel::VERBOSE_DEBUG) == verboseLevel::VERBOSE_DEBUG)
+        {
+            std::cout<<"\033[31m[FITSimg::WriteDataCube]\033[0m"<<std::endl
+                     <<"        \033[31m|- BITPIX       : \033[0m"<<BITPIX<<std::endl
+                     <<"        \033[31m|- EQV BITPIX   : \033[0m"<<eqBITPIX<<std::endl
+                     <<"        \033[31m|- DATA_TYPE    : \033[0m"<<DATA_TYPE<<std::endl
+                     <<"        \033[31m|- BLANK        : \033[0m"<<BLANK<<std::endl
+                     <<"        \033[31m|- Number of pix: \033[0m"<<Nelements()<<std::endl
+                     <<"        \033[31m|- this C type: \033[0m"<<demangle(typeid(T).name())<<sizeof(T)<<std::endl
+                     <<"        \033[31m`- this C type: \033[0m"<<demangle(typeid(S).name())<<sizeof(S)<<std::endl;
+
+            for(size_t i = 0; i < Naxis.size()-1; i++)
+                std::cout<<"             \033[34m|- Axis "<<i<<"    : \033[0m"<<Naxis[i]<<std::endl;
+            std::cout<<"             \033[34m`- Axis "<<Naxis.size()-1<<"    : \033[0m"<<Naxis[Naxis.size()-1]<<std::endl;
+        }
+
+        if (_data) // fast path: we have a typed valarray<T>
+        {
+            for(long long i = 0; i < array_size; ++i)
+            {
+                // apply BZERO/BSCALE and convert to output type
+                outbuf[static_cast<size_t>(i)] = static_cast<S>( ((*_data)[static_cast<size_t>(i)] - BZERO) / BSCALE );
+
+            }
+        }
+        else // fallback: build buffer from polymorphic accessor data->get(i)
+        {
+            if (!data)
+                throw std::runtime_error("\033[31m[FITSimg::WriteDataCube]\033[0m no data to write (polymorphic storage missing)");
+
+            for(long long i = 0; i < array_size; ++i)
+            {
+                double val = static_cast<double>( data->get(static_cast<size_t>(i)) ); // generic value
+                outbuf[static_cast<size_t>(i)] = static_cast<S>( (val - static_cast<double>(BZERO)) / static_cast<double>(BSCALE) );
+            }
+        }
+
+        if((verbose & verboseLevel::VERBOSE_DEBUG) == verboseLevel::VERBOSE_DEBUG)
+        {
+            for(size_t i=0; i < outbuf.size(); ++i) std::cout<<"["<<i<<"]"<<outbuf[i]<<"   ";
+            std::cout<<std::endl;
+        }
         
-        
-        if( fits_write_pixll(fptr.get(), DATA_TYPE, fpixel, array_size, array, &img_status) )
+        if( fits_write_pixll(fptr.get(), DATA_TYPE, fpixel.data(), array_size, outbuf.data(), &img_status) )
         {
             throw FITSexception(img_status,"FITSimg","WriteDataCube");
         }
-        
-        delete [] fpixel;
-        delete [] array;
         
     }
 
@@ -963,46 +1077,54 @@ namespace DSL
     FITSimg<T>::FITSimg(const std::shared_ptr<fitsfile>& fptr): FITScube(fptr)
     {
         img_init();
+
+        if(fptr == nullptr || fptr.use_count() < 1)
+            throw FITSexception(NOT_IMAGE,"FITSimg<T>","ctor"," received nullptr");
+
+        if(Nelements() != data->size())
+            throw FITSexception(BAD_DIMEN,"FITSimg<T>","ctor"," array size missmatch");
+
+        if((verbose & verboseLevel::VERBOSE_DEBUG) == verboseLevel::VERBOSE_DEBUG)
+        {
+            std::cout<<"\033[32m[FITSimg::ctor]\033[0m Reading image data from FITS file ..."<<std::endl
+                        <<"        \033[32m|- NAXIS        : \033[0m"<<Naxis.size()<<std::endl;
+            for(size_t i = 0; i < Naxis.size()-1; i++)
+                std::cout<<"        \033[32m|    |- NAXIS"<<i<<"  : \033[0m"<<Naxis[i]<<std::endl;
+            std::cout<<"        \033[32m|    `- NAXIS"<<Naxis.size()-1<<"  : \033[0m"<<Naxis[Naxis.size()-1]<<std::endl;
+            std::cout<<"        \033[32m|- Nelements    : \033[0m"<<Nelements()<<std::endl;
+            std::cout<<"        \033[32m|- Array        : \033[0m"<<data->size()<<std::endl;
+            std::cout<<"        \033[32m|- Data type    : \033[0m"<<demangle(typeid(T).name())<<"  \033[33m["<<eqBITPIX<<"]\033[0m"<<std::endl;
+        }
         
         if(img_status)
             return;
         
         //  • GET BSCALE
-        double tmp_bscale = hdu.GetDoubleValueForKey("BSCALE");
-        if(tmp_bscale != tmp_bscale)
-            tmp_bscale = 1.;
-        BSCALE = tmp_bscale;
+        BSCALE = static_cast<T>((hdu.Exists("BSCALE"))? hdu.GetDoubleValueForKey("BSCALE"):1.);
         
         //  • GET BZERO
-        double tmp_bzero = hdu.GetDoubleValueForKey("BZERO");
-        if(tmp_bzero != tmp_bzero)
-            tmp_bzero = 0.;
-        BZERO = tmp_bzero;
+        BZERO = static_cast<T>((hdu.Exists("BZERO"))? hdu.GetDoubleValueForKey("BZERO"):0.);
         
         //  • GET BLANCK
-        uint16_t tmp_blank = hdu.GetUInt16ValueForKey("BLANK");
-        if( tmp_blank == std::numeric_limits<uint16_t>::quiet_NaN() )
-            tmp_blank = -1.*std::numeric_limits<uint16_t>::max();
-        else
-            BLANK = tmp_blank; std::cout<<"BLANK : "<<BLANK<<std::endl;
+        BLANK = (hdu.Exists("BLANK"))? static_cast<T>(hdu.GetUInt16ValueForKey("BLANK")):std::numeric_limits<uint16_t>::quiet_NaN();
         
         // • GET THE WHOLE IMAGE DATA
-        switch (BITPIX)
+        switch (eqBITPIX)
         {
             case 8:
                 ReadArray<uint8_t>(fptr);
                 break;
                 
             case 16:
-                ReadArray<uint16_t>(fptr);
+                ReadArray<int16_t>(fptr);
                 break;
                 
             case 32:
-                ReadArray<uint32_t>(fptr);
+                ReadArray<int32_t>(fptr);
                 break;
                 
             case 64:
-                ReadArray<uint64_t>(fptr);
+                ReadArray<int64_t>(fptr);
                 break;
                 
             case -32:
@@ -1014,7 +1136,7 @@ namespace DSL
                 break;
                 
             default:
-                throw FITSexception(BAD_BITPIX,"FITSimg","operator=+()","CAN'T GET IMAGES, DATA TYPE "+std::to_string(BITPIX)+" IS UNKNOWN.");
+                throw FITSexception(BAD_BITPIX,"FITSimg","ctor","CAN'T GET IMAGES, DATA TYPE "+std::to_string(BITPIX)+" IS UNKNOWN.");
         }
     }
     
@@ -1056,9 +1178,8 @@ namespace DSL
     {        
         std::vector<size_t> axis = Build_axis(ndim, _iaxis);
         
-        
 	    for(size_t i = 0; i < axis.size(); i++)
-	      Naxis.push_back(axis[i]);
+            Naxis.push_back(axis[i]);
 
         mask = pxMask(static_cast<size_t>( Nelements() ));
 
@@ -1432,6 +1553,53 @@ namespace DSL
     }
     
 #pragma endregion
+#pragma region • Image Statistic
+
+/**
+     *  @details Compute the sum of all unmasked pixel values
+     *  @return Sum of all unmasked pixel values
+     */
+    template< typename T >
+    double FITSimg<T>::GetSum() const
+    {
+        if(!data)
+            return 0.0;
+    
+        double sum = 0.0;
+        bool handled = false;
+
+        // fast typed paths (add the types you commonly use)
+        handled = WithTypedData<T>([&](const std::valarray<T>& arr)
+            {
+                for(size_t i = 0; i < arr.size(); i++)
+                {
+                    if(!mask[i])
+                        sum += static_cast<double>(arr[i]);
+                }
+            });
+        if(!handled) 
+            throw std::runtime_error("\033[31m[FITSimg::GetSum]\033[0m unsupported data type " + demangle(typeid(T).name()));
+
+        return sum;
+    }
+
+    /**
+     *  @details Compute the mean of all unmasked pixel values
+     *  @return Average of all unmasked pixel values
+     */
+    template< typename T >
+    double FITSimg<T>::GetMean() const
+    {
+        if(!data)
+            return 0.0;
+    
+        double sum = GetSum();
+        size_t nPix = mask[!mask].size();
+
+        return (nPix > 0) ? sum /= static_cast<double>(nPix) : 0;
+    }
+
+#pragma endregion
 #pragma region • data operation
     
     /**
@@ -1464,13 +1632,13 @@ namespace DSL
         std::vector<char>     null_array(static_cast<size_t>(array_size), 0);
          
         int TTYPE = 0;
-        switch (eqBITPIX)
+        switch (BITPIX)
         {
             case 8:
                 TTYPE = TBYTE;
                 break;
             
-            case 12:
+            case 10:
                 TTYPE = TSBYTE;
                 break;
 
@@ -1482,23 +1650,19 @@ namespace DSL
                 TTYPE = TUSHORT;
                 break;
                 
-            case 30:
-                TTYPE = TUINT;
-                break;
-                
-            case 31:
+            case 32:
                 TTYPE = TINT;
                 break;
                 
-            case 32:
-                TTYPE = TLONG;
-                break;
-                
             case 40:
-                TTYPE = TULONG;
+                TTYPE = TUINT;
                 
             case 64:
                 TTYPE = TLONGLONG;
+                break;
+            
+            case 80:
+                TTYPE = TULONGLONG;
                 break;
                 
             case -32:
@@ -1511,7 +1675,12 @@ namespace DSL
                 
             default:
                 img_status=BAD_BITPIX;
-                throw FITSexception(img_status,"FITSimg","operator=+()","CAN'T GET IMAGES, DATA TYPE "+std::to_string(BITPIX)+" IS UNKNOWN.");
+                throw FITSexception(img_status,"FITSimg","ReadArray","CAN'T GET IMAGES, DATA TYPE "+std::to_string(BITPIX)+" IS UNKNOWN.");
+        }
+
+        if((verbose & verboseLevel::VERBOSE_DEBUG) == verboseLevel::VERBOSE_DEBUG)
+        {
+            std::cout<<"        \033[32m`-BUFFER DATA TYPE = \033[0m"<<TTYPE<<"  \033[33m["<<TTYPE<<"]\033[0m"<<std::endl;
         }
         
         //    - EXTRACT BINARY DATA AND CONVERT TO NUMERICAL VALUE
@@ -1527,12 +1696,15 @@ namespace DSL
             switch (img_status)
             {
                 case 410:
+                    std::cerr << "runtime type: " << demangle(typeid(S).name()) <<std::endl;
                     std::cerr<<"    |- IMG DATA TYPE : "<<TTYPE<<std::endl
-                             <<"    `- this DATA TYPE: "<<BITPIX;
+                             <<"    |- this DATA TYPE: "<<BITPIX<<std::endl
+                             <<"    `- EQUIV. BITPIX : "<<eqBITPIX<<std::endl;
                     throw;
                     break;
                     
                 case 854:
+                    std::cerr << "runtime type: " << demangle(typeid(S).name()) <<std::endl;
                     std::cerr<<"    |- IMG PIXEL INDEX IS OUT OF RANGE"<<std::endl;
                     throw;
                     break;
@@ -1541,6 +1713,7 @@ namespace DSL
                     break;
             }
             
+            std::cerr << "runtime type: " << demangle(typeid(S).name()) <<std::endl;
             std::cerr<<"    |- IMG DATA TYPE : "<<TTYPE<<std::endl
                      <<"    |- BITPIX        : "<<BITPIX<<std::endl
                      <<"    |- EQUIV. BITPIX : "<<eqBITPIX<<std::endl
@@ -1551,7 +1724,7 @@ namespace DSL
                 std::cerr<<"    |    `- NAXIS["<<Naxis.size()-1<<"] : "<<Naxis[Naxis.size()-1]<<std::endl
                          <<"    |- START COO     : "<<std::endl;
             
-            for(unsigned int i=0; i < num_axis-1; i++)
+            for(size_t i=0; i < num_axis-1; i++)
                 std::cerr<<"    |   |- NAXIS"<<i<<"[0] : "<<fpixel[i]<<std::endl;
                 std::cerr<<"    |   `- NAXIS"<<num_axis-1<<"[0] : "<<fpixel[num_axis-1]<<std::endl
                          <<"    |- DATA SIZE     : "<<array_size<<std::endl
@@ -1560,6 +1733,7 @@ namespace DSL
                          <<"    `- HAS NULL      : "<<any_null;
             
             std::cerr<<"\033[0m"<<std::endl;
+            throw;
         }
         
         // typed storage (non-null)
@@ -1567,73 +1741,25 @@ namespace DSL
         if(!typed)
             throw FITSexception(SHARED_NULPTR,"FITSimg<T>","ReadArray","typed data missing");
 
-        const size_t n = static_cast<size_t>(array_size);
-
-        // Fast path when read type == storage type and no nulls/blanks to handle:
-        if constexpr (std::is_same_v<S,T>)
+        WithTypedData<T>([&](std::valarray<T>& arr)
         {
-            bool has_special_blank = any_null != 0;
-            
-            // if no explicit nulls and BLANK isn't present as NaN sentinel, direct copy
-            if(!has_special_blank)
+            for(size_t i = 0; i < static_cast<size_t>(array_size); i++)
             {
-                // assign element-wise into valarray (valarray has no iterator, use index loop)
-                for(size_t i = 0; i < n; ++i) 
-                    (*typed)[i] = array[i];
-            }
-            else
-            {
-                for(size_t i = 0; i < n; ++i)
+                if(null_array[i])
                 {
-                    bool is_blank = static_cast<bool>(null_array[i]);
-
-                    if(!is_blank && std::is_floating_point_v<S>)
-                    {
-                        is_blank = std::isnan(static_cast<long double>(array[i])) || ( static_cast<S>(BLANK) == array[i] );
-                    }
-                    else if(!is_blank)
-                    {
-                        is_blank = ( static_cast<S>(BLANK) == array[i] );
-                    }
-
-                    if(is_blank && i < mask.size())
-                    {
-                        mask[i] = true;
-                        (*typed)[i] = BLANK;
-                    }
-                    else
-                    {
-                        (*typed)[i] = array[i];
-                    }
-                }
-            }
-        }
-        else
-        {
-            // generic path: convert and handle blanks/NaN
-            for(size_t i = 0; i < n; ++i)
-            {
-                bool is_blank = static_cast<bool>(null_array[i]);
-
-                if(!is_blank && std::is_floating_point_v<S>)
-                {
-                    is_blank = std::isnan(static_cast<long double>(array[i])) || ( static_cast<S>(BLANK) == array[i] );
-                }
-                else if(!is_blank)
-                {
-                    is_blank = ( static_cast<S>(BLANK) == array[i] );
-                }
-                if(is_blank && i < mask.size())
-                {
+                    arr[i] = static_cast<T>( std::numeric_limits<T>::quiet_NaN() );
                     mask[i] = true;
-                    (*typed)[i] = BLANK;
                 }
                 else
                 {
-                    (*typed)[i] = static_cast<T>( array[i] );
+                    arr[i] = static_cast<T>( array[i] ) * BSCALE + BZERO ;
+                    mask[i] = false;
+
+                    if(i == 256 + 256*512 && (verbose & verboseLevel::VERBOSE_DEBUG) == verboseLevel::VERBOSE_DEBUG)
+                        std::cout<<"array["<<i<<":"<<PixelCoordinates(i)[0]<<","<<PixelCoordinates(i)[1]<<"] = "<<array[i]<<" = "<<arr[i]<<"  ("<<BSCALE<<"   "<<BZERO<<")"<<std::endl;
                 }
             }
-        }   
+        });   
 
         return;
     }
@@ -2829,7 +2955,7 @@ namespace DSL
      *  @return Return pointer to a 2D FITScube for the selected layer. Header information are updated to account for new image dimenssion.
      */
     template< typename T >
-    FITScube *FITSimg<T>::Layer(unsigned int iLayer) const
+    std::shared_ptr<FITScube> FITSimg<T>::Layer(unsigned int iLayer) const
     {
         // create copy (copy constructor duplicates header, data and mask)
         FITSimg<T> *copy = new FITSimg<T>(*this);
@@ -2907,7 +3033,7 @@ namespace DSL
         if(copy->GetData<T>()->size() != copy->hdu.GetDimension() )
             throw FITSwarning("FITScube","Layer","DIMENSION MISSMATCH : "+std::to_string(copy->GetData<T>()->size())+" != "+std::to_string(copy->hdu.GetDimension()));
 
-        return copy;
+        return std::shared_ptr<FITScube>(copy);
     }
     
     /**
@@ -2999,7 +3125,7 @@ namespace DSL
      *  @return Return the FITScube for which x and y pixel coordinate are encapsulated in the specified window size.  Header information are updated to account for new image dimenssion.
      */
     template< typename T >
-    FITScube *FITSimg<T>::Window (size_t xMin, size_t yMin, size_t xSize, size_t ySize) const
+    std::shared_ptr<FITScube> FITSimg<T>::Window (size_t xMin, size_t yMin, size_t xSize, size_t ySize) const
     {
         FITSimg<T> *copy = NULL;
         copy = new FITSimg<T>(*this);
@@ -3018,7 +3144,7 @@ namespace DSL
         
         n_elements *= n_deep;
         
-        if(FITScube::debug)
+        if((verbose & verboseLevel::VERBOSE_DETAIL) == verboseLevel::VERBOSE_DETAIL)
             std::cout<<"\033[31m[FITScube::Window]\033[0m"<<std::endl
                      << "    \033[31m|- NEW IMAGE SIZE :\033[0m "<<n_elements<<std::endl
                      << "    \033[31m|- WINDOW         :\033[0m ("<<xMin<<","<<yMin<<")\033[34m -> \033[0m("<<xMax<<","<<yMax<<") [pix]"<<std::endl
@@ -3026,7 +3152,7 @@ namespace DSL
         
         copy->Resize(xMin, yMin, xSize, ySize);
         
-        return  copy;
+        return  std::shared_ptr<FITScube>(copy);
     }
     
     /**
@@ -3035,7 +3161,7 @@ namespace DSL
      *  @return Return rebined image as a new FITScube data cube.
      */
     template< typename T >
-    FITScube *FITSimg<T>::Rebin (std::vector<size_t> nbin) const
+    std::shared_ptr<FITScube> FITSimg<T>::Rebin (std::vector<size_t> nbin) const
     {
         double bin_size = 1;
         for(size_t iBin = 0; iBin < nbin.size(); iBin++)
@@ -3123,7 +3249,8 @@ namespace DSL
                 while(msk[pos] && pos < msk.size())
                     pos++;
 
-                if( pos >= Nelements())
+                if( pos 
+                    >= Nelements())
                     break;
             }
         });
@@ -3136,7 +3263,7 @@ namespace DSL
         size.clear();
         msk.resize(0);
         
-        return  copy;
+        return  std::shared_ptr<FITScube>(copy);
     }
     
     template < typename T >

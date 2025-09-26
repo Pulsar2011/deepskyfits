@@ -13,6 +13,9 @@
 #include <fitsio.h>
 #include <cmath>
 #include <limits>
+#include <typeinfo>
+#include <cxxabi.h>
+#include <string>
 
 namespace DSL
 {
@@ -204,6 +207,15 @@ namespace DSL {
     }
 
     template<typename> inline constexpr bool always_false_v = false;
+
+    auto demangle = [](const char* name) -> std::string
+    {
+        int status = 0;
+        char* dem = abi::__cxa_demangle(name, nullptr, nullptr, &status);
+        std::string s = (status == 0 && dem) ? dem : name;
+        free(dem);
+        return s;
+    }; 
 
 } // namespace DSL
 

@@ -148,7 +148,10 @@ class FITSmanager;
         }
         
         //  • GET EXTENSION NAME
-        name = hdu.GetValueForKey("EXTNAME");
+        name.clear();
+        
+        if(hdu.Exists("EXTNAME"))
+            name = hdu.GetValueForKey("EXTNAME");
         if(name.size() < 1)
             name += "PRIMARY";
         
@@ -545,15 +548,21 @@ class FITSmanager;
         }
         std::shared_ptr<fitsfile> fptr(raw_fptr, [](fitsfile* p){ int status=0; fits_close_file(p, &status); });
         
-        std::cout<<"\033[31m[FITScube::Write]\033[0m: Create image of "<<Naxis.size()<<" axis (";
+        if((verbose & verboseLevel::VERBOSE_IMG) == verboseLevel::VERBOSE_IMG)
+            std::cout<<"\033[31m[FITScube::Write]\033[0m: Create image of "<<Naxis.size()<<" axis (";
+
         long long int *axis = new long long int [Naxis.size()];
         for(unsigned int i = 0; i < Naxis.size()-1; i++)
         {
             axis[i] = static_cast<long long int>( Naxis[i] );
-             std::cout<<axis[i]<<",";
+
+            if((verbose & verboseLevel::VERBOSE_IMG) == verboseLevel::VERBOSE_IMG)
+                std::cout<<axis[i]<<",";
         }
         axis[Naxis.size()-1] = static_cast<long long int>( Naxis[Naxis.size()-1] );
-        std::cout<<axis[Naxis.size()-1]<<")"<<std::endl;
+
+        if((verbose & verboseLevel::VERBOSE_IMG) == verboseLevel::VERBOSE_IMG)
+            std::cout<<axis[Naxis.size()-1]<<")"<<std::endl;
         
         if(BITPIX == 0)
         {
@@ -573,20 +582,7 @@ class FITSmanager;
         
         Write(fptr);
         
-        try
-        {
-            if( fits_close_file(fptr.get(), &img_status) )
-            {
-                throw FITSexception(img_status,"FITScube","Close","FILE : "+fileName);
-            }
-        }
-        catch(std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-        }
-        
         fptr.reset();
-
     }
   
     
@@ -740,203 +736,9 @@ class FITSmanager;
         mask &= (!_m) ;
     }
 
-    /**
-     * @details Initialize type uint8_t FITS variable.
-     */
-    template< >
-    void FITSimg<uint8_t>::template_init()
-    {
-        BitPerPixel(8);
-        Bscale(1. );
-        Bzero (0. );
-    }
-    
-    /**
-     * @details Initialize type uint8_t FITS variable.
-     */
-    template< >
-    void FITSimg<int8_t>::template_init()
-    {
-        BitPerPixel(8);
-        Bscale(static_cast<double>(1));
-        Bzero(static_cast<double>(0));
-    }
-    
-    /**
-     * @details Initialize type uint8_t FITS variable.
-     */
-    template< >
-    void FITSimg<uint16_t>::template_init()
-    {
-        BitPerPixel(16,20);
-        Bscale(static_cast<double>(1.));
-        Bzero(static_cast<double>(32768.));
-    }
-    
-    /**
-     * @details Initialize type uint8_t FITS variable.
-     */
-    template< >
-    void FITSimg<int16_t>::template_init()
-    {
-        BitPerPixel(static_cast<int>(16));
-        Bscale(1. );
-        Bzero (0. );
-    }
-    
-    /**
-     * @details Initialize type uint8_t FITS variable.
-     */
-    template< >
-    void FITSimg<int32_t>::template_init()
-    {
-        BitPerPixel(32);
-        Bscale(1. );
-        Bzero (0. );
-    }
-    
-    /**
-     * @details Initialize type uint8_t FITS variable.
-     */
-    template< >
-    void FITSimg<uint32_t>::template_init()
-    {
-        BitPerPixel(32,40);
-        Bscale(static_cast<double>(1.));
-        Bzero(static_cast<double>(2147483648.));
-    }
-    
-    /**
-     * @details Initialize type uint8_t FITS variable.
-     */
-    template< >
-    void FITSimg<int64_t>::template_init()
-    {
-        BitPerPixel(static_cast<int>(64));
-        Bscale(1. );
-        Bzero (0. );
-    }
-
-    /**
-     * @details Initialize type uint64_t FITS variable.
-     */
-    template< >
-    void FITSimg<uint64_t>::template_init()
-    {
-        BitPerPixel(static_cast<int>(64));
-        Bscale(1. );
-        Bzero (0. );
-    }
-
-    /**
-     * @details Initialize type uint64_t FITS variable.
-     */
-    template< >
-    void FITSimg<size_t>::template_init()
-    {
-        BitPerPixel(static_cast<int>(64));
-        Bscale(1. );
-        Bzero (0. );
-    }
-    
-    /**
-     * @details Initialize type uint8_t FITS variable.
-     */
-    template< >
-    void FITSimg<float>::template_init()
-    {
-        std::cout<<"SET BITPIX TO -32"<<std::endl;
-        BitPerPixel(static_cast<int>(-32));
-        Bscale(1. );
-        Bzero (0. );
-    }
-    
-    /**
-     * @details Initialize type double FITS variable.
-     */
-    template< >
-    void FITSimg<double>::template_init()
-    {
-        BitPerPixel(static_cast<int>(-64));
-        Bscale(1. );
-        Bzero (0. );
-        
-    }
 #pragma endregion
 
 #pragma region • Data operation
-
-    /**
-     *  @details Compute the sum of all unmasked pixel values
-     *  @return Sum of all unmasked pixel values
-     */
-    double FITScube::GetSum() const
-    {
-        if(!data)
-            return 0.0;
-    
-        double sum = 0.0;
-        bool handled = false;
-
-        // fast typed paths (add the types you commonly use)
-        handled = WithTypedData<int8_t>([&](const std::valarray<int8_t>& arr){ sum += static_cast<double>( arr[!mask].sum() ); });
-        if(handled) return sum;
-
-        handled = WithTypedData<uint8_t>([&](const std::valarray<uint8_t>& arr){ sum += static_cast<double>( arr[!mask].sum() ); });
-        if(handled) return sum;
-
-        handled = WithTypedData<int16_t>([&](const std::valarray<int16_t>& arr){ sum += static_cast<double>( arr[!mask].sum() ); });
-        if(handled) return sum;
-
-        handled = WithTypedData<uint16_t>([&](const std::valarray<uint16_t>& arr){ sum += static_cast<double>( arr[!mask].sum() ); });
-        if(handled) return sum;
-
-        handled = WithTypedData<int32_t>([&](const std::valarray<int32_t>& arr){ sum += static_cast<double>( arr[!mask].sum() ); });
-        if(handled) return sum;
-
-        handled = WithTypedData<uint32_t>([&](const std::valarray<uint32_t>& arr){ sum += static_cast<double>( arr[!mask].sum() ); });
-        if(handled) return sum;
-
-        handled = WithTypedData<int64_t>([&](const std::valarray<int64_t>& arr){ sum += static_cast<double>( arr[!mask].sum() ); });
-        if(handled) return sum;
-
-        handled = WithTypedData<uint64_t>([&](const std::valarray<uint64_t>& arr){ sum += static_cast<double>( arr[!mask].sum() ); });
-        if(handled) return sum;
-
-        handled = WithTypedData<size_t>([&](const std::valarray<size_t>& arr){ sum += static_cast<double>( arr[!mask].sum() ); });
-        if(handled) return sum;
-
-        handled = WithTypedData<float>([&](const std::valarray<float>& arr){ sum += static_cast<double>( arr[!mask].sum() ); });
-        if(handled) return sum;
-
-        handled = WithTypedData<double>([&](const std::valarray<double>& arr){ sum += arr[!mask].sum(); });
-        if(handled) return sum;
-
-       // fallback generic per-element access via FitsArrayBase::get()
-        for(size_t i = 0; i < data->size(); ++i)
-        {
-            if(i < mask.size() && mask[i]) continue;
-            sum += static_cast<double>(data->get(i));
-        }
-
-        return sum;
-    }
-
-    /**
-     *  @details Compute the mean of all unmasked pixel values
-     *  @return Average of all unmasked pixel values
-     */
-    double FITScube::GetMean() const
-    {
-        if(!data)
-            return 0.0;
-    
-        double sum = GetSum();
-        size_t nPix = mask[!mask].size();
-
-        return (nPix > 0) ? sum /= static_cast<double>(nPix) : 0;
-    }
-
     /**
      *  @details Compute the mean of all unmasked pixel values
      *  @return Average of all unmasked pixel values

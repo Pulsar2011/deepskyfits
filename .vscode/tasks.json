@@ -4,7 +4,7 @@
         {
             "label": "make gtest",
             "type": "shell",
-            "command": "make gTest_manager gTest_hdu",
+            "command": "make gTest_manager gTest_hdu gTest_FitsImage",
             "group": "build",
             "problemMatcher": []
         }
