@@ -204,9 +204,21 @@ namespace DSL
         else if(fvalue.find('.') != std::string::npos && (
                 fvalue.find('e') != std::string::npos ||
                 fvalue.find('E') != std::string::npos    ))
-            ftype = fDouble;
+            {
+                double val = std::stod(fvalue, nullptr);
+                if(std::abs(val) > static_cast<double>(std::numeric_limits<float>::max()) || std::abs(val) < 1.e-7) 
+                    ftype = fDouble;
+                else
+                    ftype = fFloat;
+            }
         else if(fvalue.find('.') != std::string::npos)
-            ftype = fFloat;
+            {
+                double val = std::stod(fvalue, nullptr);
+                if(std::abs(val) > static_cast<double>(std::numeric_limits<float>::max()) || std::abs(val) < 1.e-7) 
+                    ftype = fDouble;
+                else
+                    ftype = fFloat;
+            }
         else if(fvalue.find('-') != std::string::npos )
         {
             int64_t num = std::stoll(fvalue, nullptr, 10);
@@ -959,10 +971,10 @@ namespace DSL
             if( it->first == "HISTORY")
                 continue;
 
-            if( it->first == "BSCALE" && std::abs(std::stod(it->second.value())-1) <= std::numeric_limits<double>::epsilon() )
+            if( it->first == "BSCALE" )
                 continue;
 
-            if( it->first == "BZERO" && std::abs(std::stod(it->second.value())) <= std::numeric_limits<double>::epsilon() )
+            if( it->first == "BZERO" )
                 continue;
             
             switch(it->second.type())
@@ -1028,6 +1040,49 @@ namespace DSL
         it = hdu.find("HISTORY");
         if( it != hdu.end() )
             WriteCharValueForKey( it, fptr );
+
+        bool has_bzero = false;
+        bool has_bscale = false;
+        double bzero = 0.0;
+        double bscale = 1.0;
+        
+        FITSDictionary::const_iterator ibz = hdu.find("BZERO");
+        if( ibz != hdu.end() )
+        {
+            bzero = GetDoubleValueForKey("BZERO");
+            has_bzero = (std::abs(bzero) > std::numeric_limits<double>::epsilon());
+        }
+
+        FITSDictionary::const_iterator ibs = hdu.find("BSCALE");
+        if( ibs != hdu.end() )
+        {
+            bscale = GetDoubleValueForKey("BSCALE");
+            has_bscale = (std::abs(bscale-1.0) > std::numeric_limits<double>::epsilon());
+        }
+
+        FITSDictionary::const_iterator ibb = hdu.find("BITPIX");
+        if( ibb == hdu.end() )
+            throw FITSexception(KEY_NO_EXIST,"FITShdu","Write","BITPIX key not found in HDU");
+
+        if(has_bscale || has_bzero)
+        {
+            if(ibz == hdu.end() || ibs == hdu.end())
+                throw FITSexception(KEY_NO_EXIST,"FITShdu","Write","BZERO and BSCALE must be both present to be written");
+
+            if(ibs->second.type() == fDouble || ibs->second.type() == fFloat)
+                WriteDoubleValueForKey( ibs, fptr );
+            else if (std::stod(ibs->second.value()) < 0)
+                WriteInt64ValueForKey( ibs, fptr );
+            else
+                WriteUInt64ValueForKey( ibs, fptr );
+
+            if(ibz->second.type() == fDouble || ibz->second.type() == fFloat)
+                WriteDoubleValueForKey( ibz, fptr );
+            else if (std::stod(ibz->second.value()) < 0)
+                WriteInt64ValueForKey( ibz, fptr );
+            else 
+                WriteUInt64ValueForKey( ibz, fptr );
+        }
 
     }
     
@@ -1422,9 +1477,11 @@ namespace DSL
                 {
                     std::stringstream ss;
                     ss<<"KEYWORD "<<keyword<<" ALREADY EXIST BUT IT ISN'T OF THE SAME TYPE."<<std::endl
-                      <<"VALUE WON'T BE MODIFIED.\033[34m "<<keyword<<"\033[0m -> "<<kt<<" ["<<FITSkeyword::GetDataType(kt)<<"] % "<<it->second.type()<<" ["<<FITSkeyword::GetDataType(it->second.type())<<"]"<<std::endl
-                      <<"\033[34m"<<it->first<<std::flush;
+                        <<"TYPE WILL BE MODIFIED.\033[34m "<<keyword<<"\033[0m "<<it->second.type()<<" ["<<FITSkeyword::GetDataType(it->second.type())<<"] -> "<<kt<<" ["<<FITSkeyword::GetDataType(kt)<<"]"<<std::endl
+                        <<"\033[0m"<<std::flush;
                     it->second.Dump(ss);
+
+                    it->second.setType(kt);
                     
                     throw FITSwarning("FITShdu","ValueForKey",ss.str());
                 }
@@ -1433,9 +1490,6 @@ namespace DSL
             {
                 if((verbose & DSL::verboseLevel::VERBOSE_DETAIL)==DSL::verboseLevel::VERBOSE_DETAIL)
                     std::cerr<<e.what()<<std::endl;
-
-                if((verbose&verboseLevel::VERBOSE_DEBUG)==verboseLevel::VERBOSE_DEBUG)
-                    throw e;
             }
             
             it->second.setValue(value);

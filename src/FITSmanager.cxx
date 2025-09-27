@@ -437,48 +437,58 @@ namespace DSL
                 throw FITSexception(fits_status,"FITSmanager","GetImageAtIndex");
             }
 
+            if(eqBITPIX == 64)
+            {
+                unsigned long long bz = 0;
+                if(ffgkyujj(fptr.get(), "BZERO", &bz, NULL, &fits_status))
+                    bz=0ULL;
+                
+                if (bz == 9223372036854775808ULL)
+                    eqBITPIX = 80;
+            }
+
             if((verbose & verboseLevel::VERBOSE_IMG)== verboseLevel::VERBOSE_IMG)
                 std::cout<<"FITS image eqBITPIX = "<<eqBITPIX<<std::endl;
         
             switch (eqBITPIX)
             {
-                case 8:
+                case BYTE_IMG:
                     img = new FITSimg<uint8_t>(fptr);
                     break;
                 
-                case 10:
+                case SBYTE_IMG:
                     img = new FITSimg<int8_t>(fptr);
                     break;
 
-                case 16:
+                case SHORT_IMG:
                     img = new FITSimg<int16_t>(fptr);
                     break;
                 
-                case 20:
+                case USHORT_IMG:
                     img = new FITSimg<uint16_t>(fptr);
                     break;
                 
-                case 32:
+                case LONG_IMG:
                     img = new FITSimg<int32_t>(fptr);
                     break;
                 
-                case 40:
+                case ULONG_IMG:
                     img = new FITSimg<uint32_t>(fptr);
                     break;
                 
-                case 64:
+                case LONGLONG_IMG:
                     img = new FITSimg<int64_t>(fptr);
                     break;
                 
-                case 80:
+                case ULONGLONG_IMG:
                     img = new FITSimg<uint64_t>(fptr);
                     break;
                 
-                case -32:
+                case FLOAT_IMG:
                     img = new FITSimg<float>(fptr);
                     break;
                 
-                case -64:
+                case DOUBLE_IMG:
                     img = new FITSimg<double>(fptr);
                     break;
                 

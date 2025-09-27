@@ -520,7 +520,7 @@ namespace DSL
 #endif
         
     };
-
+#pragma endregion
 #pragma endregion
 #pragma region - FITSimg class definition
     template< typename T >
@@ -833,6 +833,10 @@ namespace DSL
 
 #pragma endregion
 #pragma region • Accessor
+
+        const T& ReadBscale() const {return BSCALE;}
+        const T& ReadBzero () const {return BZERO ;}
+        const T& ReadBlank () const {return BLANK ;}
     
 #pragma endregion
 #pragma region • Display methods
@@ -868,57 +872,64 @@ namespace DSL
         else
             BLANK = std::numeric_limits<T>::min();
 
-                if constexpr (std::is_floating_point_v<T>)
-            BLANK = std::numeric_limits<T>::quiet_NaN();
-        else
-            BLANK = std::numeric_limits<T>::min();
-
         // type-specific FITS parameters
-        if constexpr (std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>)
+        if constexpr (std::is_same_v<T, uint8_t>)
         {
-            BitPerPixel(8);
+            BitPerPixel(BYTE_IMG);   // unsigned 8 uses BITPIX=8
             Bscale(static_cast<T>(1));
             Bzero (static_cast<T>(0));
         }
+        else if constexpr (std::is_same_v<T, int8_t>)
+        {
+            BitPerPixel(8,SBYTE_IMG); // signed 8 uses BITPIX=8, equiv 10
+            Bscale(static_cast<T>(1));
+            Bzero (static_cast<T>(-128));
+        }
         else if constexpr (std::is_same_v<T, int16_t>)
         {
-            BitPerPixel(16); // unsigned 16 uses BITPIX=16, equiv 20
+            BitPerPixel(SHORT_IMG); // signed 16 uses BITPIX=16
             Bscale(static_cast<T>(1));
             Bzero (static_cast<T>(0));
         }
         else if constexpr (std::is_same_v<T, uint16_t>)
         {
-            BitPerPixel(16,20);
+            BitPerPixel(16,USHORT_IMG); // unsigned 16 uses BITPIX=16, equiv 20
             Bscale(static_cast<T>(1));
             Bzero (static_cast<T>(32768));
         }
         else if constexpr (std::is_same_v<T, int32_t>)
         {
-            BitPerPixel(32);
+            BitPerPixel(LONG_IMG);     // signed 32 uses BITPIX=32
             Bscale(static_cast<T>(1));
             Bzero (static_cast<T>(0));
         }
         else if constexpr (std::is_same_v<T, uint32_t>)
         {
-            BitPerPixel(32, 40); // unsigned 32 uses equiv 40
+            BitPerPixel(32, ULONG_IMG); // unsigned 32 uses BITPIX=32, equiv 40
             Bscale(static_cast<T>(1));
             Bzero (static_cast<T>((T)2147483648));
         }
-        else if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, uint64_t> || std::is_same_v<T, size_t>)
+        else if constexpr (std::is_same_v<T, int64_t>)
         {
-            BitPerPixel(64);
+            BitPerPixel(LONGLONG_IMG); // signed 64 uses BITPIX=64
             Bscale(static_cast<T>(1));
             Bzero (static_cast<T>(0));
         }
+        else if constexpr (std::is_same_v<T, uint64_t> || std::is_same_v<T, size_t>)
+        {
+            BitPerPixel(64, ULONGLONG_IMG); // unsigned 64 uses equiv 80
+            Bscale(static_cast<T>(1));
+            Bzero (static_cast<T>((T)9223372036854775808));
+        }
         else if constexpr (std::is_same_v<T, float>)
         {
-            BitPerPixel(-32);
+            BitPerPixel(FLOAT_IMG);
             Bscale(static_cast<T>(1));
             Bzero (static_cast<T>(0));
         }
         else if constexpr (std::is_same_v<T, double>)
         {
-            BitPerPixel(-64);
+            BitPerPixel(DOUBLE_IMG);
             Bscale(static_cast<T>(1));
             Bzero (static_cast<T>(0));
         }
@@ -942,6 +953,166 @@ namespace DSL
     
 #pragma endregion
 #pragma region • I/O
+
+    /**
+     *  @details Read the RAW data from the FITS file and extract the pixel content
+     *  @param fptr; Input fitsfile
+     */
+    template< typename T >
+    template< typename S >
+    void FITSimg<T>::ReadArray(const std::shared_ptr<fitsfile>& fptr)
+    {
+        
+        if(fptr == nullptr || fptr.use_count() < 1)
+            return;
+            
+        // • GET THE WHOLE IMAGE DATA
+        //    - GET PIXEL DIMENSION
+        
+        if((verbose&verboseLevel::VERBOSE_HDU)==verboseLevel::VERBOSE_HDU)
+            hdu.Dump(std::cout);
+        
+        const long      num_axis    = static_cast<const long>( Naxis.size() );
+        const LONGLONG array_size  = static_cast<const long long>( Nelements() );
+        
+        //    - ALLOCATE BUFFER MEMORY
+        int any_null = 0;
+        img_status   = 0;
+        
+        std::vector<LONGLONG> fpixel(static_cast<size_t>(num_axis), 1);
+        std::vector<S>        array(static_cast<size_t>(array_size));
+        std::vector<char>     null_array(static_cast<size_t>(array_size), 0);
+         
+        int TTYPE = 0;
+        switch (eqBITPIX)
+        {
+            case BYTE_IMG:
+            case SBYTE_IMG:
+                if (eqBITPIX == SBYTE_IMG)
+                    TTYPE = TSBYTE;
+                else
+                    TTYPE = TBYTE;
+                break;
+            
+            case SHORT_IMG:
+            case USHORT_IMG:
+                if (eqBITPIX == USHORT_IMG)
+                    TTYPE = TUSHORT;
+                else
+                    TTYPE = TSHORT;
+                break;
+                
+            case LONG_IMG:
+            case ULONG_IMG:
+                if (eqBITPIX == ULONG_IMG)
+                    TTYPE = TUINT;
+                else
+                    TTYPE = TINT;
+                break;
+                
+            case LONGLONG_IMG:
+            case ULONGLONG_IMG:
+                if (eqBITPIX == ULONGLONG_IMG)
+                    TTYPE = TULONGLONG;
+                else
+                    TTYPE = TLONGLONG;
+                break;
+                
+            case FLOAT_IMG:
+                TTYPE = TFLOAT;
+                break;
+                
+            case DOUBLE_IMG:
+                TTYPE = TDOUBLE;
+                break;
+                
+            default:
+                img_status=BAD_BITPIX;
+                throw FITSexception(img_status,"FITSimg","ReadArray","CAN'T GET IMAGES, DATA TYPE "+std::to_string(BITPIX)+" IS UNKNOWN.");
+        }
+
+        if((verbose & verboseLevel::VERBOSE_DEBUG) == verboseLevel::VERBOSE_DEBUG)
+        {
+            std::cout<<"        \033[32m`-BUFFER DATA TYPE = \033[0m"<<TTYPE<<"  \033[33m["<<TTYPE<<"]\033[0m"<<std::endl;
+        }
+        
+        //    - EXTRACT BINARY DATA AND CONVERT TO NUMERICAL VALUE
+        
+        try
+        {
+            if( fits_read_pixnullll(fptr.get(), TTYPE, fpixel.data(), array_size, array.data(), null_array.data(), &any_null, &img_status  ) )
+                 throw FITSexception(img_status,"FITSimg<T>","ReadArray");
+        }
+        catch(std::exception& e)
+        {
+            std::cerr<<e.what()<<std::endl;
+            switch (img_status)
+            {
+                case 410:
+                    std::cerr << "runtime type: " << demangle(typeid(S).name()) <<std::endl;
+                    std::cerr<<"    |- IMG DATA TYPE : "<<TTYPE<<std::endl
+                             <<"    |- this DATA TYPE: "<<BITPIX<<std::endl
+                             <<"    `- EQUIV. BITPIX : "<<eqBITPIX<<std::endl;
+                    throw;
+                    break;
+                    
+                case 854:
+                    std::cerr << "runtime type: " << demangle(typeid(S).name()) <<std::endl;
+                    std::cerr<<"    |- IMG PIXEL INDEX IS OUT OF RANGE"<<std::endl;
+                    throw;
+                    break;
+               
+                default:
+                    break;
+            }
+            
+            std::cerr << "runtime type: " << demangle(typeid(S).name()) <<std::endl;
+            std::cerr<<"    |- IMG DATA TYPE : "<<TTYPE<<std::endl
+                     <<"    |- BITPIX        : "<<BITPIX<<std::endl
+                     <<"    |- EQUIV. BITPIX : "<<eqBITPIX<<std::endl
+                     <<"    |- NAXIS         : "<<num_axis<<std::endl;
+            
+            for(size_t i=0; i < Naxis.size()-1; i++)
+                std::cerr<<"    |    |- NAXIS["<<i<<"] : "<<Naxis[i]<<std::endl;
+                std::cerr<<"    |    `- NAXIS["<<Naxis.size()-1<<"] : "<<Naxis[Naxis.size()-1]<<std::endl
+                         <<"    |- START COO     : "<<std::endl;
+            
+            for(size_t i=0; i < num_axis-1; i++)
+                std::cerr<<"    |   |- NAXIS"<<i<<"[0] : "<<fpixel[i]<<std::endl;
+                std::cerr<<"    |   `- NAXIS"<<num_axis-1<<"[0] : "<<fpixel[num_axis-1]<<std::endl
+                         <<"    |- DATA SIZE     : "<<array_size<<std::endl
+                         <<"    |- ARRAY[0]      : "<<array[0]<<std::endl
+                         <<"    |- null_array[0] : "<<null_array[0]<<std::endl
+                         <<"    `- HAS NULL      : "<<any_null;
+            
+            std::cerr<<"\033[0m"<<std::endl;
+            throw;
+        }
+        
+        // typed storage (non-null)
+        std::valarray<T>* typed = this->template GetData<T>();
+        if(!typed)
+            throw FITSexception(SHARED_NULPTR,"FITSimg<T>","ReadArray","typed data missing");
+
+        WithTypedData<T>([&](std::valarray<T>& arr)
+        {
+            for(size_t i = 0; i < static_cast<size_t>(array_size); i++)
+            {
+                if(null_array[i])
+                {
+                    arr[i] = static_cast<T>( std::numeric_limits<T>::quiet_NaN() );
+                    mask[i] = true;
+                }
+                else
+                {
+                    arr[i] = static_cast<T>( array[i] );
+                    mask[i] = false;
+                }
+            }
+        });   
+
+        return;
+    }
     
     /**
      *  @details Write, or update data, to the current HDU images
@@ -956,29 +1127,45 @@ namespace DSL
             return;
         }
         
-        switch (BITPIX)
+        switch (eqBITPIX)
         {
-            case 8:
-                WriteData<uint8_t>(fptr, TBYTE);
+            case BYTE_IMG:
+            case SBYTE_IMG:
+                if (eqBITPIX == SBYTE_IMG)
+                    WriteData<int8_t>(fptr, TSBYTE);
+                else
+                    WriteData<uint8_t>(fptr, TBYTE);
                 break;
                 
-            case 16:
-                WriteData<int16_t>(fptr, TSHORT);
+            case SHORT_IMG:
+            case USHORT_IMG:
+                if(eqBITPIX == USHORT_IMG)
+                    WriteData<uint16_t>(fptr, TUSHORT);
+                else
+                    WriteData<int16_t>(fptr, TSHORT);
                 break;
                 
-            case 32:
-                WriteData<int32_t>(fptr, TINT);
+            case LONG_IMG:
+            case ULONG_IMG:
+                if(eqBITPIX == ULONG_IMG)
+                    WriteData<uint32_t>(fptr, TUINT);
+                else
+                    WriteData<int32_t>(fptr, TINT);
                 break;
                 
-            case 64:
-                WriteData<int64_t>(fptr, TLONGLONG);
+            case LONGLONG_IMG:
+            case ULONGLONG_IMG:
+                if(eqBITPIX == ULONGLONG_IMG)
+                    WriteData<uint64_t>(fptr, TULONGLONG);
+                else
+                    WriteData<int64_t>(fptr, TLONGLONG);
                 break;
                 
-            case -32:
+            case FLOAT_IMG:
                 WriteData<float>(fptr, TFLOAT);
                 break;
                 
-            case -64:
+            case DOUBLE_IMG:
                 WriteData<double>(fptr, TDOUBLE);
                 break;
                 
@@ -1025,8 +1212,8 @@ namespace DSL
                      <<"        \033[31m|- DATA_TYPE    : \033[0m"<<DATA_TYPE<<std::endl
                      <<"        \033[31m|- BLANK        : \033[0m"<<BLANK<<std::endl
                      <<"        \033[31m|- Number of pix: \033[0m"<<Nelements()<<std::endl
-                     <<"        \033[31m|- this C type: \033[0m"<<demangle(typeid(T).name())<<sizeof(T)<<std::endl
-                     <<"        \033[31m`- this C type: \033[0m"<<demangle(typeid(S).name())<<sizeof(S)<<std::endl;
+                     <<"        \033[31m|- this C type: \033[0m"<<demangle(typeid(T).name())<<"["<<sizeof(T)<<"]"<<std::endl
+                     <<"        \033[31m`-  out C type: \033[0m"<<demangle(typeid(S).name())<<"["<<sizeof(S)<<"]"<<std::endl;
 
             for(size_t i = 0; i < Naxis.size()-1; i++)
                 std::cout<<"             \033[34m|- Axis "<<i<<"    : \033[0m"<<Naxis[i]<<std::endl;
@@ -1038,8 +1225,7 @@ namespace DSL
             for(long long i = 0; i < array_size; ++i)
             {
                 // apply BZERO/BSCALE and convert to output type
-                outbuf[static_cast<size_t>(i)] = static_cast<S>( ((*_data)[static_cast<size_t>(i)] - BZERO) / BSCALE );
-
+                outbuf[static_cast<size_t>(i)] = static_cast<S> ((*_data)[static_cast<size_t>(i)]);
             }
         }
         else // fallback: build buffer from polymorphic accessor data->get(i)
@@ -1050,7 +1236,7 @@ namespace DSL
             for(long long i = 0; i < array_size; ++i)
             {
                 double val = static_cast<double>( data->get(static_cast<size_t>(i)) ); // generic value
-                outbuf[static_cast<size_t>(i)] = static_cast<S>( (val - static_cast<double>(BZERO)) / static_cast<double>(BSCALE) );
+                outbuf[static_cast<size_t>(i)] = static_cast<S>( val );
             }
         }
 
@@ -1059,7 +1245,7 @@ namespace DSL
             for(size_t i=0; i < outbuf.size(); ++i) std::cout<<"["<<i<<"]"<<outbuf[i]<<"   ";
             std::cout<<std::endl;
         }
-        
+
         if( fits_write_pixll(fptr.get(), DATA_TYPE, fpixel.data(), array_size, outbuf.data(), &img_status) )
         {
             throw FITSexception(img_status,"FITSimg","WriteDataCube");
@@ -1111,27 +1297,43 @@ namespace DSL
         // • GET THE WHOLE IMAGE DATA
         switch (eqBITPIX)
         {
-            case 8:
+            case SBYTE_IMG:
+                ReadArray<int8_t>(fptr);
+                break;
+
+            case BYTE_IMG:
                 ReadArray<uint8_t>(fptr);
                 break;
                 
-            case 16:
+            case SHORT_IMG:
                 ReadArray<int16_t>(fptr);
                 break;
+            
+            case USHORT_IMG:
+                ReadArray<uint16_t>(fptr);
+                break;
                 
-            case 32:
+            case LONG_IMG:
                 ReadArray<int32_t>(fptr);
                 break;
-                
-            case 64:
-                ReadArray<int64_t>(fptr);
+            
+            case ULONG_IMG:
+                ReadArray<uint32_t>(fptr);
                 break;
                 
-            case -32:
+            case LONGLONG_IMG:
+                ReadArray<int64_t>(fptr);
+                break;
+
+            case ULONGLONG_IMG:
+                ReadArray<uint64_t>(fptr);
+                break;
+                
+            case FLOAT_IMG:
                 ReadArray<float>(fptr);
                 break;
                 
-            case -64:
+            case DOUBLE_IMG:
                 ReadArray<double>(fptr);
                 break;
                 
@@ -1601,168 +1803,6 @@ namespace DSL
 
 #pragma endregion
 #pragma region • data operation
-    
-    /**
-     *  @details Read the RAW data from the FITS file and extract the pixel content
-     *  @param fptr; Input fitsfile
-     */
-    template< typename T >
-    template< typename S >
-    void FITSimg<T>::ReadArray(const std::shared_ptr<fitsfile>& fptr)
-    {
-        
-        if(fptr == nullptr || fptr.use_count() < 1)
-            return;
-            
-        // • GET THE WHOLE IMAGE DATA
-        //    - GET PIXEL DIMENSION
-        
-        if((verbose&verboseLevel::VERBOSE_HDU)==verboseLevel::VERBOSE_HDU)
-            hdu.Dump(std::cout);
-        
-        const long      num_axis    = static_cast<const long>( Naxis.size() );
-        const LONGLONG array_size  = static_cast<const long long>( Nelements() );
-        
-        //    - ALLOCATE BUFFER MEMORY
-        int any_null = 0;
-        img_status   = 0;
-        
-        std::vector<LONGLONG> fpixel(static_cast<size_t>(num_axis), 1);
-        std::vector<S>        array(static_cast<size_t>(array_size));
-        std::vector<char>     null_array(static_cast<size_t>(array_size), 0);
-         
-        int TTYPE = 0;
-        switch (BITPIX)
-        {
-            case 8:
-                TTYPE = TBYTE;
-                break;
-            
-            case 10:
-                TTYPE = TSBYTE;
-                break;
-
-            case 16:
-                TTYPE = TSHORT;
-                break;
-                
-            case 20:
-                TTYPE = TUSHORT;
-                break;
-                
-            case 32:
-                TTYPE = TINT;
-                break;
-                
-            case 40:
-                TTYPE = TUINT;
-                
-            case 64:
-                TTYPE = TLONGLONG;
-                break;
-            
-            case 80:
-                TTYPE = TULONGLONG;
-                break;
-                
-            case -32:
-                TTYPE = TFLOAT;
-                break;
-                
-            case -64:
-                TTYPE = TDOUBLE;
-                break;
-                
-            default:
-                img_status=BAD_BITPIX;
-                throw FITSexception(img_status,"FITSimg","ReadArray","CAN'T GET IMAGES, DATA TYPE "+std::to_string(BITPIX)+" IS UNKNOWN.");
-        }
-
-        if((verbose & verboseLevel::VERBOSE_DEBUG) == verboseLevel::VERBOSE_DEBUG)
-        {
-            std::cout<<"        \033[32m`-BUFFER DATA TYPE = \033[0m"<<TTYPE<<"  \033[33m["<<TTYPE<<"]\033[0m"<<std::endl;
-        }
-        
-        //    - EXTRACT BINARY DATA AND CONVERT TO NUMERICAL VALUE
-        
-        try
-        {
-            if( fits_read_pixnullll(fptr.get(), TTYPE, fpixel.data(), array_size, array.data(), null_array.data(), &any_null, &img_status  ) )
-                 throw FITSexception(img_status,"FITSimg<T>","ReadArray");
-        }
-        catch(std::exception& e)
-        {
-            std::cerr<<e.what()<<std::endl;
-            switch (img_status)
-            {
-                case 410:
-                    std::cerr << "runtime type: " << demangle(typeid(S).name()) <<std::endl;
-                    std::cerr<<"    |- IMG DATA TYPE : "<<TTYPE<<std::endl
-                             <<"    |- this DATA TYPE: "<<BITPIX<<std::endl
-                             <<"    `- EQUIV. BITPIX : "<<eqBITPIX<<std::endl;
-                    throw;
-                    break;
-                    
-                case 854:
-                    std::cerr << "runtime type: " << demangle(typeid(S).name()) <<std::endl;
-                    std::cerr<<"    |- IMG PIXEL INDEX IS OUT OF RANGE"<<std::endl;
-                    throw;
-                    break;
-               
-                default:
-                    break;
-            }
-            
-            std::cerr << "runtime type: " << demangle(typeid(S).name()) <<std::endl;
-            std::cerr<<"    |- IMG DATA TYPE : "<<TTYPE<<std::endl
-                     <<"    |- BITPIX        : "<<BITPIX<<std::endl
-                     <<"    |- EQUIV. BITPIX : "<<eqBITPIX<<std::endl
-                     <<"    |- NAXIS         : "<<num_axis<<std::endl;
-            
-            for(size_t i=0; i < Naxis.size()-1; i++)
-                std::cerr<<"    |    |- NAXIS["<<i<<"] : "<<Naxis[i]<<std::endl;
-                std::cerr<<"    |    `- NAXIS["<<Naxis.size()-1<<"] : "<<Naxis[Naxis.size()-1]<<std::endl
-                         <<"    |- START COO     : "<<std::endl;
-            
-            for(size_t i=0; i < num_axis-1; i++)
-                std::cerr<<"    |   |- NAXIS"<<i<<"[0] : "<<fpixel[i]<<std::endl;
-                std::cerr<<"    |   `- NAXIS"<<num_axis-1<<"[0] : "<<fpixel[num_axis-1]<<std::endl
-                         <<"    |- DATA SIZE     : "<<array_size<<std::endl
-                         <<"    |- ARRAY[0]      : "<<array[0]<<std::endl
-                         <<"    |- null_array[0] : "<<null_array[0]<<std::endl
-                         <<"    `- HAS NULL      : "<<any_null;
-            
-            std::cerr<<"\033[0m"<<std::endl;
-            throw;
-        }
-        
-        // typed storage (non-null)
-        std::valarray<T>* typed = this->template GetData<T>();
-        if(!typed)
-            throw FITSexception(SHARED_NULPTR,"FITSimg<T>","ReadArray","typed data missing");
-
-        WithTypedData<T>([&](std::valarray<T>& arr)
-        {
-            for(size_t i = 0; i < static_cast<size_t>(array_size); i++)
-            {
-                if(null_array[i])
-                {
-                    arr[i] = static_cast<T>( std::numeric_limits<T>::quiet_NaN() );
-                    mask[i] = true;
-                }
-                else
-                {
-                    arr[i] = static_cast<T>( array[i] ) * BSCALE + BZERO ;
-                    mask[i] = false;
-
-                    if(i == 256 + 256*512 && (verbose & verboseLevel::VERBOSE_DEBUG) == verboseLevel::VERBOSE_DEBUG)
-                        std::cout<<"array["<<i<<":"<<PixelCoordinates(i)[0]<<","<<PixelCoordinates(i)[1]<<"] = "<<array[i]<<" = "<<arr[i]<<"  ("<<BSCALE<<"   "<<BZERO<<")"<<std::endl;
-                }
-            }
-        });   
-
-        return;
-    }
     
     /**
      *  @brief Assignement opperator

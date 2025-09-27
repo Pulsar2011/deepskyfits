@@ -65,6 +65,7 @@ namespace DSL
 #pragma endregion
 #pragma region  • Modifier
             void setValue(const std::string&);                         //!< Set value for key
+            void setType(const key_type& t) { ftype = t; }             //!< Set type for key
         
 #pragma endregion
 #pragma region  • Dump

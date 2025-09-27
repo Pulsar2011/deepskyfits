@@ -146,6 +146,19 @@ class FITSmanager;
         {
             throw FITSexception(img_status,"FITScube","ctor");
         }
+
+        if(eqBITPIX == 64)
+        {
+            unsigned long long bz = 0;
+            if(ffgkyujj(fptr.get(), "BZERO", &bz, NULL, &img_status))
+            {
+                bz=0ULL;
+                img_status = 0;
+            }
+            
+            if (bz == 9223372036854775808ULL)
+                eqBITPIX = 80;
+        }
         
         //  • GET EXTENSION NAME
         name.clear();
@@ -564,7 +577,7 @@ class FITSmanager;
         if((verbose & verboseLevel::VERBOSE_IMG) == verboseLevel::VERBOSE_IMG)
             std::cout<<axis[Naxis.size()-1]<<")"<<std::endl;
         
-        if(BITPIX == 0)
+        if( BITPIX == 0 )
         {
             img_status = BAD_BITPIX;
             throw FITSexception(img_status,"FITScube","Write","FILE : "+fileName);
@@ -635,7 +648,7 @@ class FITSmanager;
         else
             eqBITPIX = eq;
         
-        hdu.ValueForKey( "BITPIX" , static_cast<int long long>(BITPIX) );
+        hdu.ValueForKey( "BITPIX" , BITPIX );
     }
     
     
