@@ -1,0 +1,12 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "make gtest",
+            "type": "shell",
+            "command": "make gTest_manager gTest_hdu gTest_FitsImage",
+            "group": "build",
+            "problemMatcher": []
+        }
+    ]
+}
