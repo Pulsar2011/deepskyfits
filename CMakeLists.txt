@@ -182,6 +182,10 @@ file(GLOB FITSIO_HEADER "cfitsio/*.h")
 
 set(HEADER_FILES ${CORE_HEADER})
 file(GLOB FITS_HEADER "include/cfitsio/*.h")
+file(GLOB MINUIT_HEADER "include/Minuit2/*.h")
+file(GLOB MINUIT2_HEADER "include/Minuit2/Minuit2/*.h")
+file(GLOB MINUITF_HEADER "include/Minuit2/Fit/*.h")
+file(GLOB MINUITM_HEADER "include/Minuit2/Math/*.h")
 
 #-------------------- Configuration de la bibliothèque
 
@@ -344,11 +348,48 @@ TARGET  distclean
 if(CMAKE_INSTALL_PREFIX)
     INSTALL(FILES ${CORE_HEADER} DESTINATION include/DSTfits)
     INSTALL(FILES ${FITS_HEADER} DESTINATION include/cfitsio)
+    INSTALL(FILES ${MINUIT_HEADER} DESTINATION include/Minuit2)
+    INSTALL(FILES ${MINUIT2_HEADER} DESTINATION include/Minuit2/Minuit2)
+    INSTALL(FILES ${MINUITF_HEADER} DESTINATION include/Minuit2/Fit)
+    INSTALL(FILES ${MINUITM_HEADER} DESTINATION include/Minuit2/Math)
+
+    # Core library built by this project
     INSTALL(TARGETS DSTfits
-		RUNTIME DESTINATION exe
-		LIBRARY DESTINATION lib
-		ARCHIVE DESTINATION lib
-)
+        RUNTIME DESTINATION exe
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+    )
+
+    # cfitsio is built via ExternalProject -> not a CMake target; install the produced archive directly
+    set(CFITSIO_OUTPUT_LIB ${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a)
+    INSTALL(FILES ${CFITSIO_OUTPUT_LIB} DESTINATION lib)
+
+    # Minuit2 libraries: install if targets exist, otherwise fallback to copying built files
+    if(TARGET Minuit2)
+        INSTALL(TARGETS Minuit2
+            RUNTIME DESTINATION exe
+            LIBRARY DESTINATION lib
+            ARCHIVE DESTINATION lib
+        )
+    endif()
+
+    if(TARGET Minuit2Math)
+        INSTALL(TARGETS Minuit2Math
+            RUNTIME DESTINATION exe
+            LIBRARY DESTINATION lib
+            ARCHIVE DESTINATION lib
+        )
+    endif()
+
+    if(NOT (TARGET Minuit2 OR TARGET Minuit2Math))
+        # Fallback: copy any libMinuit2* libraries found in the build lib dir
+        install(DIRECTORY ${CMAKE_SOURCE_DIR}/build/lib/ DESTINATION lib
+            FILES_MATCHING
+            PATTERN "libMinuit2*.a"
+            PATTERN "libMinuit2*.so"
+            PATTERN "libMinuit2*.dylib"
+        )
+    endif()
 endif(CMAKE_INSTALL_PREFIX)
 
 # At the end of your CMakeLists.txt, generate a helper script for cfitsio headers:
