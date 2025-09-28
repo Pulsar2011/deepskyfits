@@ -236,17 +236,45 @@ target_link_libraries(DSTfits
     PRIVATE z
 )
 
+#-------------------- Download sample FITS files for testing
+set(TESTDATA_DIR ${CMAKE_SOURCE_DIR}/build/testdata)
+file(MAKE_DIRECTORY ${TESTDATA_DIR})
+
+set(SAMPLE_FITS_URL
+    "https://heasarc.gsfc.nasa.gov/FTP/fits_info/sample_files/images/rosat_pspc_rdf2_3_bk1.fits"
+    "https://heasarc.gsfc.nasa.gov/FTP/fits_info/sample_files/images/rosat_pspc_rdf2_3_im2.fits"
+    "http://fits.gsfc.nasa.gov/samples/testkeys.fits"
+    "https://fits.gsfc.nasa.gov/nrao_data/samples/image/vogtstar_awt.fits"
+)
+
+set(SAMPLE_FITS_FILE "")
+foreach(url ${SAMPLE_FITS_URL})
+    get_filename_component(fname ${url} NAME)
+    list(APPEND SAMPLE_FITS_FILE "${TESTDATA_DIR}/${fname}")
+    add_custom_command(
+        OUTPUT "${TESTDATA_DIR}/${fname}"
+        COMMAND wget -O "${TESTDATA_DIR}/${fname}" "${url}"
+        COMMENT "Downloading sample FITS file: ${fname}"
+    )
+endforeach()
+
+add_custom_target(download_testdata
+    DEPENDS ${SAMPLE_FITS_FILE}
+)
+
 foreach( test_source_file ${TEST_SRC} )
 	get_filename_component( tSRC ${test_source_file} NAME_WE)
 	add_executable(
 		${tSRC}
 		${test_source_file}
 	)
+    # Ensure test data is downloaded before running tests
+    add_dependencies(${tSRC} download_testdata)
 
     if(COMPILER_SUPPORTS_CXX17)
-        target_link_libraries( ${tSRC} DSTfits gtest gtest_main)
+        target_link_libraries( ${tSRC} DSTfits Minuit2 gtest gtest_main)
     else(COMPILER_SUPPORTS_CXX17)
-        target_link_libraries( ${tSRC} DSTfits ${Boost_LIBRARIES} gtest gtest_main)
+        target_link_libraries( ${tSRC} DSTfits Minuit2 ${Boost_LIBRARIES} gtest gtest_main)
     endif(COMPILER_SUPPORTS_CXX17)
 
 
@@ -308,7 +336,6 @@ COMMENT "distribution clean"
 COMMAND rm ARGS    -Rf ${DISTCLEANED}
 COMMAND test -e install_manifest.txt || xargs ARGS rm -f < install_manifest.txt
 COMMAND test -e install_manifest.txt || rm ARGS -f install_manifest.txt
-COMMAND make -C ${CMAKE_SOURCE_DIR}/cfitsio distclean
 TARGET  distclean
 )
 
