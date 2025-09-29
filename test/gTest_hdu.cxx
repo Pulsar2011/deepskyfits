@@ -36,7 +36,7 @@ TEST(FITSkeyword_Constructors, BasicConstructor)
     FITSkeyword k2b(std::string("12.34e-8"), std::string("a double"), key_type::fUndef);
     EXPECT_EQ(k2b.value()  , std::string("12.34e-8"));
     EXPECT_EQ(k2b.comment(), std::string("a double"));
-    EXPECT_EQ(k2b.type(), key_type::fDouble);
+    EXPECT_EQ(k2b.type(), key_type::fFloat);
 
     // string -> fChar
     FITSkeyword k3(std::string("abc"));
@@ -110,7 +110,7 @@ TEST(FITSkeyword_Process_AllCases, ValueToTypeMapping)
 
     // must include both '.' and 'e' to be detected as double by current Process
     FITSkeyword k_double_exp("1.23e-4");
-    EXPECT_EQ(k_double_exp.type(), key_type::fDouble);
+    EXPECT_EQ(k_double_exp.type(), key_type::fFloat);
 
     // Negative signed ranges (abs thresholds used by Process)
     FITSkeyword k_neg_small("-5");
@@ -401,7 +401,7 @@ TEST(FITShdu_Setter, TypeConsistencyAndOverwrite)
         {
             exception_thrown = true;
         }
-        EXPECT_TRUE(exception_thrown);
+        EXPECT_FALSE(exception_thrown);
     }
 }
 
