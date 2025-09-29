@@ -134,7 +134,6 @@ namespace DSL
         
 #pragma endregion
 #pragma region • Accessor
-        double at(const size_t& i) const;                              //!< Get pixel value at index i
         size_t Size(const size_t& i = 0) const ;                       //!< Get number of pixel of the axe
         size_t           Nelements() const;                            //!< Get total number of pixel
         inline const int Status()          const {return img_status;}  //!< Get fits error status

@@ -356,18 +356,7 @@ class FITSmanager;
     }
     
 #pragma endregion
-#pragma region • accessor
-
-    double FITScube::at(const size_t& i) const
-    {
-        double v = std::numeric_limits<double>::quiet_NaN();
-        
-        if(i >= Nelements())
-            throw std::out_of_range("FITSimg::at: index is out of range");
-        
-        return data->get(i);
-    }
-        
+#pragma region • accessor        
     /**
      *  Obtain the number of pixel along one of the dimension of the FITS datacube
      *  @param i: the dimension one are interested in, starting from 1 for the NAXIS1 of the FITS datacube
