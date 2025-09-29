@@ -344,7 +344,7 @@ TEST(FITSmanager, create_fitsfile)
 
 TEST(FITSmanager, ReadingImage)
 {    
-    std::string src = "build/testdata/rosat_pspc_rdf2_3_bk1_copy.fits";
+    std::string src = "build/testdata/rosat_pspc_rdf2_3_bk1.fits";
 
     // Use the copied file for all operations
     FITSmanager ff(src);

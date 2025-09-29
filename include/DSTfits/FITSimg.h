@@ -139,7 +139,11 @@ namespace DSL
         size_t           Nelements() const;                            //!< Get total number of pixel
         inline const int Status()          const {return img_status;}  //!< Get fits error status
         inline const int GetBitPerPixel()  const {return BITPIX;}      //!< Get the number of Bit per image pixel
+        inline const int GetEqBitPerPixel()  const {return eqBITPIX;}  //!< Get the number of equivalent Bit per image pixel
         inline const size_t GetDimension() const {return Naxis.size();}
+        inline const std::string GetName() const {if(hdu.Exists("EXTNAME")) return hdu.GetValueForKey("EXTNAME"); else return std::string("NO NAME");}       //!< Get the name of the image
+
+        inline double at(const size_t& i) const { if(data == nullptr) throw FITSexception(SHARED_NOMEM,"FITScube","at","No data in memory"); return data->get(i); }
         
         std::vector<double>                     WorldCoordinates(const size_t&) const; //!< Get world coordinates
         virtual std::vector<double>             WorldCoordinates(const std::vector<size_t>&) const; //!< Get world coordinates
@@ -827,7 +831,7 @@ namespace DSL
         
         void Resize(const size_t&, const size_t&, const size_t&, const size_t&);
         
-        void Print()const;
+        void Print() const;
 #pragma endregion
     };
     
@@ -2634,10 +2638,6 @@ namespace DSL
 #pragma endregion
 #pragma region • Accessor    
     
-#pragma endregion
-#pragma region • Display methods
-    
-#pragma endregion
 #pragma endregion
 
 #pragma region • Data export methods
