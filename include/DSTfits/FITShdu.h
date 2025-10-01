@@ -27,7 +27,6 @@ namespace DSL
 {
 
      /*!
-     /*!
      * @typedef DSL::key_code
      * @details DSL::key_code is a short-cut type used to describe HDU name
      */

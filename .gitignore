@@ -28,6 +28,7 @@ DST_version.cxx
 *screenlog*
 gdb
 googletest
+CMakeDoxyfile.in
 
 *.html
 *.tex
