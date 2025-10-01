@@ -929,7 +929,7 @@ class FITSmanager;
             throw FITSexception(NOT_IMAGE,"FITScube","GetMinimum","No data available");
     
         bool handled = false;
-        double minVal = std::numeric_limits<double>::max();
+        double minVal = 0;
 
         // fast typed paths (add the types you commonly use)
         handled = WithTypedData<int8_t>([&](const std::valarray<int8_t>& arr){ minVal += static_cast<double>( arr[!mask].min() ); });
@@ -985,7 +985,7 @@ class FITSmanager;
             throw FITSexception(NOT_IMAGE,"FITScube","GetMinimum","No data available");
     
         bool handled = false;
-        double maxVal = std::numeric_limits<double>::min();
+        double maxVal = 0;
 
         // fast typed paths (add the types you commonly use)
         handled = WithTypedData<int8_t>([&](const std::valarray<int8_t>& arr){ maxVal += static_cast<double>( arr[!mask].max() ); });
