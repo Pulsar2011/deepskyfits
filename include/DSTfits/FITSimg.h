@@ -138,20 +138,11 @@ namespace DSL
         size_t           Nelements() const;                            //!< Get total number of pixel
         inline const int Status()          const {return img_status;}  //!< Get fits error status
         inline const int GetBitPerPixel()  const {return BITPIX;}      //!< Get the number of Bit per image pixel
+        inline const int GetEqBitPerPixel()  const {return eqBITPIX;}  //!< Get the number of equivalent Bit per image pixel
         inline const size_t GetDimension() const {return Naxis.size();}
-        
-        enum zScale
-        {
-            /**
-             *  @enum DSL::FITScube::zScale
-             *  @details Defines the type of the z axis during Qt display. It do not affect the ROOT display.
-             */
-            fLIN,   ///< Linear scale
-            fLOG,   ///< Logaritmic scale
-            fSINH,  ///< Sinus hyperbolic scale
-            fQUAD,  ///< Quadratic scale
-            fSQRT,  ///< Squared root scale
-        };
+        inline const std::string GetName() const {if(hdu.Exists("EXTNAME")) return hdu.GetValueForKey("EXTNAME"); else return std::string("NO NAME");}       //!< Get the name of the image
+
+        inline double at(const size_t& i) const { if(data == nullptr) throw FITSexception(SHARED_NOMEM,"FITScube","at","No data in memory"); return data->get(i); }
         
         std::vector<double>                     WorldCoordinates(const size_t&) const; //!< Get world coordinates
         virtual std::vector<double>             WorldCoordinates(const std::vector<size_t>&) const; //!< Get world coordinates
@@ -506,21 +497,8 @@ namespace DSL
         
         virtual void Print() const {};
         
-#ifdef _HAS_Qt4_
-#pragma endregion
-#pragma region - Qt display capability
-        virtual QCustomPlot* QtDisplay(std::string OPTION = "") const { return NULL;}
-        virtual QCustomPlot* QtDisplay(unsigned int iMin, unsigned int iMax, std::string OPTION="") const { return NULL;}
-        virtual QCustomPlot* QtDisplayLayer(unsigned int iLayer, std::string OPTION="") const {return NULL;}
-        
-        virtual void Overlay(QCustomPlot*, std::string OPTION = "") const { return;}
-        virtual void Overlay(QCustomPlot*, unsigned int iMin, unsigned int iMax, std::string OPTION="") const { return;}
-        
-        
-#endif
-        
     };
-
+#pragma endregion
 #pragma endregion
 #pragma region - FITSimg class definition
     template< typename T >
@@ -833,6 +811,10 @@ namespace DSL
 
 #pragma endregion
 #pragma region • Accessor
+
+        const T& ReadBscale() const {return BSCALE;}
+        const T& ReadBzero () const {return BZERO ;}
+        const T& ReadBlank () const {return BLANK ;}
     
 #pragma endregion
 #pragma region • Display methods
@@ -848,7 +830,7 @@ namespace DSL
         
         void Resize(const size_t&, const size_t&, const size_t&, const size_t&);
         
-        void Print()const;
+        void Print() const;
 #pragma endregion
     };
     
@@ -868,57 +850,64 @@ namespace DSL
         else
             BLANK = std::numeric_limits<T>::min();
 
-                if constexpr (std::is_floating_point_v<T>)
-            BLANK = std::numeric_limits<T>::quiet_NaN();
-        else
-            BLANK = std::numeric_limits<T>::min();
-
         // type-specific FITS parameters
-        if constexpr (std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>)
+        if constexpr (std::is_same_v<T, uint8_t>)
         {
-            BitPerPixel(8);
+            BitPerPixel(BYTE_IMG);   // unsigned 8 uses BITPIX=8
             Bscale(static_cast<T>(1));
             Bzero (static_cast<T>(0));
         }
+        else if constexpr (std::is_same_v<T, int8_t>)
+        {
+            BitPerPixel(8,SBYTE_IMG); // signed 8 uses BITPIX=8, equiv 10
+            Bscale(static_cast<T>(1));
+            Bzero (static_cast<T>(-128));
+        }
         else if constexpr (std::is_same_v<T, int16_t>)
         {
-            BitPerPixel(16); // unsigned 16 uses BITPIX=16, equiv 20
+            BitPerPixel(SHORT_IMG); // signed 16 uses BITPIX=16
             Bscale(static_cast<T>(1));
             Bzero (static_cast<T>(0));
         }
         else if constexpr (std::is_same_v<T, uint16_t>)
         {
-            BitPerPixel(16,20);
+            BitPerPixel(16,USHORT_IMG); // unsigned 16 uses BITPIX=16, equiv 20
             Bscale(static_cast<T>(1));
             Bzero (static_cast<T>(32768));
         }
         else if constexpr (std::is_same_v<T, int32_t>)
         {
-            BitPerPixel(32);
+            BitPerPixel(LONG_IMG);     // signed 32 uses BITPIX=32
             Bscale(static_cast<T>(1));
             Bzero (static_cast<T>(0));
         }
         else if constexpr (std::is_same_v<T, uint32_t>)
         {
-            BitPerPixel(32, 40); // unsigned 32 uses equiv 40
+            BitPerPixel(32, ULONG_IMG); // unsigned 32 uses BITPIX=32, equiv 40
             Bscale(static_cast<T>(1));
             Bzero (static_cast<T>((T)2147483648));
         }
-        else if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, uint64_t> || std::is_same_v<T, size_t>)
+        else if constexpr (std::is_same_v<T, int64_t>)
         {
-            BitPerPixel(64);
+            BitPerPixel(LONGLONG_IMG); // signed 64 uses BITPIX=64
             Bscale(static_cast<T>(1));
             Bzero (static_cast<T>(0));
         }
+        else if constexpr (std::is_same_v<T, uint64_t> || std::is_same_v<T, size_t>)
+        {
+            BitPerPixel(64, ULONGLONG_IMG); // unsigned 64 uses equiv 80
+            Bscale(static_cast<T>(1));
+            Bzero (static_cast<T>((T)9223372036854775808));
+        }
         else if constexpr (std::is_same_v<T, float>)
         {
-            BitPerPixel(-32);
+            BitPerPixel(FLOAT_IMG);
             Bscale(static_cast<T>(1));
             Bzero (static_cast<T>(0));
         }
         else if constexpr (std::is_same_v<T, double>)
         {
-            BitPerPixel(-64);
+            BitPerPixel(DOUBLE_IMG);
             Bscale(static_cast<T>(1));
             Bzero (static_cast<T>(0));
         }
@@ -942,6 +931,166 @@ namespace DSL
     
 #pragma endregion
 #pragma region • I/O
+
+    /**
+     *  @details Read the RAW data from the FITS file and extract the pixel content
+     *  @param fptr; Input fitsfile
+     */
+    template< typename T >
+    template< typename S >
+    void FITSimg<T>::ReadArray(const std::shared_ptr<fitsfile>& fptr)
+    {
+        
+        if(fptr == nullptr || fptr.use_count() < 1)
+            return;
+            
+        // • GET THE WHOLE IMAGE DATA
+        //    - GET PIXEL DIMENSION
+        
+        if((verbose&verboseLevel::VERBOSE_HDU)==verboseLevel::VERBOSE_HDU)
+            hdu.Dump(std::cout);
+        
+        const long      num_axis    = static_cast<const long>( Naxis.size() );
+        const LONGLONG array_size  = static_cast<const long long>( Nelements() );
+        
+        //    - ALLOCATE BUFFER MEMORY
+        int any_null = 0;
+        img_status   = 0;
+        
+        std::vector<LONGLONG> fpixel(static_cast<size_t>(num_axis), 1);
+        std::vector<S>        array(static_cast<size_t>(array_size));
+        std::vector<char>     null_array(static_cast<size_t>(array_size), 0);
+         
+        int TTYPE = 0;
+        switch (BITPIX)
+        {
+            case BYTE_IMG:
+            case SBYTE_IMG:
+                if (eqBITPIX == SBYTE_IMG)
+                    TTYPE = TSBYTE;
+                else
+                    TTYPE = TBYTE;
+                break;
+            
+            case SHORT_IMG:
+            case USHORT_IMG:
+                if (eqBITPIX == USHORT_IMG)
+                    TTYPE = TUSHORT;
+                else
+                    TTYPE = TSHORT;
+                break;
+                
+            case LONG_IMG:
+            case ULONG_IMG:
+                if (eqBITPIX == ULONG_IMG)
+                    TTYPE = TUINT;
+                else
+                    TTYPE = TINT;
+                break;
+                
+            case LONGLONG_IMG:
+            case ULONGLONG_IMG:
+                if (eqBITPIX == ULONGLONG_IMG)
+                    TTYPE = TULONGLONG;
+                else
+                    TTYPE = TLONGLONG;
+                break;
+                
+            case FLOAT_IMG:
+                TTYPE = TFLOAT;
+                break;
+                
+            case DOUBLE_IMG:
+                TTYPE = TDOUBLE;
+                break;
+                
+            default:
+                img_status=BAD_BITPIX;
+                throw FITSexception(img_status,"FITSimg","ReadArray","CAN'T GET IMAGES, DATA TYPE "+std::to_string(BITPIX)+" IS UNKNOWN.");
+        }
+
+        if((verbose & verboseLevel::VERBOSE_DEBUG) == verboseLevel::VERBOSE_DEBUG)
+        {
+            std::cout<<"        \033[32m`-BUFFER DATA TYPE = \033[0m"<<TTYPE<<"  \033[33m["<<TTYPE<<"]\033[0m"<<std::endl;
+        }
+        
+        //    - EXTRACT BINARY DATA AND CONVERT TO NUMERICAL VALUE
+        
+        try
+        {
+            if( fits_read_pixnullll(fptr.get(), TTYPE, fpixel.data(), array_size, array.data(), null_array.data(), &any_null, &img_status  ) )
+                 throw FITSexception(img_status,"FITSimg<T>","ReadArray");
+        }
+        catch(std::exception& e)
+        {
+            std::cerr<<e.what()<<std::endl;
+            switch (img_status)
+            {
+                case 410:
+                    std::cerr << "runtime type: " << demangle(typeid(S).name()) <<std::endl;
+                    std::cerr<<"    |- IMG DATA TYPE : "<<TTYPE<<std::endl
+                             <<"    |- this DATA TYPE: "<<BITPIX<<std::endl
+                             <<"    `- EQUIV. BITPIX : "<<eqBITPIX<<std::endl;
+                    throw;
+                    break;
+                    
+                case 854:
+                    std::cerr << "runtime type: " << demangle(typeid(S).name()) <<std::endl;
+                    std::cerr<<"    |- IMG PIXEL INDEX IS OUT OF RANGE"<<std::endl;
+                    throw;
+                    break;
+               
+                default:
+                    break;
+            }
+            
+            std::cerr << "runtime type: " << demangle(typeid(S).name()) <<std::endl;
+            std::cerr<<"    |- IMG DATA TYPE : "<<TTYPE<<std::endl
+                     <<"    |- BITPIX        : "<<BITPIX<<std::endl
+                     <<"    |- EQUIV. BITPIX : "<<eqBITPIX<<std::endl
+                     <<"    |- NAXIS         : "<<num_axis<<std::endl;
+            
+            for(size_t i=0; i < Naxis.size()-1; i++)
+                std::cerr<<"    |    |- NAXIS["<<i<<"] : "<<Naxis[i]<<std::endl;
+                std::cerr<<"    |    `- NAXIS["<<Naxis.size()-1<<"] : "<<Naxis[Naxis.size()-1]<<std::endl
+                         <<"    |- START COO     : "<<std::endl;
+            
+            for(size_t i=0; i < num_axis-1; i++)
+                std::cerr<<"    |   |- NAXIS"<<i<<"[0] : "<<fpixel[i]<<std::endl;
+                std::cerr<<"    |   `- NAXIS"<<num_axis-1<<"[0] : "<<fpixel[num_axis-1]<<std::endl
+                         <<"    |- DATA SIZE     : "<<array_size<<std::endl
+                         <<"    |- ARRAY[0]      : "<<array[0]<<std::endl
+                         <<"    |- null_array[0] : "<<null_array[0]<<std::endl
+                         <<"    `- HAS NULL      : "<<any_null;
+            
+            std::cerr<<"\033[0m"<<std::endl;
+            throw;
+        }
+        
+        // typed storage (non-null)
+        std::valarray<T>* typed = this->template GetData<T>();
+        if(!typed)
+            throw FITSexception(SHARED_NULPTR,"FITSimg<T>","ReadArray","typed data missing");
+
+        WithTypedData<T>([&](std::valarray<T>& arr)
+        {
+            for(size_t i = 0; i < static_cast<size_t>(array_size); i++)
+            {
+                if(null_array[i])
+                {
+                    arr[i] = static_cast<T>( std::numeric_limits<T>::quiet_NaN() );
+                    mask[i] = true;
+                }
+                else
+                {
+                    arr[i] = static_cast<T>( array[i] );
+                    mask[i] = false;
+                }
+            }
+        });   
+
+        return;
+    }
     
     /**
      *  @details Write, or update data, to the current HDU images
@@ -956,29 +1105,45 @@ namespace DSL
             return;
         }
         
-        switch (BITPIX)
+        switch (eqBITPIX)
         {
-            case 8:
-                WriteData<uint8_t>(fptr, TBYTE);
+            case BYTE_IMG:
+            case SBYTE_IMG:
+                if (eqBITPIX == SBYTE_IMG)
+                    WriteData<int8_t>(fptr, TSBYTE);
+                else
+                    WriteData<uint8_t>(fptr, TBYTE);
                 break;
                 
-            case 16:
-                WriteData<int16_t>(fptr, TSHORT);
+            case SHORT_IMG:
+            case USHORT_IMG:
+                if(eqBITPIX == USHORT_IMG)
+                    WriteData<uint16_t>(fptr, TUSHORT);
+                else
+                    WriteData<int16_t>(fptr, TSHORT);
                 break;
                 
-            case 32:
-                WriteData<int32_t>(fptr, TINT);
+            case LONG_IMG:
+            case ULONG_IMG:
+                if(eqBITPIX == ULONG_IMG)
+                    WriteData<uint32_t>(fptr, TUINT);
+                else
+                    WriteData<int32_t>(fptr, TINT);
                 break;
                 
-            case 64:
-                WriteData<int64_t>(fptr, TLONGLONG);
+            case LONGLONG_IMG:
+            case ULONGLONG_IMG:
+                if(eqBITPIX == ULONGLONG_IMG)
+                    WriteData<uint64_t>(fptr, TULONGLONG);
+                else
+                    WriteData<int64_t>(fptr, TLONGLONG);
                 break;
                 
-            case -32:
+            case FLOAT_IMG:
                 WriteData<float>(fptr, TFLOAT);
                 break;
                 
-            case -64:
+            case DOUBLE_IMG:
                 WriteData<double>(fptr, TDOUBLE);
                 break;
                 
@@ -1025,8 +1190,8 @@ namespace DSL
                      <<"        \033[31m|- DATA_TYPE    : \033[0m"<<DATA_TYPE<<std::endl
                      <<"        \033[31m|- BLANK        : \033[0m"<<BLANK<<std::endl
                      <<"        \033[31m|- Number of pix: \033[0m"<<Nelements()<<std::endl
-                     <<"        \033[31m|- this C type: \033[0m"<<demangle(typeid(T).name())<<sizeof(T)<<std::endl
-                     <<"        \033[31m`- this C type: \033[0m"<<demangle(typeid(S).name())<<sizeof(S)<<std::endl;
+                     <<"        \033[31m|- this C type: \033[0m"<<demangle(typeid(T).name())<<"["<<sizeof(T)<<"]"<<std::endl
+                     <<"        \033[31m`-  out C type: \033[0m"<<demangle(typeid(S).name())<<"["<<sizeof(S)<<"]"<<std::endl;
 
             for(size_t i = 0; i < Naxis.size()-1; i++)
                 std::cout<<"             \033[34m|- Axis "<<i<<"    : \033[0m"<<Naxis[i]<<std::endl;
@@ -1038,8 +1203,7 @@ namespace DSL
             for(long long i = 0; i < array_size; ++i)
             {
                 // apply BZERO/BSCALE and convert to output type
-                outbuf[static_cast<size_t>(i)] = static_cast<S>( ((*_data)[static_cast<size_t>(i)] - BZERO) / BSCALE );
-
+                outbuf[static_cast<size_t>(i)] = static_cast<S> ((*_data)[static_cast<size_t>(i)]);
             }
         }
         else // fallback: build buffer from polymorphic accessor data->get(i)
@@ -1050,7 +1214,7 @@ namespace DSL
             for(long long i = 0; i < array_size; ++i)
             {
                 double val = static_cast<double>( data->get(static_cast<size_t>(i)) ); // generic value
-                outbuf[static_cast<size_t>(i)] = static_cast<S>( (val - static_cast<double>(BZERO)) / static_cast<double>(BSCALE) );
+                outbuf[static_cast<size_t>(i)] = static_cast<S>( val );
             }
         }
 
@@ -1059,7 +1223,7 @@ namespace DSL
             for(size_t i=0; i < outbuf.size(); ++i) std::cout<<"["<<i<<"]"<<outbuf[i]<<"   ";
             std::cout<<std::endl;
         }
-        
+
         if( fits_write_pixll(fptr.get(), DATA_TYPE, fpixel.data(), array_size, outbuf.data(), &img_status) )
         {
             throw FITSexception(img_status,"FITSimg","WriteDataCube");
@@ -1111,27 +1275,43 @@ namespace DSL
         // • GET THE WHOLE IMAGE DATA
         switch (eqBITPIX)
         {
-            case 8:
+            case SBYTE_IMG:
+                ReadArray<int8_t>(fptr);
+                break;
+
+            case BYTE_IMG:
                 ReadArray<uint8_t>(fptr);
                 break;
                 
-            case 16:
+            case SHORT_IMG:
                 ReadArray<int16_t>(fptr);
                 break;
+            
+            case USHORT_IMG:
+                ReadArray<uint16_t>(fptr);
+                break;
                 
-            case 32:
+            case LONG_IMG:
                 ReadArray<int32_t>(fptr);
                 break;
-                
-            case 64:
-                ReadArray<int64_t>(fptr);
+            
+            case ULONG_IMG:
+                ReadArray<uint32_t>(fptr);
                 break;
                 
-            case -32:
+            case LONGLONG_IMG:
+                ReadArray<int64_t>(fptr);
+                break;
+
+            case ULONGLONG_IMG:
+                ReadArray<uint64_t>(fptr);
+                break;
+                
+            case FLOAT_IMG:
                 ReadArray<float>(fptr);
                 break;
                 
-            case -64:
+            case DOUBLE_IMG:
                 ReadArray<double>(fptr);
                 break;
                 
@@ -1601,168 +1781,6 @@ namespace DSL
 
 #pragma endregion
 #pragma region • data operation
-    
-    /**
-     *  @details Read the RAW data from the FITS file and extract the pixel content
-     *  @param fptr; Input fitsfile
-     */
-    template< typename T >
-    template< typename S >
-    void FITSimg<T>::ReadArray(const std::shared_ptr<fitsfile>& fptr)
-    {
-        
-        if(fptr == nullptr || fptr.use_count() < 1)
-            return;
-            
-        // • GET THE WHOLE IMAGE DATA
-        //    - GET PIXEL DIMENSION
-        
-        if((verbose&verboseLevel::VERBOSE_HDU)==verboseLevel::VERBOSE_HDU)
-            hdu.Dump(std::cout);
-        
-        const long      num_axis    = static_cast<const long>( Naxis.size() );
-        const LONGLONG array_size  = static_cast<const long long>( Nelements() );
-        
-        //    - ALLOCATE BUFFER MEMORY
-        int any_null = 0;
-        img_status   = 0;
-        
-        std::vector<LONGLONG> fpixel(static_cast<size_t>(num_axis), 1);
-        std::vector<S>        array(static_cast<size_t>(array_size));
-        std::vector<char>     null_array(static_cast<size_t>(array_size), 0);
-         
-        int TTYPE = 0;
-        switch (BITPIX)
-        {
-            case 8:
-                TTYPE = TBYTE;
-                break;
-            
-            case 10:
-                TTYPE = TSBYTE;
-                break;
-
-            case 16:
-                TTYPE = TSHORT;
-                break;
-                
-            case 20:
-                TTYPE = TUSHORT;
-                break;
-                
-            case 32:
-                TTYPE = TINT;
-                break;
-                
-            case 40:
-                TTYPE = TUINT;
-                
-            case 64:
-                TTYPE = TLONGLONG;
-                break;
-            
-            case 80:
-                TTYPE = TULONGLONG;
-                break;
-                
-            case -32:
-                TTYPE = TFLOAT;
-                break;
-                
-            case -64:
-                TTYPE = TDOUBLE;
-                break;
-                
-            default:
-                img_status=BAD_BITPIX;
-                throw FITSexception(img_status,"FITSimg","ReadArray","CAN'T GET IMAGES, DATA TYPE "+std::to_string(BITPIX)+" IS UNKNOWN.");
-        }
-
-        if((verbose & verboseLevel::VERBOSE_DEBUG) == verboseLevel::VERBOSE_DEBUG)
-        {
-            std::cout<<"        \033[32m`-BUFFER DATA TYPE = \033[0m"<<TTYPE<<"  \033[33m["<<TTYPE<<"]\033[0m"<<std::endl;
-        }
-        
-        //    - EXTRACT BINARY DATA AND CONVERT TO NUMERICAL VALUE
-        
-        try
-        {
-            if( fits_read_pixnullll(fptr.get(), TTYPE, fpixel.data(), array_size, array.data(), null_array.data(), &any_null, &img_status  ) )
-                 throw FITSexception(img_status,"FITSimg<T>","ReadArray");
-        }
-        catch(std::exception& e)
-        {
-            std::cerr<<e.what()<<std::endl;
-            switch (img_status)
-            {
-                case 410:
-                    std::cerr << "runtime type: " << demangle(typeid(S).name()) <<std::endl;
-                    std::cerr<<"    |- IMG DATA TYPE : "<<TTYPE<<std::endl
-                             <<"    |- this DATA TYPE: "<<BITPIX<<std::endl
-                             <<"    `- EQUIV. BITPIX : "<<eqBITPIX<<std::endl;
-                    throw;
-                    break;
-                    
-                case 854:
-                    std::cerr << "runtime type: " << demangle(typeid(S).name()) <<std::endl;
-                    std::cerr<<"    |- IMG PIXEL INDEX IS OUT OF RANGE"<<std::endl;
-                    throw;
-                    break;
-               
-                default:
-                    break;
-            }
-            
-            std::cerr << "runtime type: " << demangle(typeid(S).name()) <<std::endl;
-            std::cerr<<"    |- IMG DATA TYPE : "<<TTYPE<<std::endl
-                     <<"    |- BITPIX        : "<<BITPIX<<std::endl
-                     <<"    |- EQUIV. BITPIX : "<<eqBITPIX<<std::endl
-                     <<"    |- NAXIS         : "<<num_axis<<std::endl;
-            
-            for(size_t i=0; i < Naxis.size()-1; i++)
-                std::cerr<<"    |    |- NAXIS["<<i<<"] : "<<Naxis[i]<<std::endl;
-                std::cerr<<"    |    `- NAXIS["<<Naxis.size()-1<<"] : "<<Naxis[Naxis.size()-1]<<std::endl
-                         <<"    |- START COO     : "<<std::endl;
-            
-            for(size_t i=0; i < num_axis-1; i++)
-                std::cerr<<"    |   |- NAXIS"<<i<<"[0] : "<<fpixel[i]<<std::endl;
-                std::cerr<<"    |   `- NAXIS"<<num_axis-1<<"[0] : "<<fpixel[num_axis-1]<<std::endl
-                         <<"    |- DATA SIZE     : "<<array_size<<std::endl
-                         <<"    |- ARRAY[0]      : "<<array[0]<<std::endl
-                         <<"    |- null_array[0] : "<<null_array[0]<<std::endl
-                         <<"    `- HAS NULL      : "<<any_null;
-            
-            std::cerr<<"\033[0m"<<std::endl;
-            throw;
-        }
-        
-        // typed storage (non-null)
-        std::valarray<T>* typed = this->template GetData<T>();
-        if(!typed)
-            throw FITSexception(SHARED_NULPTR,"FITSimg<T>","ReadArray","typed data missing");
-
-        WithTypedData<T>([&](std::valarray<T>& arr)
-        {
-            for(size_t i = 0; i < static_cast<size_t>(array_size); i++)
-            {
-                if(null_array[i])
-                {
-                    arr[i] = static_cast<T>( std::numeric_limits<T>::quiet_NaN() );
-                    mask[i] = true;
-                }
-                else
-                {
-                    arr[i] = static_cast<T>( array[i] ) * BSCALE + BZERO ;
-                    mask[i] = false;
-
-                    if(i == 256 + 256*512 && (verbose & verboseLevel::VERBOSE_DEBUG) == verboseLevel::VERBOSE_DEBUG)
-                        std::cout<<"array["<<i<<":"<<PixelCoordinates(i)[0]<<","<<PixelCoordinates(i)[1]<<"] = "<<array[i]<<" = "<<arr[i]<<"  ("<<BSCALE<<"   "<<BZERO<<")"<<std::endl;
-                }
-            }
-        });   
-
-        return;
-    }
     
     /**
      *  @brief Assignement opperator
@@ -2619,328 +2637,6 @@ namespace DSL
 #pragma endregion
 #pragma region • Accessor    
     
-#pragma endregion
-#pragma region • Display methods
-#ifdef _HAS_Qt4_
-
-#pragma region - Qt display capability
-    /**
-     *  Display FITS 2D images onto the scrren.
-     *  @param OPTION: Optional parameters used to customize the plot:
-     *      - LOGZ  : Display color scale in LOG10 scale
-     *      - QUADZ : Display color scale in QUADRATIC scale
-     *      - SQRTZ : Display color scale in SQUARE_ROOT scale
-     *      - SINH  : Display color scale in SINH scale
-     *  @return Pointer to the displayed plot structur for further customization and overplotting
-     */
-    template< typename T >
-    QCustomPlot* FITSimg<T>::QtDisplay(std::string OPTION) const
-    {
-        return QtDisplay(0 , Nelements(), OPTION);
-    }
-    
-    /**
-     *  Display sub FITS 2D images onto the scrren.
-     *  @param iMin: index of the pixel used as the lower left corner
-     *  @param iMax: index of the pixel used as the upper left corner
-     *  @param OPTION: Optional parameters used to customize the plot:
-     *      - LOGZ  : Display color scale in LOG10 scale
-     *      - QUADZ : Display color scale in QUADRATIC scale
-     *      - SQRTZ : Display color scale in SQUARE_ROOT scale
-     *      - SINH  : Display color scale in SINH scale
-     *  @return Pointer to the displayed plot structur for further customization and overplotting
-     */
-    template< typename T >
-    QCustomPlot* FITSimg<T>::QtDisplay(unsigned int iMin, unsigned int iMax, std::string OPTION) const
-    {
-        //- SEARCH FOR EXISTING QtMainWindows
-        QtFITSviewer *mw = new QtFITSviewer();
-        mw->setWindowTitle(QString(hdu.GetValueForKey("EXTNAME").c_str()));
-        
-        const unsigned long long nx = static_cast<unsigned long long>( Naxis[0] );
-        const unsigned long long ny = static_cast<unsigned long long>( Naxis[1] );
-        
-        int xsize = (nx*2 < 900)? nx*2 : 900;
-        xsize = (xsize < 542 )? 542 : xsize;
-        
-        int ysize = xsize*ny/nx-100;
-        ysize = (ysize < 390)? 390 : ysize;
-        ysize = (ysize > 900-100)? 900 : ysize;
-        
-        mw->setGeometry(400, 250, xsize, ysize);
-        
-        //- Obtain the plot
-        QCustomPlot *qPlot = mw->GetPlot();
-        qPlot->yAxis->setScaleRatio(qPlot->xAxis,1.0);
-        
-        //- Fill the graph
-        qPlot->xAxis->setLabel("pixel [px]");
-        qPlot->yAxis->setLabel("pixel [px]");
-        
-        Overlay(qPlot, iMin, iMax, OPTION);
-        
-        mw->SetPlot(qPlot);
-        mw->show();
-        
-        return qPlot;
-        
-    }
-    
-    template< typename T >
-    void FITSimg<T>::Overlay(QCustomPlot* qPlot, std::string OPTION) const
-    {
-        return Overlay(qPlot, 0 , Nelements(), OPTION);
-    }
-    
-    template< typename T >
-    void FITSimg<T>::Overlay(QCustomPlot* qPlot, unsigned int iMin, unsigned int iMax, std::string OPTION) const
-    {
-#if __cplusplus >= 199711L
-        //auto pixels_coo = std::bind( &FITScube::PixelCoordinates, this,std::placeholders::_1);
-        auto pixels_coo   = std::bind( static_cast<std::vector<double>(FITScube::*)(size_t) const>(&FITScube::WorldCoordinates), this,std::placeholders::_1);
-#endif
-        
-        std::vector<unsigned long long> xPixels;
-        
-        std::transform(OPTION.begin(), OPTION.end(), OPTION.begin(), ::tolower);
-        
-
-        const unsigned long long nx = static_cast<unsigned long long>( Naxis[0] );
-        const unsigned long long ny = static_cast<unsigned long long>( Naxis[1] );
-        
-        FITScube::zScale useScale = fLIN;
-        if(OPTION.find("logz",0) != std::string::npos )
-            useScale  = fLOG;
-        else if(OPTION.find("sinhz",0) != std::string::npos )
-            useScale  = fSINH;
-        else if(OPTION.find("quadz",0) != std::string::npos )
-            useScale  = fQUAD;
-        else if(OPTION.find("sqrtz",0) != std::string::npos )
-            useScale  = fSQRT;
-        else
-            useScale = fLIN;
-        
-        QCPColorMap *colorMap = new QCPColorMap(qPlot->xAxis, qPlot->yAxis);
-        colorMap->data()->setSize(nx, ny);								// we want the color map to have nx * ny data points
-                                                                        // set the color gradient of the color map to one of the presets:
-
-        double min_x, max_x, min_y, max_y;
-        
-#if __cplusplus >= 199711L
-        min_x = std::min(pixels_coo(0)[0],pixels_coo(data->size()-1)[0]);
-        max_x = std::max(pixels_coo(0)[0],pixels_coo(data->size()-1)[0]);
-        
-        min_y = std::min(pixels_coo(0)[1],pixels_coo(data->size()-1)[1]);
-        max_y = std::max(pixels_coo(0)[1],pixels_coo(data->size()-1)[1]);
-#else
-        min_x = std::min(WorldCoordinates(0)[0],WorldCoordinates(data->size()-1)[0]);
-        max_x = std::max(WorldCoordinates(0)[0],WorldCoordinates(data->size()-1)[0]);
-        
-        min_y = std::min(WorldCoordinates(0)[1],WorldCoordinates(data->size()-1)[1]);
-        max_y = std::max(WorldCoordinates(0)[1],WorldCoordinates(data->size()-1)[1]);
-#endif
-        
-        colorMap->data()->setRange(QCPRange(min_x, max_x), QCPRange(min_y, max_y));	// and span the coordinate range in both key (x) and value (y) dimensions
-        colorMap->data()->fill(0);
-        
-        // now we assign some data, by accessing the QCPColorMapData instance of the color map:
-        
-        unsigned int k = iMin;
-        double* Intensity = new double[nx*ny];
-        for(unsigned int ik = 0; ik< nx*ny; ik++) Intensity[ik]=0;
-        
-        for(k = iMin; k < iMax; k++)
-        {
-            if(*(&mask[0]+k))
-                continue;
-                     
-            Intensity[k%(nx*ny)] += *(&data[0]+k);
-        }
-        
-        bool is_increasing_xAxis = true;
-        bool is_increasing_yAxis = true;
-        
-        if(WorldCoordinates(0)[0] > WorldCoordinates(data->size()-1)[0])
-            is_increasing_xAxis  = false;
-        
-        if(WorldCoordinates(0)[1] > WorldCoordinates(data->size()-1)[1])
-            is_increasing_yAxis  = false;
-        
-        for(unsigned int ik = 0; ik< nx*ny; ik++)
-        {
-            
-            k = iMin + ik;
-            
-            xPixels.clear();
-            
-#if __cplusplus >= 199711L
-            xPixels = FITSimg<T>::PixelCoordinates(k);
-
-            double xIndex = (is_increasing_xAxis)? xPixels[0] : Naxis[0] - (xPixels[0]+1);//-PixelCoordinates(0)[0];
-            double yIndex = (is_increasing_yAxis)? xPixels[1] : Naxis[1] - (xPixels[1]+1);//-PixelCoordinates(0)[1];
-#else
-            xPixels = PixelCoordinates(k);
-            
-            double xIndex = xPixels[0];//-WorldCoordinates(0)[0];
-            double yIndex = xPixels[1];//-WorldCoordinates(0)[1];
-#endif
-            
-            if(Intensity[ik] == 0)
-                continue;
-                
-            switch (useScale)
-            {
-                case fLIN:
-                    Intensity[ik] *= 1.;
-                    break;
-                    
-                case fLOG:
-                    Intensity[ik] = log10(Intensity[ik]);
-                    break;
-                    
-                case fQUAD:
-                    Intensity[ik] = pow(Intensity[ik], 2.);
-                    break;
-                    
-                case fSQRT:
-                    Intensity[ik] = sqrt(Intensity[ik]);
-                    break;
-                    
-                case fSINH:
-                    Intensity[ik] = sinh(Intensity[ik]);
-                    break;
-                    
-                default:
-                    Intensity[ik] *= 1;
-                    break;
-            }
-            
-            colorMap->data()->setCell(xIndex, yIndex, static_cast<double>( Intensity[ik]) );
-        }
-        
-        
-        delete [] Intensity;
-        
-        std::string UNITS = hdu.GetValueForKey("UNITS");
-        if(UNITS.size() < 1)
-            UNITS += std::string("Intensity");
-        
-        switch (useScale)
-        {
-            case fLOG:
-                UNITS = "log10("+UNITS+")";
-                break;
-                
-            case fQUAD:
-                UNITS += "^2";
-                break;
-                
-            case fSQRT:
-                UNITS += "^(1/2)";
-                break;
-                
-            case fSINH:
-                UNITS += "sinh("+UNITS+")";
-                break;
-                
-            default:
-                break;
-        }
-
-        
-        QCPColorScale *colorScale = NULL;
-        
-        if(	!(qPlot->plotLayout()->hasElement (0, 1)) )
-        {
-            // add a color scale:
-            colorScale = new QCPColorScale(qPlot);
-            colorScale->setGradient(QCPColorGradient::gpThermal);
-            //colorMap->setGradient(QCPColorGradient::gpThermal);
-        
-            colorScale->axis()->setLabel(UNITS.c_str());
-            qPlot->plotLayout()->addElement(0, 1, colorScale);          // add it to the right of the main axis rect
-            colorScale->setType(QCPAxis::atRight);						// scale shall be vertical bar with tick/axis labels right (actually atRight is already the default)
-            
-            // make sure the axis rect and color scale synchronize their bottom and top margins (so they line up):
-            QCPMarginGroup *marginGroup = new QCPMarginGroup(qPlot);
-            qPlot->axisRect()->setMarginGroup(QCP::msBottom|QCP::msTop, marginGroup);
-            colorScale->setMarginGroup(QCP::msBottom|QCP::msTop, marginGroup);
-        }
-        else
-            colorScale = static_cast<QCPColorScale*>(qPlot->plotLayout()->element(0,1));
-            
-        
-        colorMap->setColorScale(colorScale);						// associate the color map with the color scale
-        // we could have also created a QCPColorGradient instance and added own	colors to
-        // the gradient, see the documentation of QCPColorGradient for what's possible.
-        
-        // rescale the data dimension (color) such that all data points lie in the span visualized by the color gradient:
-        colorMap->rescaleDataRange();
-        
-        if(fabs(GetMaximum()/GetMinimum()) > 100)
-            colorMap->setDataRange(QCPRange(Get5thpercentil(),Get95thpercentil()));
-        
-        colorMap->setInterpolate(false);
-        
-        //qPlot->addPlottable(colorMap);
-        
-        // rescale the key (x) and value (y) axes so the whole color map is visible:
-        qPlot->rescaleAxes();
-        qPlot->replot();
-    }
-    
-    /**
-     *  Display a 2D layer (or a single slice) of 3D FITS datacube onto Qt Widget output.
-     *
-     *  @param iLayer: The Layer to display
-     *  @param OPTION: Dysplay option
-     *  @return Pointer to the displayed plot structur for further customization and overplotting.
-     */
-    template< typename T >
-    QCustomPlot* FITSimg<T>::QtDisplayLayer(unsigned int iLayer, std::string OPTION) const
-    {
-        if(Naxis.size() <= 2)
-            QtDisplay(OPTION);
-        
-        try
-        {
-            if(iLayer > Naxis[2])
-            {
-                iLayer=Naxis.size();
-#if __cplusplus < 201103L
-                throw FITSwarning("FITSimg","QtDisplayLayer","Image only contains "+std::to_string(static_cast<long long>(Naxis[2]))+" layers.\nThe last layer will be displayed");
-#else
-                throw FITSwarning("FITSimg","QtDisplayLayer","Image only contains "+std::to_string(Naxis[2])+" layers.\nThe last layer will be displayed");
-#endif
-            }
-        
-            if(iLayer < 1)
-            {
-                iLayer = 1;
-#if __cplusplus < 201103L
-                throw FITSwarning("FITSimg","QtDisplayLayer","Layer should be comprised between 1 to "+std::to_string(static_cast<long long>(Naxis[2]))+".\nThe first layer will be displayed");
-#else
-                throw FITSwarning("FITSimg","QtDisplayLayer","Layer should be comprised between 1 to "+std::to_string(Naxis[2])+".\nThe first layer will be displayed");
-#endif
-            }
-        }
-        catch(std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-        }
-        
-        unsigned int nx = static_cast<unsigned int>( Size(1) );
-        unsigned int ny = static_cast<unsigned int>( Size(2) );
-        
-        unsigned int iMin       = nx*ny*(iLayer-1);
-        unsigned int iMax       = nx*ny + iMin;
-        
-        return QtDisplay(iMin, iMax, OPTION);
-    }
-    
-#endif
-    
-#pragma endregion
 #pragma endregion
 
 #pragma region • Data export methods

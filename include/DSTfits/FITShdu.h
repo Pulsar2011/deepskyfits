@@ -21,15 +21,19 @@
 
 #include <DSTfits/FITSdata.h>
 
+#include <DSTfits/FITSdata.h>
+
 namespace DSL
 {
 
+     /*!
      /*!
      * @typedef DSL::key_code
      * @details DSL::key_code is a short-cut type used to describe HDU name
      */
     typedef std::string key_code;
     
+#pragma region  - FITSkeyword class definition
 #pragma region  - FITSkeyword class definition
     /*!
      * @class DSL::FITSkeyword FITShdu.h "fitsExtractor/FITShdu.h"
@@ -65,6 +69,7 @@ namespace DSL
 #pragma endregion
 #pragma region  • Modifier
             void setValue(const std::string&);                         //!< Set value for key
+            void setType(const key_type& t) { ftype = t; }             //!< Set type for key
         
 #pragma endregion
 #pragma region  • Dump

@@ -146,6 +146,19 @@ class FITSmanager;
         {
             throw FITSexception(img_status,"FITScube","ctor");
         }
+
+        if(eqBITPIX == 64)
+        {
+            unsigned long long bz = 0;
+            if(ffgkyujj(fptr.get(), "BZERO", &bz, NULL, &img_status))
+            {
+                bz=0ULL;
+                img_status = 0;
+            }
+            
+            if (bz == 9223372036854775808ULL)
+                eqBITPIX = 80;
+        }
         
         //  • GET EXTENSION NAME
         name.clear();
@@ -343,8 +356,7 @@ class FITSmanager;
     }
     
 #pragma endregion
-#pragma region • accessor
-    
+#pragma region • accessor        
     /**
      *  Obtain the number of pixel along one of the dimension of the FITS datacube
      *  @param i: the dimension one are interested in, starting from 1 for the NAXIS1 of the FITS datacube
@@ -564,7 +576,7 @@ class FITSmanager;
         if((verbose & verboseLevel::VERBOSE_IMG) == verboseLevel::VERBOSE_IMG)
             std::cout<<axis[Naxis.size()-1]<<")"<<std::endl;
         
-        if(BITPIX == 0)
+        if( BITPIX == 0 )
         {
             img_status = BAD_BITPIX;
             throw FITSexception(img_status,"FITScube","Write","FILE : "+fileName);
@@ -635,7 +647,7 @@ class FITSmanager;
         else
             eqBITPIX = eq;
         
-        hdu.ValueForKey( "BITPIX" , static_cast<int long long>(BITPIX) );
+        hdu.ValueForKey( "BITPIX" , BITPIX );
     }
     
     
@@ -917,7 +929,7 @@ class FITSmanager;
             throw FITSexception(NOT_IMAGE,"FITScube","GetMinimum","No data available");
     
         bool handled = false;
-        double minVal = std::numeric_limits<double>::max();
+        double minVal = 0;
 
         // fast typed paths (add the types you commonly use)
         handled = WithTypedData<int8_t>([&](const std::valarray<int8_t>& arr){ minVal += static_cast<double>( arr[!mask].min() ); });
@@ -973,7 +985,7 @@ class FITSmanager;
             throw FITSexception(NOT_IMAGE,"FITScube","GetMinimum","No data available");
     
         bool handled = false;
-        double maxVal = std::numeric_limits<double>::min();
+        double maxVal = 0;
 
         // fast typed paths (add the types you commonly use)
         handled = WithTypedData<int8_t>([&](const std::valarray<int8_t>& arr){ maxVal += static_cast<double>( arr[!mask].max() ); });
