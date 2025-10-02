@@ -2,10 +2,13 @@
 //  FITSmanager.cxx
 //  DeepSkyLib
 //
-//  Created by GILLARD William on 01/04/15.
+//  Created by GILLARD William
 //  Centre de Physic des Particules de Marseille
-//	Copyright (c) 2015, All rights reserved
-//
+//  Licensed under CC BY-NC 4.0
+//  You may share and adapt this code with attribution, 
+//  but not for commercial purposes.
+//  Licence text: https://creativecommons.org/licenses/by-nc/4.0/
+
 
 #include <DSTfits/FITSexception.h>
 #include <DSTfits/FITSmanager.h>
