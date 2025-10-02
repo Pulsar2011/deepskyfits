@@ -1,11 +1,13 @@
 //
 //  FITSimg.h++
 //  
-//
-//  Created by GILLARD William on 31/03/15.
-//	Copyright (c) 2015, All rights reserved
-//  CPPM
-//
+//  Created by GILLARD William
+//  Centre de Physic des Particules de Marseille
+//  Licensed under CC BY-NC 4.0
+//  You may share and adapt this code with attribution, 
+//  but not for commercial purposes.
+//  Licence text: https://creativecommons.org/licenses/by-nc/4.0/
+
 
 #include <cstdio>
 #include <vector>

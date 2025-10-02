@@ -2,10 +2,13 @@
 //  FITStable.h
 //  DeepSkyLib
 //
-//  Created by GILLARD William on 07/08/17.
+//  Created by GILLARD William
 //  Centre de Physic des Particules de Marseille
-//	Copyright (c) 2015, All rights reserved
-//
+//  Licensed under CC BY-NC 4.0
+//  You may share and adapt this code with attribution, 
+//  but not for commercial purposes.
+//  Licence text: https://creativecommons.org/licenses/by-nc/4.0/
+
 
 #ifndef _DSL_FITStable_
 #define _DSL_FITStable_
