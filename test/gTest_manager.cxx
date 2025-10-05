@@ -1,6 +1,11 @@
 #include <gtest/gtest.h>
 #include <DSTfits/FITSmanager.h>
 
+#include <type_traits>
+#include <string>
+#include <limits>
+#include <fstream>
+
 using namespace DSL;
 
 #pragma region - Test verbose utilities
@@ -360,4 +365,89 @@ TEST(FITSmanager, ReadingImage)
     EXPECT_FALSE(ff.isOpen());         
 
 }
+
+template <typename T>
+class FITSimgTest : public ::testing::Test
+{
+    protected:
+        using value_type = T;
+        static size_t N() { return 10; }
+        
+        std::string MakeFilename() const
+        {
+            std::ostringstream ss;
+            ss << "build/testdata/test_" << typeid(T).name() << ".fits";
+            return ss.str();
+        }
+        void EnsureOutDir() const { std::filesystem::create_directories("build/testdata"); }
+};
+
+using StatTypes = ::testing::Types<uint8_t,int8_t,int16_t,uint16_t,int32_t,uint32_t,int64_t,uint64_t,float,double>;
+TYPED_TEST_SUITE(FITSimgTest, StatTypes);
+
+TYPED_TEST(FITSimgTest, modif_fitsfile)
+{
+    std::remove(this->MakeFilename().c_str());
+
+    verbose = verboseLevel::VERBOSE_NONE;
+    using T = typename TestFixture::value_type;
+
+    this->EnsureOutDir();
+
+    const size_t N = TestFixture::N();
+    FITSimg<T> img1(2, {N, N});
+    
+    auto data = img1.template GetData<T>();
+    ASSERT_NE(data, nullptr);
+
+    // fill predictable pattern: value = (i % 256) + (j)
+    for (size_t j = 0; j < data->size(); ++j)
+        (*data)[j] = static_cast<T>(1);
+
+    img1.Write(this->MakeFilename(), true);
+
+    FITSmanager fm(this->MakeFilename(),false);
+    ASSERT_TRUE(fm.isOpen());
+    ASSERT_EQ(fm.NumberOfHeader(), 1);
+    ASSERT_EQ(fm.Status(), 0);
+    ASSERT_EQ(fm.GetFileName(), this->MakeFilename());
+
+    std::shared_ptr<FITScube> imgptr = fm.GetPrimary();
+    ASSERT_NE(imgptr, nullptr);
+    ASSERT_EQ(imgptr->Size(1), N);
+    ASSERT_EQ(imgptr->Size(2), N);
+    auto data_r = imgptr->template GetData<T>();
+    ASSERT_NE(data_r, nullptr);
+    ASSERT_NEAR(((*data_r)-(*data)).sum(), 0.0, 1e-12);
+
+    FITSimg<T> img2(2, {N, N});
+    img2.SetName("SECOND_IMAGE");
+    auto data2 = img2.template GetData<T>();
+    ASSERT_NE(data2, nullptr);
+
+    for(size_t k = 0; k < data2->size(); k++)
+        (*data2)[k] = static_cast<T>(2);
+
+    fm.AppendImage(img2);
+    fm.Close();
+
+    FITSmanager fm2(this->MakeFilename());
+    ASSERT_TRUE(fm2.isOpen());
+    ASSERT_EQ(fm2.NumberOfHeader(), 2);
+    ASSERT_EQ(fm2.Status(), 0);
+    ASSERT_EQ(fm2.GetFileName(), this->MakeFilename());
+    std::shared_ptr<FITScube> imgptr2 = fm2.GetImageAtIndex(2);
+    ASSERT_NE(imgptr2, nullptr);
+    ASSERT_EQ(imgptr2->Size(1), N);
+    ASSERT_EQ(imgptr2->Size(2), N);
+    auto data_r2 = imgptr2->template GetData<T>();
+    ASSERT_NE(data_r2, nullptr);
+    ASSERT_NEAR(((*data_r2)-(*data2)).sum(), 0.0, 1e-12);
+
+    fm2.Close();
+
+    std::remove(this->MakeFilename().c_str());
+
+}
+
 #pragma endregion

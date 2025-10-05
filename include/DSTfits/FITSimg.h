@@ -226,45 +226,62 @@ namespace DSL
         inline const FITShdu& HDU() const {return hdu;}
         inline       FITShdu& HDU() {return hdu;}
         
-        virtual double GetSum ()                  const = 0;
-        virtual double GetMean()                  const = 0;
-        virtual double GetQuadraticMean()         const;
-        virtual double GetVariance()              const;
-        virtual double GetMedian()                const;
-        virtual double GetMinimum()               const;
-        virtual double GetMaximum()               const;
-        virtual double Getpercentil(double)       const;
-        virtual double Get5thpercentil()          const;
-        virtual double Get25thpercentil()         const;
-        virtual double Get75thpercentil()         const;
-        virtual double Get95thpercentil()         const;
+        virtual double GetSum ()                   const =0;
+        virtual double GetMean()                   const =0;
+        virtual double GetQuadraticMean()          const =0;
+        virtual double GetVariance()               const =0;
+        virtual double GetStdDev()                 const =0;
+        virtual double GetRMS()                    const =0;
+        virtual double GetRMSE()                   const =0;
+        virtual double GetMedian()                 const =0;
+        virtual double GetMinimum()                const =0;
+        virtual double GetMaximum()                const =0;
+        virtual double Getpercentil(const double&) const =0;
+        virtual double Get5thpercentil()           const =0;
+        virtual double Get25thpercentil()          const =0;
+        virtual double Get75thpercentil()          const =0;
+        virtual double Get95thpercentil()          const =0;
         
         inline std::valarray<bool> GetMask() const {return mask;}
         
-        virtual uint8_t      UByteValueAtPixel   (const size_t&) const =0;
-        virtual int8_t       ByteValueAtPixel    (const size_t&) const =0;
-        virtual uint16_t     UShortValueAtPixel  (const size_t&) const =0;
-        virtual int16_t      ShortValueAtPixel   (const size_t&) const =0;
-        virtual unsigned int UIntValueAtPixel    (const size_t&) const =0;
-        virtual int          IntValueAtPixel     (const size_t&) const =0;
-        virtual uint32_t     ULongValueAtPixel   (const size_t&) const =0;
-        virtual int32_t      LongValueAtPixel    (const size_t&) const =0;
-        virtual int64_t      LongLongValueAtPixel(const size_t&) const =0;
-        virtual float        FloatValueAtPixel   (const size_t&) const =0;
-        virtual double       DoubleValueAtPixel  (const size_t&) const =0;
+        virtual uint8_t  UInt8ValueAtPixel    (const size_t&) const =0;
+        virtual uint8_t  UByteValueAtPixel    (const size_t&) const =0;
+        virtual int8_t   Int8ValueAtPixel     (const size_t&) const =0;
+        virtual int8_t   ByteValueAtPixel     (const size_t&) const =0;
+        virtual uint16_t UInt16ValueAtPixel   (const size_t&) const =0;
+        virtual uint16_t UShortValueAtPixel   (const size_t&) const =0;
+        virtual int16_t  Int16ValueAtPixel    (const size_t&) const =0;
+        virtual int16_t  ShortValueAtPixel    (const size_t&) const =0;
+        virtual uint32_t UInt32ValueAtPixel   (const size_t&) const =0;
+        virtual uint32_t ULongValueAtPixel    (const size_t&) const =0;
+        virtual int32_t  Int32ValueAtPixel    (const size_t&) const =0;
+        virtual int32_t  LongValueAtPixel     (const size_t&) const =0;
+        virtual uint64_t UInt64ValueAtPixel   (const size_t&) const =0;
+        virtual uint64_t ULongLongValueAtPixel(const size_t&) const =0;
+        virtual int64_t  Int64ValueAtPixel    (const size_t&) const =0;
+        virtual int64_t  LongLongValueAtPixel (const size_t&) const =0;
+        virtual float    FloatValueAtPixel    (const size_t&) const =0;
+        virtual double   DoubleValueAtPixel   (const size_t&) const =0;
 
 
-        virtual uint8_t      UByteValueAtPixel   (const std::initializer_list<size_t>&) const = 0;
-        virtual int8_t       ByteValueAtPixel    (const std::initializer_list<size_t>&) const = 0;
-        virtual uint16_t     UShortValueAtPixel  (const std::initializer_list<size_t>&) const = 0;
-        virtual int16_t      ShortValueAtPixel   (const std::initializer_list<size_t>&) const = 0;
-        virtual unsigned int UIntValueAtPixel    (const std::initializer_list<size_t>&) const = 0;
-        virtual int          IntValueAtPixel     (const std::initializer_list<size_t>&) const = 0;
-        virtual uint32_t     ULongValueAtPixel   (const std::initializer_list<size_t>&) const = 0;
-        virtual int32_t      LongValueAtPixel    (const std::initializer_list<size_t>&) const = 0;
-        virtual int64_t      LongLongValueAtPixel(const std::initializer_list<size_t>&) const = 0;
-        virtual float        FloatValueAtPixel   (const std::initializer_list<size_t>&) const = 0;
-        virtual double       DoubleValueAtPixel  (const std::initializer_list<size_t>&) const = 0;
+        virtual uint8_t  UInt8ValueAtPixel     (const std::initializer_list<size_t>&) const = 0;
+        virtual uint8_t  UByteValueAtPixel     (const std::initializer_list<size_t>&) const = 0;
+        virtual int8_t   Int8ValueAtPixel      (const std::initializer_list<size_t>&) const = 0;
+        virtual int8_t   ByteValueAtPixel      (const std::initializer_list<size_t>&) const = 0;
+        virtual uint16_t UInt16ValueAtPixel    (const std::initializer_list<size_t>&) const = 0;
+        virtual uint16_t UShortValueAtPixel    (const std::initializer_list<size_t>&) const = 0;
+        virtual int16_t  Int16ValueAtPixel     (const std::initializer_list<size_t>&) const = 0;
+        virtual int16_t  ShortValueAtPixel     (const std::initializer_list<size_t>&) const = 0;
+        virtual uint32_t UInt32ValueAtPixel    (const std::initializer_list<size_t>&) const = 0;
+        virtual uint32_t ULongValueAtPixel     (const std::initializer_list<size_t>&) const = 0;
+        virtual int32_t  Int32ValueAtPixel     (const std::initializer_list<size_t>&) const = 0;
+        virtual int32_t  LongValueAtPixel      (const std::initializer_list<size_t>&) const = 0;
+        virtual int64_t  Int64ValueAtPixel     (const std::initializer_list<size_t>&) const = 0;
+        virtual int64_t  LongLongValueAtPixel  (const std::initializer_list<size_t>&) const = 0;
+        virtual uint64_t UInt64ValueAtPixel    (const std::initializer_list<size_t>&) const = 0;
+        virtual uint64_t ULongLongValueAtPixel (const std::initializer_list<size_t>&) const = 0;
+        virtual float    FloatValueAtPixel     (const std::initializer_list<size_t>&) const = 0;
+        virtual double   DoubleValueAtPixel    (const std::initializer_list<size_t>&) const = 0;
         
 
         // Typed accessors: return pointer to the internal typed valarray<T> managed by FitsArray<T>.
@@ -493,9 +510,10 @@ namespace DSL
 #pragma endregion
 #pragma region • Pure virtual methods
         
-        virtual std::shared_ptr<FITScube> Layer(unsigned int) const  =0;
+        virtual std::shared_ptr<FITScube> Layer(const size_t&) const  =0;
         virtual std::shared_ptr<FITScube> Window (size_t, size_t, size_t, size_t) const =0;
-        virtual std::shared_ptr<FITScube> Rebin  (std::vector<size_t> ) const =0;
+        virtual std::shared_ptr<FITScube> Rebin  (const std::initializer_list<size_t>& l, bool doMean=false) const {return Rebin(std::vector<size_t>(l),doMean);};
+        virtual std::shared_ptr<FITScube> Rebin  (const std::vector<size_t>& , bool doMean=false) const =0;
         
         virtual void Print() const {};
         
@@ -582,18 +600,23 @@ namespace DSL
 #pragma endregion
 
 #pragma region • Statistical property
-        double GetSum ()                  const;
-        double GetMean()                  const;
-        //double GetQuadraticMean()         const;
-        //double GetVariance()              const;
-        //double GetMedian()                const;
-        //double GetMinimum()               const;
-        //double GetMaximum()               const;
-        //double Getpercentil(double)       const;
-        //double Get5thpercentil()          const;
-        //double Get25thpercentil()         const;
-        //double Get75thpercentil()         const;
-        //double Get95thpercentil()         const;
+        double GetSum ()                   const;
+        double GetMean()                   const;
+        double GetQuadraticMean()          const;
+        double GetVariance()               const;
+        double GetStdDev()                 const;
+        double GetRMS()                    const;
+        double GetRMSE()                   const;
+        double GetMedian()                 const;
+        double GetMinimum()                const;
+        double GetMaximum()                const;
+        double Getpercentil(const double&) const;
+        double Get5thpercentil()           const;
+        double Get25thpercentil()          const;
+        double Get75thpercentil()          const;
+        double Get95thpercentil()          const;
+        double GetKurtosis()               const;
+        double GetSkewness()               const;
 
 #pragma endregion
 #pragma region • data operation
@@ -609,27 +632,58 @@ namespace DSL
         const T operator [](const size_t&) const;  ///< Get pixel content
               T operator [](const size_t&);	      ///< Get pixel content
         
+        uint8_t      UInt8ValueAtPixel   (const size_t& k) const {return UByteValueAtPixel   (k);}
         uint8_t      UByteValueAtPixel   (const size_t&) const;
+
+        int8_t       Int8ValueAtPixel    (const size_t& k) const {return ByteValueAtPixel    (k);}
         int8_t       ByteValueAtPixel    (const size_t&) const;
+
+        uint16_t     UInt16ValueAtPixel  (const size_t& k) const {return UShortValueAtPixel  (k);}
         uint16_t     UShortValueAtPixel  (const size_t&) const;
+
+        int16_t      Int16ValueAtPixel   (const size_t& k) const {return ShortValueAtPixel   (k);}
         int16_t      ShortValueAtPixel   (const size_t&) const;
-        unsigned int UIntValueAtPixel    (const size_t&) const;
-        int          IntValueAtPixel     (const size_t&) const;
+
+        uint32_t     UInt32ValueAtPixel  (const size_t& k) const {return ULongValueAtPixel   (k);}
         uint32_t     ULongValueAtPixel   (const size_t&) const;
+
+        int32_t      Int32ValueAtPixel   (const size_t& k) const {return LongValueAtPixel    (k);}
         int32_t      LongValueAtPixel    (const size_t&) const;
+
+        int64_t      Int64ValueAtPixel  (const size_t& k) const {return LongLongValueAtPixel(k);}
         int64_t      LongLongValueAtPixel(const size_t&) const;
+
+        uint64_t     UInt64ValueAtPixel   (const size_t& k) const {return ULongLongValueAtPixel(k);}
+        uint64_t     ULongLongValueAtPixel(const size_t&) const;
+
         float        FloatValueAtPixel   (const size_t&) const;
         double       DoubleValueAtPixel  (const size_t&) const;
 
+        uint8_t      UInt8ValueAtPixel   (const std::initializer_list<size_t>& k) const {return UByteValueAtPixel(k);}
         uint8_t      UByteValueAtPixel   (const std::initializer_list<size_t>&) const ;
+
+        int8_t       Int8ValueAtPixel    (const std::initializer_list<size_t>& k) const {return ByteValueAtPixel(k);}
         int8_t       ByteValueAtPixel    (const std::initializer_list<size_t>&) const ;
+
+        uint16_t     UInt16ValueAtPixel  (const std::initializer_list<size_t>& k) const {return UShortValueAtPixel(k);}
         uint16_t     UShortValueAtPixel  (const std::initializer_list<size_t>&) const ;
+
+        int16_t      Int16ValueAtPixel   (const std::initializer_list<size_t>& k) const {return ShortValueAtPixel(k);}
         int16_t      ShortValueAtPixel   (const std::initializer_list<size_t>&) const ;
-        unsigned int UIntValueAtPixel    (const std::initializer_list<size_t>&) const ;
-        int          IntValueAtPixel     (const std::initializer_list<size_t>&) const ;
+
+        uint32_t     UInt32ValueAtPixel  (const std::initializer_list<size_t>& k) const {return ULongValueAtPixel(k);}
         uint32_t     ULongValueAtPixel   (const std::initializer_list<size_t>&) const ;
+
+        int32_t      Int32ValueAtPixel   (const std::initializer_list<size_t>& k) const {return LongValueAtPixel(k);}
         int32_t      LongValueAtPixel    (const std::initializer_list<size_t>&) const ;
+
+        int64_t      Int64ValueAtPixel   (const std::initializer_list<size_t>& k) const {return LongLongValueAtPixel(k);}
         int64_t      LongLongValueAtPixel(const std::initializer_list<size_t>&) const ;
+
+        uint64_t      UInt64ValueAtPixel   (const std::initializer_list<size_t>& k) const {return ULongLongValueAtPixel(k);}
+        uint64_t      ULongLongValueAtPixel(const std::initializer_list<size_t>&) const ;
+
+
         float        FloatValueAtPixel   (const std::initializer_list<size_t>&) const ;
         double       DoubleValueAtPixel  (const std::initializer_list<size_t>&) const ;
 
@@ -776,7 +830,7 @@ namespace DSL
         void operator/=(const std::valarray<  double>& val){return operator/=<  double>(val);}
 
         template<typename S>
-        void operator/= (const FITSimg<S>&);///< Multiply images
+        void operator/=(const FITSimg<S>&);///< Multiply images
 
         void operator/=(const FITScube&);
 
@@ -826,9 +880,9 @@ namespace DSL
         
 #pragma endregion
 #pragma region • Extraction method
-        std::shared_ptr<FITScube> Layer(unsigned int) const;
+        std::shared_ptr<FITScube> Layer(const size_t&) const;
         std::shared_ptr<FITScube> Window (size_t, size_t, size_t, size_t) const;
-        std::shared_ptr<FITScube> Rebin  (std::vector<size_t> ) const;
+        std::shared_ptr<FITScube> Rebin  (const std::vector<size_t>&, bool doMean=false ) const;
         
         void Resize(const size_t&, const size_t&, const size_t&, const size_t&);
         
@@ -1175,7 +1229,7 @@ namespace DSL
         const long long array_size  = static_cast<const long long>( Nelements() );
     
         std::vector<long long> fpixel(static_cast<size_t>(num_axis));
-        for(long long i=0; i < num_axis; ++i) fpixel[i] = 1;
+        for(long long i=0; i < num_axis; ++i) fpixel[i] = static_cast<long long>(Naxis[i]); //1;
 
         // prepare contiguous output buffer using std::vector (safer than new/delete[])
         std::vector<S> outbuf(static_cast<size_t>(array_size));
@@ -1226,7 +1280,8 @@ namespace DSL
             std::cout<<std::endl;
         }
 
-        if( fits_write_pixll(fptr.get(), DATA_TYPE, fpixel.data(), array_size, outbuf.data(), &img_status) )
+        //if( fits_write_pixll(fptr.get(), DATA_TYPE, fpixel.data(), array_size, outbuf.data(), &img_status) )
+        if( fits_write_img(fptr.get(), DATA_TYPE, (LONGLONG)1, array_size, outbuf.data(), &img_status) )
         {
             throw FITSexception(img_status,"FITSimg","WriteDataCube");
         }
@@ -1669,7 +1724,7 @@ namespace DSL
             throw FITSexception(BAD_DIMEN,"FITScube","AddLayer","The two images didn't have same x and y dimensions");
     
         // Check the data are of the same type
-        if(BITPIX != iLayer.BITPIX)
+        if(eqBITPIX != iLayer.eqBITPIX)
            throw FITSexception(BAD_DIMEN,"FITScube","AddLayer","The two images have't the same data type");
         
         // Increment the number of dimenssion to account for the new Layer
@@ -1780,6 +1835,275 @@ namespace DSL
 
         return (nPix > 0) ? sum /= static_cast<double>(nPix) : 0;
     }
+
+    /**
+     *  @details Compute the quadratic mean of all unmasked pixel values
+     *  @return Quadratic mean of all unmasked pixel values
+     */
+    template< typename T >
+    double FITSimg<T>::GetQuadraticMean() const
+    {
+        if(!data)
+            return 0.0;
+    
+        size_t nPix = mask[!mask].size();
+        double sum=0;
+
+        bool handled = WithTypedData<T>([&](const std::valarray<T>& arr)
+            {
+                for(size_t i = 0; i < arr.size(); i++)
+                {
+                    if(!mask[i])
+                        sum += static_cast<double>(arr[i]*arr[i]);
+                }
+            });
+        if(!handled) 
+            throw std::runtime_error("\033[31m[FITSimg::GetQuadraticMean]\033[0m unsupported data type " + demangle(typeid(T).name()));
+
+        return (nPix > 0) ? std::sqrt(sum /= static_cast<double>(nPix)) : 0;
+    }
+
+    /**
+     *  @details Compute the variance of all unmasked pixel values
+     *  @return Variance of all unmasked pixel values
+     */
+    template< typename T >
+    double FITSimg<T>::GetVariance() const
+    {
+        if(!data)
+            return 0.0;
+    
+        size_t nPix = mask[!mask].size();
+        double mean = GetMean();
+        double var  = 0.0;
+        bool handled = false;
+
+        handled = WithTypedData<T>([&](const std::valarray<T>& arr)
+            {
+                for(size_t i = 0; i < arr.size(); i++)
+                {
+                    if(!mask[i])
+                        var += (static_cast<double>(arr[i]) - mean) * (static_cast<double>(arr[i]) - mean);
+                }
+            });
+        if(!handled) 
+            throw std::runtime_error("\033[31m[FITSimg::GetVariance]\033[0m unsupported data type " + demangle(typeid(T).name()));
+
+        return (nPix > 1) ? var /= static_cast<double>(nPix-1) : 0;
+    }
+
+    /**
+     *  @details Compute the standard deviation of all unmasked pixel values
+     *  @return Standard deviation of all unmasked pixel values
+     */
+    template< typename T >
+    double FITSimg<T>::GetStdDev() const
+    {
+        if(!data)
+            return 0.0;
+
+        return std::sqrt( GetVariance() );
+    }
+
+    /**
+     *  @details Root Mean Square all unmasked pixel values
+     *  @return RMS of all unmasked pixel values
+     */
+    template< typename T >
+    double FITSimg<T>::GetRMS() const
+    {
+        return GetQuadraticMean();
+    }
+
+    /**
+     *  @details Compute Root Mean Square Error of all unmasked pixel values
+     *  @return RMSE of all unmasked pixel values
+     */
+    template< typename T >
+    double FITSimg<T>::GetRMSE() const
+    {
+        if(!data)
+            return 0.0;
+
+        double var = GetVariance();
+        size_t nPix = mask[!mask].size();
+        
+        return sqrt(var*static_cast<double>(nPix-1)/static_cast<double>(nPix));
+    }
+
+    template< typename T >
+    double FITSimg<T>::Getpercentil(const double& fpp) const
+    {
+        if(fpp < 0. || fpp > 1.)
+            throw FITSexception(BAD_OPTION,"FITScube","Getpercentil","fpp should be in the range [0,1]");
+
+        if(!data)
+            return 0.0;
+
+        std::vector<double> sorted;
+        bool handled = false;
+
+        handled = WithTypedData<T>([&](const std::valarray<T>& arr)
+            {
+                for(size_t i = 0; i < arr.size(); i++)
+                {
+                    if(!mask[i])
+                        sorted.push_back( static_cast<double>(arr[i]) );
+                }
+            });
+        if(!handled) 
+            throw std::runtime_error("\033[31m[FITSimg::Getpercentil]\033[0m unsupported data type " + demangle(typeid(T).name()));
+
+        std::sort(sorted.begin(), sorted.end());
+        double pos = fpp * static_cast<double>(sorted.size()-1);
+        size_t idx = static_cast<size_t>( pos + 0.5 );
+        double dpos= pos - static_cast<double>(idx);
+
+        double pp_value = 0.0;
+
+        if(idx +1 < sorted.size())
+            pp_value = sorted[idx] + dpos * (sorted[idx+1] - sorted[idx]);
+        else
+            pp_value = sorted[idx];
+
+        return pp_value;
+    }
+
+    template< typename T >
+    double FITSimg<T>::GetMedian() const
+    {
+        return Getpercentil(0.5);
+    }
+
+    template< typename T >
+    double FITSimg<T>::Get5thpercentil() const
+    {
+        return Getpercentil(0.05);
+    }
+
+    template< typename T >
+    double FITSimg<T>::Get25thpercentil() const
+    {
+        return Getpercentil(0.25);
+    }
+
+    template< typename T >
+    double FITSimg<T>::Get75thpercentil() const
+    {
+        return Getpercentil(0.75);
+    }
+
+    template< typename T >
+    double FITSimg<T>::Get95thpercentil() const
+    {
+        return Getpercentil(0.95);
+    }
+
+    template< typename T >
+    double FITSimg<T>::GetKurtosis() const
+    {
+        if(!data)
+            return 0.0;
+    
+        size_t nPix = mask[!mask].size();
+        double mean = GetMean();
+        double var  = GetVariance();
+        double kurt = 0.0;
+        bool handled = false;
+
+        handled = WithTypedData<T>([&](const std::valarray<T>& arr)
+            {
+                double m4 = 0.0;
+
+                for(size_t i = 0; i < arr.size(); i++)
+                {
+                    if(mask[i])
+                        continue;
+                    
+                    double d = static_cast<double>(arr[i]) - mean;
+                    double d2 = d*d;
+                    m4 += d2*d2;
+                }
+                
+                double s4 = var*var;
+                double n = static_cast<double>(nPix);
+
+                double term1 = (n*(n+1)*m4)/( (n-1)*(n-2)*(n-3)*s4 );
+                double term2 = (3.*(n-1)*(n-1))/((n-2)*(n-3));
+                    
+                kurt = term1 - term2;
+                
+            });
+        if(!handled) 
+            throw std::runtime_error("\033[31m[FITSimg::GetKurtosis]\033[0m unsupported data type " + demangle(typeid(T).name()));
+
+        return kurt;
+    }
+
+    template< typename T >
+    double FITSimg<T>::GetSkewness() const
+    {
+        if(!data)
+            return 0.0;
+
+        size_t nPix = mask[!mask].size();
+        double mean = GetMean();
+        double var  = GetVariance();
+        double skew = 0.0;
+        bool handled = false;
+
+        handled = WithTypedData<T>([&](const std::valarray<T>& arr)
+            {
+                for(size_t i = 0; i < arr.size(); i++)
+                {
+                    if(!mask[i])
+                        skew += (static_cast<double>(arr[i]) - mean) * (static_cast<double>(arr[i]) - mean) * (static_cast<double>(arr[i]) - mean);
+                }
+            });
+        if(!handled)
+            throw std::runtime_error("\033[31m[FITSimg::GetSkewness]\033[0m unsupported data type " + demangle(typeid(T).name()));
+
+        return (nPix > 2 && var > 0.) ? (skew /= static_cast<double>(nPix) ) / (var * std::sqrt(var)) : 0;
+    }
+
+    template< typename T >
+    double FITSimg<T>::GetMinimum() const
+    {
+        if(!data)
+            return 0.0;
+        
+        bool handled = false;
+        double minVal = std::numeric_limits<double>::max();
+
+        handled = WithTypedData<T>([&](const std::valarray<T>& arr)
+            {
+                minVal = static_cast<double>( ((typename std::valarray<T>) arr[!mask]).min() );
+            });
+        if(!handled) 
+            throw std::runtime_error("\033[31m[FITSimg::GetMin]\033[0m unsupported data type " + demangle(typeid(T).name()));
+        
+        return minVal;
+    }
+
+    template< typename T >
+    double FITSimg<T>::GetMaximum() const
+    {
+        if(!data)
+            return 0.0;
+        
+        bool handled = false;
+        double maxVal = -1*std::numeric_limits<double>::max();
+
+        handled = WithTypedData<T>([&](const std::valarray<T>& arr)
+            {
+                maxVal = static_cast<double>( ((typename std::valarray<T>) arr[!mask]).max() );
+            });
+        if(!handled) 
+            throw std::runtime_error("\033[31m[FITSimg::GetMin]\033[0m unsupported data type " + demangle(typeid(T).name()));
+        
+        return maxVal;
+    }
+
 
 #pragma endregion
 #pragma region • data operation
@@ -1932,52 +2256,6 @@ namespace DSL
         
         return ShortValueAtPixel(iPx);
     }
-
-    template< typename T >
-    unsigned int FITSimg<T>::UIntValueAtPixel(const size_t& iPx) const
-    {
-        T val=0;
-
-        WithTypedData<T>([&](const std::valarray<T>& arr)
-        {
-            if(iPx >= arr.size())
-                throw FITSexception(BAD_DIMEN,"FITSimg","UIntValueAtPixel","pixel index out of range");
-            val = arr[iPx];
-        });
-
-        return static_cast<unsigned int>(val);
-    }
-    
-    template< typename T >
-    unsigned int FITSimg<T>::UIntValueAtPixel(const std::initializer_list<size_t>& iCoo) const
-    {
-        size_t iPx = this->PixelIndex(iCoo);
-
-        return UIntValueAtPixel(iPx);
-    }
-    
-    template< typename T >
-    int FITSimg<T>::IntValueAtPixel(const size_t& iPx) const
-    {
-        T val=0;
-
-        WithTypedData<T>([&](const std::valarray<T>& arr)
-        {
-            if(iPx >= arr.size())
-                throw FITSexception(BAD_DIMEN,"FITSimg","IntValueAtPixel","pixel index out of range");
-            val = arr[iPx];
-        });
-
-        return static_cast<int>(val);
-    }
-    
-    template< typename T >
-    int FITSimg<T>::IntValueAtPixel(const std::initializer_list<size_t>& iCoo) const
-    {
-        size_t iPx = this->PixelIndex(iCoo);
-
-        return IntValueAtPixel(iPx);
-    }
     
     
     template< typename T >
@@ -2047,6 +2325,29 @@ namespace DSL
         size_t iPx = this->PixelIndex(iCoo);
 
         return LongLongValueAtPixel(iPx);
+    }
+
+    template< typename T >
+    uint64_t FITSimg<T>::ULongLongValueAtPixel(const size_t& iPx) const
+    {
+        T val=0;
+
+        WithTypedData<T>([&](const std::valarray<T>& arr)
+        {
+            if(iPx >= arr.size())
+                throw FITSexception(BAD_DIMEN,"FITSimg","LongLongValueAtPixel","pixel index out of range");
+            val = arr[iPx];
+        });
+
+        return static_cast<uint64_t>(val);
+    }
+    
+    template< typename T >
+    uint64_t FITSimg<T>::ULongLongValueAtPixel(const std::initializer_list<size_t>& iCoo) const
+    {
+        size_t iPx = this->PixelIndex(iCoo);
+
+        return ULongLongValueAtPixel(iPx);
     }
     
     template< typename T >
@@ -2147,7 +2448,11 @@ namespace DSL
         if(!safe_cast_check_scalar<S, T>(val))
             throw FITSexception(SHARED_BADARG, "FITSimg<T>::operator*=", "unsafe conversion from scalar to storage type");
 
-        T v = static_cast<T>(val);
+        T v=0;
+        if constexpr (std::is_floating_point_v<S> && std::is_integral_v<T>)
+            v += static_cast<T>(val+0.5);
+        else
+            v += static_cast<T>(val);
 
         WithTypedData<T>([&](std::valarray<T>& arr)
             {
@@ -2181,7 +2486,11 @@ namespace DSL
         if (val == static_cast<S>(0))
             throw FITSexception(SHARED_BADARG, "FITSimg<T>::operator/=", "division by zero");
 
-        T v = static_cast<T>(val);
+        T v=0;
+        if constexpr (std::is_floating_point_v<S> && std::is_integral_v<T>)
+            v += static_cast<T>(val+0.5);
+        else
+            v += static_cast<T>(val);
 
         WithTypedData<T>([&](std::valarray<T>& arr)
         {
@@ -2212,7 +2521,11 @@ namespace DSL
         if(!safe_cast_check_scalar<S, T>(val))
             throw FITSexception(SHARED_BADARG, "FITSimg<T>::operator+=", "unsafe conversion from scalar to storage type");
         
-        T v = static_cast<T>(val);
+        T v=0;
+        if constexpr (std::is_floating_point_v<S> && std::is_integral_v<T>)
+            v += static_cast<T>(val+0.5);
+        else
+            v += static_cast<T>(val);
 
         WithTypedData<T>([&](std::valarray<T>& arr)
         {
@@ -2243,7 +2556,11 @@ namespace DSL
         if(!safe_cast_check_scalar<S, T>(val))
             throw FITSexception(SHARED_BADARG, "FITSimg<T>::operator-=", "unsafe conversion from scalar to storage type");
 
-        T v = static_cast<T>(val);
+        T v=0;
+        if constexpr (std::is_floating_point_v<S> && std::is_integral_v<T>)
+            v += static_cast<T>(val+0.5);
+        else
+            v += static_cast<T>(val);
     
         WithTypedData<T>([&](std::valarray<T>& arr)
         {
@@ -2632,8 +2949,17 @@ namespace DSL
                 img_status = BAD_DIMEN;
                 throw FITSexception(img_status,"FITScube","SetPixelValue","Pixel ["+std::to_string(index)+"] is out of range");
         }
+
+        T v =0;
+        if constexpr (std::is_floating_point_v<S> && std::is_integral_v<T>)
+            v = static_cast<T>(val+0.5);
+        else
+            v = static_cast<T>(val);
         
-        WithTypedData<T>([&](std::valarray<T>& arr){arr[index] = static_cast<T>(val);});
+        WithTypedData<T>([&](std::valarray<T>& arr)
+        {
+            arr[index] = v;
+        });
     }
     
 #pragma endregion
@@ -2649,16 +2975,15 @@ namespace DSL
     
     /**
      *  Extract layer from a 3D FITS cube.
-     *  @param iLayer: The layer one want to extract in single FITSimg. Layer numbering start at 1
+     *  @param iLayer: The layer one want to extract in single FITSimg.
      *  @return Return pointer to a 2D FITScube for the selected layer. Header information are updated to account for new image dimenssion.
      */
     template< typename T >
-    std::shared_ptr<FITScube> FITSimg<T>::Layer(unsigned int iLayer) const
+    std::shared_ptr<FITScube> FITSimg<T>::Layer(const size_t& iLayer) const
     {
         // create copy (copy constructor duplicates header, data and mask)
         FITSimg<T> *copy = new FITSimg<T>(*this);
 
-        if(iLayer > 0) --iLayer; // convert to 0-based
 
         if(Naxis.size() <= 2)
             throw FITSexception(BAD_DIMEN,"FITScube","Layer","Image does not contain layers. Copy of this will be returned.");
@@ -2859,7 +3184,7 @@ namespace DSL
      *  @return Return rebined image as a new FITScube data cube.
      */
     template< typename T >
-    std::shared_ptr<FITScube> FITSimg<T>::Rebin (std::vector<size_t> nbin) const
+    std::shared_ptr<FITScube> FITSimg<T>::Rebin (const std::vector<size_t>& nbin, bool doMean) const
     {
         double bin_size = 1;
         for(size_t iBin = 0; iBin < nbin.size(); iBin++)
@@ -2908,24 +3233,24 @@ namespace DSL
             if(hdu.Exists("CDELT"+std::to_string(k)))
                 copy->HDU().ValueForKey("CDELT"+std::to_string(k),
                                          this->HDU().GetDoubleValueForKey("CDELT"+std::to_string(k))
-                                         * static_cast<double>(Size(k)/copy->Size(k)));
+                                         * static_cast<double>(Size(k))/static_cast<double>(copy->Size(k)));
             else
                 copy->HDU().ValueForKey("CDELT"+std::to_string(k),
-                                         static_cast<double>(Size(k)/copy->Size(k)),"");
+                                         static_cast<double>(Size(k))/static_cast<double>(copy->Size(k)),"");
 
             if(hdu.Exists("CRVAL"+std::to_string(k)))
                 copy->HDU().ValueForKey("CRVAL"+std::to_string(k),
                                          this->HDU().GetDoubleValueForKey("CRVAL"+std::to_string(k))
-                                         + static_cast<double>(Size(k)/copy->Size(k))/2.);
+                                         + static_cast<double>(Size(k))/static_cast<double>(copy->Size(k))/2.);
             else
                 copy->HDU().ValueForKey("CRVAL"+std::to_string(k),
-                                         static_cast<double>(Size(k)/copy->Size(k))/2.);
+                                         static_cast<double>(Size(k))/static_cast<double>(copy->Size(k))/2.);
         }
 
         if((verbose & verboseLevel::VERBOSE_DETAIL) == verboseLevel::VERBOSE_DETAIL)
             std::cout<<" Rebining :";
 
-        WithTypedData<T>([&](const std::valarray<T>& arr)
+        bool handle=WithTypedData<T>([&](const std::valarray<T>& arr)
         {
             size_t pos = 0;
             for(size_t n = 0; n < copy->Size(); n++)
@@ -2942,7 +3267,9 @@ namespace DSL
                             std::valarray<size_t>(size.data(), size.size()),
                             std::valarray<size_t>(stride.data(), stride.size()))] = true;
 
-                copy->SetPixelValue(val.sum()/bin_size, n);
+                
+
+                copy->SetPixelValue(val.sum()/((doMean)?bin_size:1.), n);
 
                 while(msk[pos] && pos < msk.size())
                     pos++;
@@ -2952,6 +3279,8 @@ namespace DSL
                     break;
             }
         });
+        if(!handle)
+            throw FITSexception(SHARED_NULPTR,"FITSimg<T>::Rebin","missing data");
 
         if((verbose & verboseLevel::VERBOSE_DETAIL) == verboseLevel::VERBOSE_DETAIL)
             std::cout<<" \033[33m DONE\033[0m"<<std::endl;
@@ -2985,8 +3314,7 @@ namespace DSL
     
 #pragma endregion
 #pragma endregion
-#pragma region - External opperator
-    
+#pragma region - External opperators    
     /**
      *  @brief Compare two fits images.
      *  @details Compare, pixel by pixel, the content of the FITSimg img1 to the content of the FITSimg img2.
@@ -2998,9 +3326,8 @@ namespace DSL
     template< typename T >
     const std::valarray<bool> operator==(const FITSimg<T>& img1, const FITSimg<T>& img2)
     {
-        std::valarray<bool> test = ( img1.data == img2.data );
-        test[img1.mask] = 0;
-        test[img2.mask] = 0;
+        std::valarray<bool> test = ( (*(img1.template GetData<T>())) == (*(img2.template GetData<T>())) );
+        test[img1.GetMask() || img2.GetMask()] = false;
         
         return test;
     }
@@ -3016,9 +3343,8 @@ namespace DSL
     template< typename T >
     const std::valarray<bool> operator<=(const FITSimg<T>& img1,const FITSimg<T>& img2)
     {
-        std::valarray<bool> test = ( img1.data <= img2.data );
-        test[img1.mask] = 0;
-        test[img2.mask] = 0;
+        std::valarray<bool> test = ( (*(img1.template GetData<T>())) <= (*(img2.template GetData<T>())) );
+        test[img1.GetMask() || img2.GetMask()] = false;
         
         return test;
     }
@@ -3034,9 +3360,8 @@ namespace DSL
     template< typename T >
     const std::valarray<bool> operator< (const FITSimg<T>& img1,const FITSimg<T>& img2)
     {
-        std::valarray<bool> test = ( img1.data < img2.data );
-        test[img1.mask] = 0;
-        test[img2.mask] = 0;
+        std::valarray<bool> test = ( (*(img1.template GetData<T>())) < (*(img2.template GetData<T>())) );
+        test[img1.GetMask() || img2.GetMask()] = false;
         
         return test;
     }
@@ -3052,9 +3377,8 @@ namespace DSL
     template< typename T >
     const std::valarray<bool> operator>=(const FITSimg<T>& img1,const FITSimg<T>& img2)
     {
-        std::valarray<bool> test = ( img1.data >= img2.data );
-        test[img1.mask] = 0;
-        test[img2.mask] = 0;
+        std::valarray<bool> test = ( (*(img1.template GetData<T>())) >= (*(img2.template GetData<T>())) );
+        test[img1.GetMask() || img2.GetMask()] = false;
         
         return test;
     }
@@ -3070,9 +3394,8 @@ namespace DSL
     template< typename T >
     const std::valarray<bool> operator> (const FITSimg<T>& img1,const FITSimg<T>& img2)
     {
-        std::valarray<bool> test = ( img1.data > img2.data );
-        test[img1.mask] = 0;
-        test[img2.mask] = 0;
+        std::valarray<bool> test = ( (*(img1.template GetData<T>())) > (*(img2.template GetData<T>())) );
+        test[img1.GetMask() || img2.GetMask()] = false;
         
         return test;
     }
@@ -3088,9 +3411,8 @@ namespace DSL
     template< typename T >
     const std::valarray<bool> operator!=(const FITSimg<T>& img1,const FITSimg<T>& img2)
     {
-        std::valarray<bool> test = ( img1.data != img2.data );
-        test[img1.mask] = 0;
-        test[img2.mask] = 0;
+        std::valarray<bool> test = ( (*(img1.template GetData<T>())) != (*(img2.template GetData<T>())) );
+        test[img1.GetMask() || img2.GetMask()] = false;
         
         return test;
     }
@@ -3106,8 +3428,8 @@ namespace DSL
     template< typename T >
     const std::valarray<bool> operator==(const FITSimg<T>& img1, const T& val)
     {
-        std::valarray<bool> test = ( img1.data == val );
-        test[img1.mask] = 0;
+        std::valarray<bool> test = ( (*(img1.template GetData<T>())) == val );
+        test[img1.GetMask()] = false;
         
         return test;
     }
@@ -3123,8 +3445,8 @@ namespace DSL
     template< typename T >
     const std::valarray<bool> operator<=(const FITSimg<T>& img1, const T& val)
     {
-        std::valarray<bool> test = ( img1.data <= val );
-        test[img1.mask] = 0;
+        std::valarray<bool> test = ( (*(img1.template GetData<T>())) <= val );
+        test[img1.GetMask()] = false;
         
         return test;
     }
@@ -3140,8 +3462,8 @@ namespace DSL
     template< typename T >
     const std::valarray<bool> operator< (const FITSimg<T>& img1, const T& val)
     {
-        std::valarray<bool> test = ( img1.data < val );
-        test[img1.mask] = 0;
+        std::valarray<bool> test = ( (*(img1.template GetData<T>())) < val );
+        test[img1.GetMask()] = false;
         
         return test;
     }
@@ -3157,8 +3479,8 @@ namespace DSL
     template< typename T >
     const std::valarray<bool> operator>=(const FITSimg<T>& img1, const T& val)
     {
-        std::valarray<bool> test = ( img1.data >= val );
-        test[img1.mask] = 0;
+        std::valarray<bool> test = ( (*(img1.template GetData<T>())) >= val );
+        test[img1.GetMask()] = false;
         
         return test;
     }
@@ -3174,8 +3496,8 @@ namespace DSL
     template< typename T >
     const std::valarray<bool> operator> (const FITSimg<T>& img1, const T& val)
     {
-        std::valarray<bool> test = ( img1.data > val );
-        test[img1.mask] = 0;
+        std::valarray<bool> test = ( (*(img1.template GetData<T>())) > val );
+        test[img1.GetMask()] = false;
         
         return test;
     }
@@ -3191,8 +3513,8 @@ namespace DSL
     template< typename T >
     const std::valarray<bool> operator!=(const FITSimg<T>& img1, const T& val)
     {
-        std::valarray<bool> test = ( img1.data != val );
-        test[img1.mask] = 0;
+        std::valarray<bool> test = ( (*(img1.template GetData<T>())) != val );
+        test[img1.GetMask()] = false;
         
         return test;
     }
@@ -3208,9 +3530,9 @@ namespace DSL
     template< typename T >
     const std::valarray<bool> operator==(const T& val, const FITSimg<T>& img1)
     {
-        std::valarray<bool> test = ( val == img1.data );
-        test[img1.mask] = 0;
-        
+        std::valarray<bool> test = ( val ==  (*(img1.template GetData<T>())) );
+        test[img1.GetMask()] = false;
+
         return test;
     }
     
@@ -3225,8 +3547,8 @@ namespace DSL
     template< typename T >
     const std::valarray<bool> operator<=(const T& val, const FITSimg<T>& img1)
     {
-        std::valarray<bool> test = ( val <= img1.data );
-        test[img1.mask] = 0;
+        std::valarray<bool> test = ( val <=  (*(img1.template GetData<T>())) );
+        test[img1.GetMask()] = false;
         
         return test;
     }
@@ -3242,8 +3564,8 @@ namespace DSL
     template< typename T >
     const std::valarray<bool> operator< (const T& val, const FITSimg<T>& img1)
     {
-        std::valarray<bool> test = ( val < img1.data );
-        test[img1.mask] = 0;
+        std::valarray<bool> test = ( val <  (*(img1.template GetData<T>())) );
+        test[img1.GetMask()] = false;
         
         return test;
     }
@@ -3259,8 +3581,8 @@ namespace DSL
     template< typename T >
     const std::valarray<bool> operator>=(const T& val, const FITSimg<T>& img1)
     {
-        std::valarray<bool> test = ( val >= img1.data );
-        test[img1.mask] = 0;
+        std::valarray<bool> test = ( val >=  (*(img1.template GetData<T>())) );
+        test[img1.GetMask()] = false;
         
         return test;
     }
@@ -3276,8 +3598,8 @@ namespace DSL
     template< typename T >
     const std::valarray<bool> operator> (const T& val, const FITSimg<T>& img1)
     {
-        std::valarray<bool> test = ( val > img1.data );
-        test[img1.mask] = 0;
+        std::valarray<bool> test = ( val >  (*(img1.template GetData<T>())));
+        test[img1.GetMask()] = false;
         
         return test;
     }
@@ -3293,8 +3615,8 @@ namespace DSL
     template< typename T >
     const std::valarray<bool> operator!=(const T& val, const FITSimg<T>& img1)
     {
-        std::valarray<bool> test = ( val != img1.data );
-        test[img1.mask] = 0;
+        std::valarray<bool> test = ( val !=  (*(img1.template GetData<T>())) );
+        test[img1.GetMask()] = false;
         
         return test;
     }

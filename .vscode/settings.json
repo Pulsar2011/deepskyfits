@@ -87,6 +87,7 @@
         "fstream": "cpp",
         "numbers": "cpp",
         "semaphore": "cpp",
-        "shared_mutex": "cpp"
+        "shared_mutex": "cpp",
+        "numeric": "cpp"
     }
 }

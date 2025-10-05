@@ -158,7 +158,7 @@ TEST(FITSkeyword_Process_AllCases, ValueToTypeMapping)
 
     // very large unsigned value within 64-bit range -> current Process maps it to fULong as well
     FITSkeyword k_large_ull("18446744073709551615");
-    EXPECT_EQ(k_large_ull.type(), key_type::fULong);
+    EXPECT_EQ(k_large_ull.type(), key_type::fULongLong);
 }
 
 
