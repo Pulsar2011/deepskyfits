@@ -1024,6 +1024,10 @@ namespace DSL
             case SBYTE_IMG:
                 if (eqBITPIX == SBYTE_IMG)
                     TTYPE = TSBYTE;
+                else if (eqBITPIX == FLOAT_IMG)
+                    TTYPE = TFLOAT;
+                else if (eqBITPIX == DOUBLE_IMG)
+                    TTYPE = TDOUBLE;
                 else
                     TTYPE = TBYTE;
                 break;
@@ -1032,6 +1036,10 @@ namespace DSL
             case USHORT_IMG:
                 if (eqBITPIX == USHORT_IMG)
                     TTYPE = TUSHORT;
+                else if (eqBITPIX == FLOAT_IMG)
+                    TTYPE = TFLOAT;
+                else if (eqBITPIX == DOUBLE_IMG)
+                    TTYPE = TDOUBLE;
                 else
                     TTYPE = TSHORT;
                 break;
@@ -1040,6 +1048,10 @@ namespace DSL
             case ULONG_IMG:
                 if (eqBITPIX == ULONG_IMG)
                     TTYPE = TUINT;
+                else if (eqBITPIX == FLOAT_IMG)
+                    TTYPE = TFLOAT;
+                else if (eqBITPIX == DOUBLE_IMG)
+                    TTYPE = TDOUBLE;
                 else
                     TTYPE = TINT;
                 break;
@@ -1048,6 +1060,10 @@ namespace DSL
             case ULONGLONG_IMG:
                 if (eqBITPIX == ULONGLONG_IMG)
                     TTYPE = TULONGLONG;
+                else if (eqBITPIX == FLOAT_IMG)
+                    TTYPE = TFLOAT;
+                else if (eqBITPIX == DOUBLE_IMG)
+                    TTYPE = TDOUBLE;
                 else
                     TTYPE = TLONGLONG;
                 break;
