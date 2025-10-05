@@ -80,10 +80,13 @@ set(BUILD_SHARED_LIBS "YES")
 #-------------------- GCC specifics
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 	# Linux specific code
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Wall -pipe -fexceptions -fPIC  -m64 -Wno-unknown-pragmas")
+    set(CMAKE_SYSTEM_PROCESSOR x86_64)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Wall -pipe -fexceptions -fPIC -Wno-unknown-pragmas -Wmisleading-indentation")
 
 	set(OperatingSystem "Linux")
 	ADD_DEFINITIONS(-DLinuxx86_64)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+    set(CMAKE_CXX_EXTENSIONS OFF)
 ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 
 #-------------------- DARWIN specifics
@@ -162,14 +165,14 @@ message("-- CMAKE INCLUDE DIR  : " ${CMAKE_INCLUDE_PATH})
 message("-- CMAKE LIBRARY DIR  : " ${CMAKE_LIBRARY_PATH})
 
 #-------------------- Find Boost dependencies
-message("${Red}----------- SEARCH BOOST Framework -----------${ColourReset}")
-find_package(Boost REQUIRED COMPONENTS filesystem chrono)
-if(${Boost_FOUND})
-    message("${Blue}-- Boost INC DIR ${ColourReset} ${Boost_INCLUDE_DIRS}")
-    message("${Blue}-- Boost LIBRARY DIR ${ColourReset} ${Boost_LIBRARY_DIRS}")
-    message("${Blue}-- Boost LIB ${ColourReset} ${Boost_LIBRARIES}")
-endif(${Boost_FOUND})
-set(Boost_USE_MULTITHREADED ON)
+#message("${Red}----------- SEARCH BOOST Framework -----------${ColourReset}")
+#find_package(Boost REQUIRED COMPONENTS filesystem chrono)
+#if(${Boost_FOUND})
+#    message("${Blue}-- Boost INC DIR ${ColourReset} ${Boost_INCLUDE_DIRS}")
+#    message("${Blue}-- Boost LIBRARY DIR ${ColourReset} ${Boost_LIBRARY_DIRS}")
+#    message("${Blue}-- Boost LIB ${ColourReset} ${Boost_LIBRARIES}")
+#endif(${Boost_FOUND})
+#set(Boost_USE_MULTITHREADED ON)
 
 #-------------------- LIST SOURCE FILE
 
@@ -246,7 +249,6 @@ set(SAMPLE_FITS_URL
     "https://heasarc.gsfc.nasa.gov/FTP/fits_info/sample_files/images/rosat_pspc_rdf2_3_bk1.fits"
     "https://heasarc.gsfc.nasa.gov/FTP/fits_info/sample_files/images/rosat_pspc_rdf2_3_im2.fits"
     "http://fits.gsfc.nasa.gov/samples/testkeys.fits"
-    "https://fits.gsfc.nasa.gov/nrao_data/samples/image/vogtstar_awt.fits"
 )
 
 set(SAMPLE_FITS_FILE "")

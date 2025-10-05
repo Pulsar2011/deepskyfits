@@ -12,6 +12,7 @@
 #include <numeric>
 #include <type_traits>
 #include <cmath>
+#include <filesystem>
 
 using namespace DSL;
 
@@ -32,10 +33,18 @@ class FITSimgStatsTest : public ::testing::Test
         std::string MakeFilename() const
         {
             std::ostringstream ss;
+#ifdef Darwinx86_64
             ss << "build/testdata/stat_test_" << typeid(T).name() << ".fits";
+#else
+            ss << "testdata/stat_test_" << typeid(T).name() << ".fits";
+#endif
             return ss.str();
         }
+#ifdef Darwinx86_64
         void EnsureOutDir() const { std::filesystem::create_directories("build/testdata"); }
+#else
+        void EnsureOutDir() const { std::filesystem::create_directories("testdata"); }
+#endif
 };
 
 TEST(FITSimg, Create_BYTE)
@@ -52,7 +61,7 @@ TEST(FITSimg, Create_BYTE)
     EXPECT_EQ(img.Nelements(),data->size());
     
     uint8_t k = 0;
-    uint8_t N2,NN2,NN;
+    uint8_t N2=0,NN2=0,NN=0;
     for(size_t j=0; j<img.Size(2); j++)
     {
         for(size_t i=0; i<img.Size(1); i++)
@@ -69,9 +78,13 @@ TEST(FITSimg, Create_BYTE)
     EXPECT_EQ(img[N*N/2]  ,NN2);
     EXPECT_EQ(img[N*N-1]  ,NN );
 
+#ifdef Darwinx86_64
     img.Write("build/testdata/test_byte.fits", true);
-
     FITSmanager ff("build/testdata/test_byte.fits");
+#else
+    img.Write("testdata/test_byte.fits", true);
+    FITSmanager ff("testdata/test_byte.fits");
+#endif
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -114,7 +127,7 @@ TEST(FITSimg, Create_SBYTE)
     EXPECT_EQ(img.Nelements(),data->size());
     
     int8_t k = -128;
-    int8_t N2,NN2,NN;
+    int8_t N2=0,NN2=0,NN=0;
     for(size_t j=0; j<img.Size(2); j++)
     {
         for(size_t i=0; i<img.Size(1); i++)
@@ -131,9 +144,13 @@ TEST(FITSimg, Create_SBYTE)
     EXPECT_EQ(img[N*N/2]  ,NN2);
     EXPECT_EQ(img[N*N-1]  ,NN );
 
+#ifdef Darwinx86_64
     img.Write("build/testdata/test_sbyte.fits", true);
-
     FITSmanager ff("build/testdata/test_sbyte.fits");
+#else
+    img.Write("testdata/test_sbyte.fits", true);
+    FITSmanager ff("testdata/test_sbyte.fits");
+#endif
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -176,7 +193,7 @@ TEST(FITSimg, Create_SHORT)
     EXPECT_EQ(img.Nelements(),data->size());
     
     int16_t k = std::numeric_limits<int16_t>::min();
-    int16_t N2,NN2,NN;
+    int16_t N2=0,NN2=0,NN=0;
     for(size_t j=0; j<img.Size(2); j++)
         for(size_t i=0; i<img.Size(1); i++)
         {
@@ -192,9 +209,13 @@ TEST(FITSimg, Create_SHORT)
     EXPECT_EQ(img[N*N/2],  NN2);
     EXPECT_EQ(img[N*N-1]  ,NN );
 
+#ifdef Darwinx86_64
     img.Write("build/testdata/test_short.fits", true);
-
     FITSmanager ff("build/testdata/test_short.fits");
+#else
+    img.Write("testdata/test_short.fits", true);
+    FITSmanager ff("testdata/test_short.fits");
+#endif
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -241,7 +262,7 @@ TEST(FITSimg, Create_USHORT)
     EXPECT_EQ(img.Nelements(),data->size());
     
     uint16_t k = 0;
-    uint16_t N2,NN2,NN;
+    uint16_t N2=0,NN2=0,NN=0;
     uint16_t dN = static_cast<uint16_t>(static_cast<double>(std::numeric_limits<uint16_t>::max()) / static_cast<double>(N*N));
     if(dN < 1) dN = 1;
     for(size_t j=0; j<img.Size(2); j++)
@@ -260,9 +281,13 @@ TEST(FITSimg, Create_USHORT)
     EXPECT_EQ(img[N*N/2],  NN2);
     EXPECT_EQ(img[N*N-1]  ,NN );
 
+#ifdef Darwinx86_64
     img.Write("build/testdata/test_ushort.fits", true);
-
     FITSmanager ff("build/testdata/test_ushort.fits");
+#else
+    img.Write("testdata/test_ushort.fits", true);
+    FITSmanager ff("testdata/test_ushort.fits");
+#endif
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -305,7 +330,7 @@ TEST(FITSimg, Create_LONG)
     EXPECT_EQ(img.Nelements(),data->size());
     
     int32_t k = (int32_t) -65535;
-    int32_t N2,NN2,NN;
+    int32_t N2=0,NN2=0,NN=0;
     int32_t dN = static_cast<int32_t>(2.*65535. / static_cast<double>(N*N));
 
     for(size_t j=0; j<img.Size(2); j++)
@@ -322,9 +347,13 @@ TEST(FITSimg, Create_LONG)
     EXPECT_EQ(img[N*N/2]  , NN2 );
     EXPECT_EQ(img[N*N-1]  , NN  );
 
+#ifdef Darwinx86_64
     img.Write("build/testdata/test_long.fits", true);
-
     FITSmanager ff("build/testdata/test_long.fits");
+#else
+    img.Write("testdata/test_long.fits", true);
+    FITSmanager ff("testdata/test_long.fits");
+#endif
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -367,8 +396,8 @@ TEST(FITSimg, Create_ULONG)
     EXPECT_EQ(img.Nelements(),data->size());
     
     uint32_t k = 0;
-    uint32_t N2,NN2,NN;
-    uint32_t dN = dN = static_cast<uint16_t>(static_cast<double>(std::numeric_limits<uint32_t>::max()) / static_cast<double>(N*N));
+    uint32_t N2=0,NN2=0,NN=0;
+    uint32_t dN = static_cast<uint16_t>(static_cast<double>(std::numeric_limits<uint32_t>::max()) / static_cast<double>(N*N));
     if(dN < 1) dN = 1;
 
     for(size_t j=0; j<img.Size(2); j++)
@@ -385,9 +414,13 @@ TEST(FITSimg, Create_ULONG)
     EXPECT_EQ(img[N*N/2]  , NN2 );
     EXPECT_EQ(img[N*N-1]  , NN  );
 
+#ifdef Darwinx86_64
     img.Write("build/testdata/test_ulong.fits", true);
-
     FITSmanager ff("build/testdata/test_ulong.fits");
+#else
+    img.Write("testdata/test_ulong.fits", true);
+    FITSmanager ff("testdata/test_ulong.fits");
+#endif
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -430,7 +463,7 @@ TEST(FITSimg, Create_LONGLONG)
     EXPECT_EQ(img.Nelements(),data->size());
     
     int64_t k = (int64_t) -65535;
-    int64_t N2,NN2,NN;
+    int64_t N2=0,NN2=0,NN=0;
     int64_t dN = static_cast<int64_t>(2.*65535. / static_cast<double>(N*N));
 
     for(size_t j=0; j<img.Size(2); j++)
@@ -447,9 +480,13 @@ TEST(FITSimg, Create_LONGLONG)
     EXPECT_EQ(img[N*N/2],  NN2);
     EXPECT_EQ(img[N*N-1]  ,NN );
 
+#ifdef Darwinx86_64
     img.Write("build/testdata/test_longlong.fits", true);
-
     FITSmanager ff("build/testdata/test_longlong.fits");
+#else
+    img.Write("testdata/test_longlong.fits", true);
+    FITSmanager ff("testdata/test_longlong.fits");
+#endif
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -492,7 +529,7 @@ TEST(FITSimg, Create_ULONGLONG)
     EXPECT_EQ(img.Nelements(),data->size());
     
     uint64_t k = 0;
-    uint64_t N2,NN2,NN;
+    uint64_t N2=0,NN2=0,NN=0;
     uint64_t dN = static_cast<uint16_t>(static_cast<double>(std::numeric_limits<uint64_t>::max()) / static_cast<double>(N*N));
     if(dN < 1) dN = 1;
 
@@ -510,9 +547,13 @@ TEST(FITSimg, Create_ULONGLONG)
     EXPECT_EQ(img[N*N/2],  NN2);
     EXPECT_EQ(img[N*N-1]  ,NN );
 
+#ifdef Darwinx86_64
     img.Write("build/testdata/test_ulonglong.fits", true);
-
     FITSmanager ff("build/testdata/test_ulonglong.fits");
+#else
+    img.Write("testdata/test_ulonglong.fits", true);
+    FITSmanager ff("testdata/test_ulonglong.fits");
+#endif
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -562,9 +603,14 @@ TEST(FITSimg, Create_FLOAT)
     EXPECT_EQ(img[N*N/2],  (float) 129);
     EXPECT_EQ(img[N*N-1]  ,(float) 256);
 
+#ifdef Darwinx86_64
     img.Write("build/testdata/test_float.fits", true);
-
     FITSmanager ff("build/testdata/test_float.fits");
+#else
+    img.Write("testdata/test_float.fits", true);
+    FITSmanager ff("testdata/test_float.fits");
+#endif
+
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -615,9 +661,13 @@ TEST(FITSimg, Create_DOUBLE)
     EXPECT_EQ(img[N*N/2],  (double) 129);
     EXPECT_EQ(img[N*N-1]  ,(double) 256);
 
+#ifdef Darwinx86_64
     img.Write("build/testdata/test_double.fits", true);
-
     FITSmanager ff("build/testdata/test_double.fits");
+#else
+    img.Write("testdata/test_double.fits", true);
+    FITSmanager ff("testdata/test_double.fits");
+#endif
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -661,7 +711,7 @@ TEST(FITSimg, Create_SHORT2FLOAT)
     EXPECT_EQ(img.Nelements(),data->size());
     
     float k = -1250.;
-    float N2,NN2,NN;
+    float N2=0,NN2=0,NN=0;
     float dN = (2*1260.)/static_cast<float>(N*N);
     for(size_t j=0; j<img.Size(2); j++)
         for(size_t i=0; i<img.Size(1); i++)
@@ -691,9 +741,14 @@ TEST(FITSimg, Create_SHORT2FLOAT)
     img.Bzero( (double)0.0);
     img.BitPerPixel(SHORT_IMG,FLOAT_IMG);
     
+#ifdef Darwinx86_64
     img.Write("build/testdata/test_short2float.fits", true);
-
     FITSmanager ff("build/testdata/test_short2float.fits");
+#else
+    img.Write("testdata/test_short2float.fits", true);
+    FITSmanager ff("testdata/test_short2float.fits");
+#endif
+
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -736,7 +791,7 @@ TEST(FITSimg, Create_LONG2DOUBLE)
     EXPECT_EQ(img.Nelements(),data->size());
     
     double k = -1250.;
-    double N2,NN2,NN;
+    double N2=0,NN2=0,NN=0;
     double dN = (2*1260.)/static_cast<double>(N*N);
     for(size_t j=0; j<img.Size(2); j++)
         for(size_t i=0; i<img.Size(1); i++)
@@ -766,9 +821,13 @@ TEST(FITSimg, Create_LONG2DOUBLE)
     img.Bzero( (double)0.0);
     img.BitPerPixel(LONG_IMG,DOUBLE_IMG);
     
+#ifdef Darwinx86_64
     img.Write("build/testdata/test_long2double.fits", true);
-
     FITSmanager ff("build/testdata/test_long2double.fits");
+#else
+    img.Write("testdata/test_long2double.fits", true);
+    FITSmanager ff("testdata/test_long2double.fits");
+#endif
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -851,7 +910,11 @@ TEST(FITSimg, Read_SHORT)
 {
     verbose = verboseLevel::VERBOSE_NONE;
 
+#ifdef Darwinx86_64
     std::string src = "build/testdata/testkeys.fits";
+#else
+    std::string src = "testdata/testkeys.fits";
+#endif
 
     // Use the copied file for all operations
 
@@ -879,7 +942,11 @@ TEST(FITSimg, Test_Crop)
 {
     verbose = verboseLevel::VERBOSE_NONE;
 
+#ifdef Darwinx86_64
     std::string src = "build/testdata/testkeys.fits";
+#else
+    std::string src = "testdata/testkeys.fits";
+#endif
 
     // Use the copied file for all operations
 
@@ -911,7 +978,11 @@ TEST(FITSimg, Naming)
 {
     verbose = verboseLevel::VERBOSE_NONE;
 
+#ifdef Darwinx86_64
     std::string src = "build/testdata/testkeys.fits";
+#else
+    std::string src = "testdata/testkeys.fits";
+#endif
 
     // Use the copied file for all operations
 
@@ -1083,7 +1154,11 @@ class FITSimgMixTest : public ::testing::Test
         using value_type = typename Pair::T;
         using other_type = typename Pair::D;
         static size_t N() { return 10; }
+#ifdef Darwinx86_64
         void EnsureOutDir() const { std::filesystem::create_directories("build/testdata"); }
+#else
+        void EnsureOutDir() const { std::filesystem::create_directories("testdata");}
+#endif
 };
 
 // instantiate the pair list: here all T are paired with double as D (adjust if you want other D per T)
@@ -1728,8 +1803,4 @@ TYPED_TEST(FITSimgStatsTest, modifier)
         EXPECT_NEAR(imgptr->DoubleValueAtPixel(8+10*N), d, 1e-5);
         EXPECT_NEAR(imgptr->DoubleValueAtPixel({8,10}), d, 1e-5);
     }
-
-
-
-
 }

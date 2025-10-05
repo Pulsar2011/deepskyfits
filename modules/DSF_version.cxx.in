@@ -1,4 +1,5 @@
 #include <DSTfits/DSF_version.h> //update as appropriate
+#include <stdexcept>
 using namespace DSF;
 
 // Namespace DSF stand For DeepSkyMath.

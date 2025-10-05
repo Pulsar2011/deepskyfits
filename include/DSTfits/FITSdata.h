@@ -23,7 +23,13 @@
 namespace DSL
 {
     
-    enum class verboseLevel: uint8_t {
+#ifdef Darwinx86_64
+    enum class verboseLevel: uint8_t
+    {
+#else
+    enum verboseLevel
+    {
+#endif
         VERBOSE_NONE    = 0x00,
         VERBOSE_BASIC   = 0x01,
         VERBOSE_DETAIL  = 0x0F,
@@ -211,6 +217,7 @@ namespace DSL {
 
     template<typename> inline constexpr bool always_false_v = false;
 
+#ifdef Darwinx86_64
     auto demangle = [](const char* name) -> std::string
     {
         int status = 0;
@@ -218,7 +225,18 @@ namespace DSL {
         std::string s = (status == 0 && dem) ? dem : name;
         free(dem);
         return s;
-    }; 
+    };
+#else
+    inline std::string demangle(const char* name)
+    {
+        int status = 0;
+        char* dem = abi::__cxa_demangle(name, nullptr, nullptr, &status);
+        std::string s = (status == 0 && dem) ? dem : name;
+        free(dem);
+        return s;
+    }
+#endif
+     
 
 } // namespace DSL
 
