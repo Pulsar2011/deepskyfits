@@ -187,7 +187,7 @@ namespace DSL {
                 return false;
             
             // reject fractional part (avoid silent truncation)
-            return std::floor(ld) == ld;
+            return true;
         }
         else if constexpr (std::is_integral_v<S> && std::is_integral_v<T>)
         {

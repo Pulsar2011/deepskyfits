@@ -19,6 +19,7 @@
 #include<stdexcept>
 #include<sstream>
 #include<memory>
+#include<mutex> // added for std::scoped_lock / std::lock
 
 namespace DSL
 {
@@ -74,7 +75,10 @@ namespace DSL
      */
     void FITSmanager::explore()
     {
-        if(fptr.use_count() == 0 || fptr == nullptr)
+        // Acquire exclusive lock because we will query CFITSIO and update internal state.
+        std::unique_lock<std::shared_mutex> lk(fptr_mtx);
+
+        if(!fptr || fptr.use_count() == 0)
         {
             num_hdu = 0;
             fits_status = BAD_FILEPTR;
@@ -90,7 +94,8 @@ namespace DSL
         }
         
         if((verbose & verboseLevel::VERBOSE_BASIC)== verboseLevel::VERBOSE_BASIC)
-            std::cout<<std::endl<<"\033[32mOPEN\033[0m file \033[33m"<<GetFileName()<<"\033[0m"<<std::endl
+            // avoid calling GetFileName() here (would try to lock same mutex) — use raw overload
+            std::cout<<std::endl<<"\033[32mOPEN\033[0m file \033[33m"<<GetFileName(fptr.get())<<"\033[0m"<<std::endl
                 <<" \033[31m`--\033[0m Number of HDU in Fits file : \033[32m"<<num_hdu<<"\033[0m"<<std::endl;
     }
     
@@ -117,15 +122,24 @@ namespace DSL
      */
     FITSmanager::FITSmanager(const std::string& fileName, const bool& readOnly):fptr(nullptr),num_hdu(0),fits_status(0)
     {
-        fitsfile * fits = static_cast<fitsfile*>(fptr.get());
+        // this constructor opens a new file; no other thread can see the object yet,
+        // but we still protect the assignment to fptr when done.
+        
+        fitsfile * fits = nullptr;
         
         if(fits_open_file(&fits, fileName.c_str(), !readOnly, &fits_status))
         {
+            // fits pointer not successfully opened
             fptr.reset();
             throw FITSexception(fits_status,"FITSmanager","ctor","FILE : "+fileName);
         }
         
-        fptr.reset(fits, FITSmanager::CloseFile);
+        {
+            // protect assignment to member fptr
+            std::unique_lock<std::shared_mutex> lk(fptr_mtx);
+            fptr.reset(fits, FITSmanager::CloseFile);
+        }
+        // now explore the file (explore takes its own locking)
         explore();
     }
     
@@ -158,7 +172,46 @@ namespace DSL
     {
         explore();
     }
-    
+
+    // Add copy-assignment operator
+    FITSmanager& FITSmanager::operator=(const FITSmanager& other)
+    {
+        if(this == &other)
+            return *this;
+
+        // Lock both mutexes to copy state safely without deadlock
+        std::scoped_lock lock(fptr_mtx, other.fptr_mtx);
+
+        fptr = other.fptr;
+        num_hdu = other.num_hdu;
+        fits_status = other.fits_status;
+
+        return *this;
+    }
+
+    // Add move-assignment operator
+    FITSmanager& FITSmanager::operator=(FITSmanager&& other) noexcept
+    {
+        if(this == &other)
+            return *this;
+
+        // Lock both mutexes using defer_lock to avoid deadlock
+        std::unique_lock<std::shared_mutex> lk1(fptr_mtx, std::defer_lock);
+        std::unique_lock<std::shared_mutex> lk2(other.fptr_mtx, std::defer_lock);
+        std::lock(lk1, lk2);
+
+        // Move the shared pointer and primitive state
+        fptr = std::move(other.fptr);
+        num_hdu = other.num_hdu;
+        fits_status = other.fits_status;
+
+        // Leave other in a valid empty state
+        other.num_hdu = 0;
+        other.fits_status = 0;
+
+        return *this;
+    }
+
     /**
      *  @details Destructor.
      */
@@ -173,7 +226,13 @@ namespace DSL
     
     const std::string FITSmanager::GetFileName() const
     {
-        return GetFileName(fptr.get());
+        // copy pointer under shared lock to safely use outside lock if desired
+        std::shared_ptr<fitsfile> local;
+        {
+            std::shared_lock<std::shared_mutex> lk(fptr_mtx);
+            local = fptr;
+        }
+        return GetFileName(local.get());
     }
 
     const std::string FITSmanager::GetFileName(fitsfile *inFits) const
@@ -190,7 +249,35 @@ namespace DSL
 
     const std::string FITSmanager::GetFileName(const std::shared_ptr<fitsfile>& inFits) const
     {
-        return GetFileName(fptr.get());
+        // FIX: use provided shared_ptr (not the member)
+        return GetFileName(inFits.get());
+    }
+
+    // Best-effort check: returns true if try_lock fails (i.e. someone holds an exclusive lock)
+    bool FITSmanager::IsExclusivelyLocked() const
+    {
+        // try to acquire exclusive lock without blocking
+        if (fptr_mtx.try_lock())
+        {
+            // we successfully acquired it -> release and report "not exclusively locked"
+            fptr_mtx.unlock();
+            return false;
+        }
+        // failed to acquire -> exclusive lock is held by someone (or contention)
+        return true;
+    }
+
+    // Best-effort check: returns true if we can acquire a shared lock (no exclusive owner)
+    bool FITSmanager::CanAcquireSharedLock() const
+    {
+        if (fptr_mtx.try_lock_shared())
+        {
+            // acquired shared lock -> release and report success
+            fptr_mtx.unlock_shared();
+            return true;
+        }
+        // could not acquire shared lock (likely an exclusive owner)
+        return false;
     }
     
 #pragma endregion
@@ -307,28 +394,33 @@ namespace DSL
         
         if(fits_open_file(&fits, fileName.c_str(), readOnly, &fits_status))
         {
-            fptr.reset();
+            // don't change member fptr on failure
             throw FITSexception(fits_status,"FITSmanager","OpenFile","FILE : "+fileName);
         }
         
-        fptr.reset(fits, FITSmanager::CloseFile);
+        {
+            // assign to member fptr under exclusive lock
+            std::unique_lock<std::shared_mutex> lk(fptr_mtx);
+            fptr.reset(fits, FITSmanager::CloseFile);
+        }
         
         explore();
     }
     
-    /**
-     *  @details Close the fitsfile refered by this.
-     */
     void FITSmanager::Close()
     {
         try
         {
-            // Use reset to release ownership and call deleter if needed
-            std::string fname=GetFileName();
-            fptr.reset();
-            num_hdu = 0;
-            fits_status = 0;
-            
+            std::string fname;
+            {
+                // exclusive lock while we reset the pointer and read name
+                std::unique_lock<std::shared_mutex> lk(fptr_mtx);
+                fname = GetFileName(fptr.get());
+                fptr.reset();
+                num_hdu = 0;
+                fits_status = 0;
+            }
+
             if((verbose & verboseLevel::VERBOSE_DEBUG)== verboseLevel::VERBOSE_DEBUG)
                 std::cout<<"File \033[33m"<<fname<<"\033[32m CLOSED\033[0m"<<std::endl;
         }
@@ -342,6 +434,7 @@ namespace DSL
     
     void FITSmanager::CloseFile(fitsfile* in)
     {
+
         char ffname[999];
         int status = 0;
 
@@ -361,6 +454,15 @@ namespace DSL
 #pragma region • Writing FITS file to disk
     void FITSmanager::Write()
     {
+        // flush is an operation on the file -> take exclusive lock to avoid concurrent modifications
+        std::unique_lock<std::shared_mutex> lk(fptr_mtx);
+
+        if(!fptr)
+        {
+            fits_status = SHARED_NULPTR;
+            throw FITSexception(fits_status,"FITSmanager","Write","CAN'T WRITE : NULL FILEPTR");
+        }
+
         if(fits_flush_file(fptr.get(), &fits_status ))
             throw FITSexception(fits_status,"FITSmanager","Write");
         
@@ -386,19 +488,20 @@ namespace DSL
      *  @note It will return a NULL pointer if the header haven't been found or in case of errors while reading the FITS data
      */
      const std::shared_ptr<FITShdu> FITSmanager::GetHeaderAtIndex(const int& hdu_index)
-    {      
-        if(fptr.use_count() == 0)
-        {
-            fits_status = SHARED_NULPTR;
-            throw FITSexception(fits_status,"FITSmanager","GetHeaderAtIndex","CAN'T GET HEADER FROM NULL POINTER");
-        }
-        
+    {
+        // MoveToHDU will perform its own checks and CFITSIO call; it takes locks internally.
         MoveToHDU(hdu_index);
         
         if(fits_status)
             throw FITSexception(fits_status,"FITSmanager","GetHeaderAtIndex","SOMETHING WENT WRONG IN ACCESSING HDU "+std::to_string(hdu_index));
 
-        return std::make_shared<FITShdu>(fptr);
+        // make a copy of fptr under shared lock so returned FITShdu captures the file
+        std::shared_ptr<fitsfile> local;
+        {
+            std::shared_lock<std::shared_mutex> lk(fptr_mtx);
+            local = fptr;
+        }
+        return std::make_shared<FITShdu>(local);
     }
     
 #pragma endregion
@@ -410,12 +513,7 @@ namespace DSL
     
     const std::shared_ptr<FITScube> FITSmanager::GetImageAtIndex(const int& hdu_index)
     {
-        if(fptr.use_count() == 0)
-        {
-            fits_status = SHARED_NULPTR;
-            throw FITSexception(fits_status,"FITSmanager","GetHeaderAtIndex","CAN'T GET HEADER FROM NULL POINTER");
-        }
-        
+        // ensure HDU movement and subsequent CFITSIO calls are safe -> use MoveToHDU which locks
         int hdu_type = MoveToHDU(hdu_index);
         
         if(fits_status)
@@ -430,12 +528,18 @@ namespace DSL
                 throw FITSexception(fits_status,"FITSmanager","GetImageAtIndex","FILE "+GetFileName()+"\nCurrent HDU isn't an FITS image!");
             }
             
+            // copy shared_ptr under shared lock to keep pointer alive while we use it
+            std::shared_ptr<fitsfile> local;
+            {
+                std::shared_lock<std::shared_mutex> lk(fptr_mtx);
+                local = fptr;
+            }
         
             FITScube *img = NULL;
         
             int eqBITPIX = 0;
         
-            if(fits_get_img_equivtype(fptr.get(), &eqBITPIX, &fits_status))
+            if(fits_get_img_equivtype(local.get(), &eqBITPIX, &fits_status))
             {
                 throw FITSexception(fits_status,"FITSmanager","GetImageAtIndex");
             }
@@ -443,7 +547,7 @@ namespace DSL
             if(eqBITPIX == 64)
             {
                 unsigned long long bz = 0;
-                if(ffgkyujj(fptr.get(), "BZERO", &bz, NULL, &fits_status))
+                if(ffgkyujj(local.get(), "BZERO", &bz, NULL, &fits_status))
                     bz=0ULL;
                 
                 if (bz == 9223372036854775808ULL)
@@ -456,43 +560,43 @@ namespace DSL
             switch (eqBITPIX)
             {
                 case BYTE_IMG:
-                    img = new FITSimg<uint8_t>(fptr);
+                    img = new FITSimg<uint8_t>(local);
                     break;
                 
                 case SBYTE_IMG:
-                    img = new FITSimg<int8_t>(fptr);
+                    img = new FITSimg<int8_t>(local);
                     break;
 
                 case SHORT_IMG:
-                    img = new FITSimg<int16_t>(fptr);
+                    img = new FITSimg<int16_t>(local);
                     break;
                 
                 case USHORT_IMG:
-                    img = new FITSimg<uint16_t>(fptr);
+                    img = new FITSimg<uint16_t>(local);
                     break;
                 
                 case LONG_IMG:
-                    img = new FITSimg<int32_t>(fptr);
+                    img = new FITSimg<int32_t>(local);
                     break;
                 
                 case ULONG_IMG:
-                    img = new FITSimg<uint32_t>(fptr);
+                    img = new FITSimg<uint32_t>(local);
                     break;
                 
                 case LONGLONG_IMG:
-                    img = new FITSimg<int64_t>(fptr);
+                    img = new FITSimg<int64_t>(local);
                     break;
                 
                 case ULONGLONG_IMG:
-                    img = new FITSimg<uint64_t>(fptr);
+                    img = new FITSimg<uint64_t>(local);
                     break;
                 
                 case FLOAT_IMG:
-                    img = new FITSimg<float>(fptr);
+                    img = new FITSimg<float>(local);
                     break;
                 
                 case DOUBLE_IMG:
-                    img = new FITSimg<double>(fptr);
+                    img = new FITSimg<double>(local);
                     break;
                 
                 default:
@@ -500,9 +604,9 @@ namespace DSL
                     throw FITSexception(fits_status,"FITSmanager","GetImageAtIndex","CAN'T GET IMAGES, DATA TYPE "+std::to_string(eqBITPIX)+" IS UNKNOWN");
             }
         
-                fits_status = img->Status();
+            fits_status = img->Status();
         
-                return std::shared_ptr<FITScube>(img);
+            return std::shared_ptr<FITScube>(img);
         }
         catch(std::exception& e)
         {
@@ -536,7 +640,9 @@ namespace DSL
     
     const std::shared_ptr<FITStable> FITSmanager::CreateTable(std::string tname, const ttype& tt)
     {
-        
+        // Creating a table mutates file -> exclusive lock
+        std::unique_lock<std::shared_mutex> lk(fptr_mtx);
+
         std::vector<char*> ttype_vec(1), tform_vec(1), tunit_vec(1);
         std::string ttype_str = "TFLOAT";
         std::string tform_str = "COL0";
@@ -545,8 +651,7 @@ namespace DSL
         tform_vec[0] = const_cast<char*>(tform_str.c_str());
         tunit_vec[0] = const_cast<char*>(tunit_str.c_str());
          
-        
-        if(fptr.use_count() == 0)
+        if(!fptr)
         {
             fits_status = SHARED_NULPTR;
             throw FITSexception(fits_status,"FITSmanager","CreateTable","CAN'T CREATE HEADER FROM NULL POINTER");
@@ -575,17 +680,20 @@ namespace DSL
 
     int FITSmanager::MoveToHDU(const int& hdu_index)
     {
-        if(fptr.use_count() == 0)
+        std::unique_lock<std::shared_mutex> lk(fptr_mtx);
+
+        if(!fptr)
         {
             fits_status = SHARED_NULPTR;
-            throw FITSexception(fits_status,"FITSmanager","GetHeaderAtIndex","CAN'T GET HEADER FROM NULL POINTER");
+            throw FITSexception(fits_status,"FITSmanager","MoveToHDU","CAN'T GET HEADER FROM NULL POINTER");
         }
 
         if(hdu_index< 1 || hdu_index > num_hdu)
         {
             std::stringstream ss;
             
-            ss<<"FILE "<<GetFileName()
+            // Avoid calling GetFileName() (would deadlock); use raw pointer overload
+            ss<<"FILE "<<GetFileName(fptr.get())
               <<std::endl
               <<"HEADER #"<<hdu_index<<" doesn't exist"<<"\033[0m"<<std::endl;
             
@@ -597,10 +705,11 @@ namespace DSL
         fits_status = 0;
         int hdu_type = 0;
         
-        if(fits_movabs_hdu( fptr.get(), hdu_index, &hdu_type, &fits_status ) == BAD_HDU_NUM)
+        // Use fits_movabs_hdu and check fits_status (CFITSIO returns status via fits_status param)
+        if(fits_movabs_hdu( fptr.get(), hdu_index, &hdu_type, &fits_status ) != 0)
         {
             std::stringstream ss;
-            ss<<"HEADER #"<<hdu_index<<" @ FILE "<<GetFileName ()<<std::endl;
+            ss<<"HEADER #"<<hdu_index<<" @ FILE "<<GetFileName(fptr.get())<<std::endl;
             
             throw FITSexception(fits_status,"FITSmanager","MoveToHDU",ss.str());
         }
@@ -616,7 +725,10 @@ namespace DSL
      */
     void FITSmanager::AppendImage(FITScube &img)
     {
-        if(fptr.use_count() == 0)
+        // Mutates file -> exclusive lock
+        std::unique_lock<std::shared_mutex> lk(fptr_mtx);
+
+        if(!fptr)
         {
             fits_status = SHARED_NULPTR;
             throw FITSexception(fits_status,"FITSmanager","GetHeaderAtIndex","CAN'T GET HEADER FROM NULL POINTER");
@@ -647,14 +759,44 @@ namespace DSL
                     std::cout<<")";
             }
         }
+
+        int total_huds = 0;
+        fits_status = 0;
+
+        // 1) get total number of HDUs and move to the last existing HDU
+        if (fits_get_num_hdus(fptr.get(), &total_huds, &fits_status))
+            throw FITSexception(fits_status,"FITSmanager","AppendImage","cannot get number of HDUs after append");
+
+        // 2) move to the last existing HDU (so the new image will be created AFTER it)
+        if (fits_movabs_hdu(fptr.get(), total_huds, nullptr, &fits_status))
+            throw FITSexception(fits_status,"FITSmanager","AppendImage","cannot move to appended HDU");
+
+        if((verbose & verboseLevel::VERBOSE_DETAIL)== verboseLevel::VERBOSE_DETAIL)
+            // avoid GetFileName() (would deadlock); use raw overload
+            std::cout<<" to \033[33m"<<GetFileName(fptr.get())<<"\033[0m as HDU #"<<num_hdu<<std::endl
+                        << "     |-- Initial Number of HDU :"<<total_huds<<std::endl;
         
+        // 3) create image (CFITSIO inserts it AFTER current HDU and makes it the current HDU)
         if(fits_create_imgll(fptr.get(), img.GetBitPerPixel(), static_cast<int>( img.GetDimension() ), axis.data(),  &fits_status ))
-        {
             throw FITSexception(fits_status,"FITSmanager","AppendImage");
-        }
+
+        // 4) refresh total HDUs and update manager state
+        if (fits_get_num_hdus(fptr.get(), &total_huds, &fits_status))
+            throw FITSexception(fits_status,"FITSmanager","AppendImage","cannot get total number of HDUs after create");
+
+         if((verbose & verboseLevel::VERBOSE_DETAIL)== verboseLevel::VERBOSE_DETAIL)
+            std::cout   << "     `-- New Number of HDU     :"<<total_huds<<std::endl;
+
+
+        num_hdu++;;
+        // move CFITSIO current HDU to the newly appended HDU
+        if (fits_movabs_hdu(fptr.get(), num_hdu, nullptr, &fits_status))
+            throw FITSexception(fits_status,"FITSmanager","AppendImage","cannot move to appended HDU");
                 
-        num_hdu++;
-        img.Write(fptr);
+        // write the image (img.Write expects shared_ptr<fitsfile>)
+        // create a temporary shared_ptr to pass into Write
+        std::shared_ptr<fitsfile> local = fptr;
+        img.Write(local);
     }
     
 #pragma endregion
@@ -769,12 +911,14 @@ namespace DSL
             AppendKey(key, TYPE, val);
             
     }
-    
+
     void FITSmanager::AppendKey(std::string key, int TYPE, std::string val, std::string cmt)
     {
+        // writing metadata -> exclusive lock
+        std::unique_lock<std::shared_mutex> lk(fptr_mtx);
         fits_status = 0;
         
-        if(fptr.use_count() == 0)
+        if(!fptr)
         {
             fits_status = SHARED_NULPTR;
             throw FITSexception(fits_status,"FITSmanager","AppendKey","CAN'T GET HEADER FROM NULL POINTER");

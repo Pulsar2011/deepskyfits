@@ -9,8 +9,34 @@
 #include <fstream>
 #include <cstdio>
 #include <cstdlib>
+#include <numeric>
+#include <type_traits>
+#include <cmath>
 
 using namespace DSL;
+
+template<typename T>
+static double eps_for_type()
+{
+    if constexpr (std::is_floating_point<T>::value) return 1e-6;
+    return 0.0; // exact for integers (mean compared as double with no tolerance)
+}
+
+template <typename T>
+class FITSimgStatsTest : public ::testing::Test
+{
+    protected:
+        using value_type = T;
+        static size_t N() { return 21; }
+        
+        std::string MakeFilename() const
+        {
+            std::ostringstream ss;
+            ss << "build/testdata/stat_test_" << typeid(T).name() << ".fits";
+            return ss.str();
+        }
+        void EnsureOutDir() const { std::filesystem::create_directories("build/testdata"); }
+};
 
 TEST(FITSimg, Create_BYTE)
 {
@@ -771,6 +797,56 @@ TEST(FITSimg, Create_LONG2DOUBLE)
     EXPECT_FALSE(ff.isOpen());
 }
 
+using StatTypes = ::testing::Types<uint8_t,int8_t,int16_t,uint16_t,int32_t,uint32_t,int64_t,uint64_t,float,double>;
+TYPED_TEST_SUITE(FITSimgStatsTest, StatTypes);
+
+TYPED_TEST(FITSimgStatsTest, arrayStatistics)
+{
+    verbose = verboseLevel::VERBOSE_NONE;
+    using T = typename TestFixture::value_type;
+
+    this->EnsureOutDir();
+
+    const size_t N = TestFixture::N();
+    FITSimg<T> img(2, {N, N});
+    
+    auto data = img.template GetData<T>();
+    ASSERT_NE(data, nullptr);
+
+    // fill predictable pattern: value = (i % 256) + (j)
+    size_t k = 0;
+    for (size_t j = 0; j < img.Size(2); ++j)
+        for (size_t i = 0; i < img.Size(1); ++i)
+        {
+            if(k >= 100)
+                img.MaskPixels({i + j * img.Size(1)});
+            (*data)[i + j * img.Size(1)] = static_cast<T>(k);
+            k++ ;
+        }
+
+
+    // compute expected stats
+    std::valarray<bool> mask = img.GetMask();
+    const double nelems = static_cast<double>(((std::valarray<bool>)mask[!mask]).size());
+    
+    EXPECT_NEAR(img.GetMinimum()      , (double)(0), 1e-6);
+    EXPECT_NEAR(img.GetMaximum()      , (nelems-1.), 1e-12);
+    EXPECT_NEAR(img.GetSum()          , (nelems * (nelems - 1.)) / 2.0, 1e-12);
+    EXPECT_NEAR(img.GetMean()         , (nelems - 1.) / 2.0, 1e-12);
+    EXPECT_NEAR(img.GetMedian()       , (nelems - 1.) / 2.0, 1e-12);
+    EXPECT_NEAR(img.GetVariance()     , nelems * ( nelems +1 ) / 12.0, 1e-12);
+    EXPECT_NEAR(img.GetStdDev()       , std::sqrt(nelems * ( nelems +1 ) / 12.0), 1e-12);
+    EXPECT_NEAR(img.GetRMS()          , std::sqrt(((nelems - 1.) * (2 * nelems - 1)) / 6.0), 1e-12);
+    EXPECT_NEAR(img.GetRMSE()         , std::sqrt(( nelems * nelems - 1. ) / 12.0), 1e-12);
+    EXPECT_NEAR(img.Get5thpercentil() , (0.05 * (nelems - 1.)), 1e-12);
+    EXPECT_NEAR(img.Get95thpercentil(), (0.95 * (nelems - 1.)), 1e-12);
+    EXPECT_NEAR(img.Get25thpercentil(), (0.25 * (nelems - 1.)), 1e-12);
+    EXPECT_NEAR(img.Get75thpercentil(), (0.75 * (nelems - 1.)), 1e-12);
+    EXPECT_NEAR(img.GetQuadraticMean(), std::sqrt(((nelems - 1.) * (2 * nelems - 1)) / 6.0), 1e-5);
+    EXPECT_NEAR(img.GetKurtosis()     , -6. * (nelems * nelems + 1.) / (5. * (nelems * nelems - 1.)), 5e-4);
+    EXPECT_NEAR(img.GetSkewness()     , 0.0, 1e-5);
+}
+
 TEST(FITSimg, Read_SHORT)
 {
     verbose = verboseLevel::VERBOSE_NONE;
@@ -789,21 +865,21 @@ TEST(FITSimg, Read_SHORT)
 
     size_t n = img->PixelIndex({150,150});
     EXPECT_EQ(n, 150 + 150*300);
-    EXPECT_EQ(img->IntValueAtPixel({150,150}), 8801);
-    EXPECT_EQ(img->IntValueAtPixel({0,0}), 3768);
-    EXPECT_EQ(img->IntValueAtPixel({299,299}), 3965);
-    EXPECT_EQ(img->IntValueAtPixel({59,290}), 6168);
+    EXPECT_EQ(img->Int16ValueAtPixel({150,150}), 8801);
+    EXPECT_EQ(img->Int16ValueAtPixel({0,0}), 3768);
+    EXPECT_EQ(img->Int16ValueAtPixel({299,299}), 3965);
+    EXPECT_EQ(img->Int16ValueAtPixel({59,290}), 6168);
 
     img.reset();
     ff.Close();
     EXPECT_FALSE(ff.isOpen());
 }
 
-TEST(FITSimg, Read_SHORT2FLOAT)
+TEST(FITSimg, Test_Crop)
 {
     verbose = verboseLevel::VERBOSE_NONE;
 
-    std::string src = "build/testdata/rosat_pspc_rdf2_3_bk1.fits";
+    std::string src = "build/testdata/testkeys.fits";
 
     // Use the copied file for all operations
 
@@ -812,14 +888,848 @@ TEST(FITSimg, Read_SHORT2FLOAT)
 
     std::shared_ptr<FITScube> img = ff.GetPrimary();
     EXPECT_NE(img, nullptr);
-    EXPECT_EQ(img->Size(1), 512);
-    EXPECT_EQ(img->Size(2), 512);
+    EXPECT_EQ(img->Size(1), 300);
+    EXPECT_EQ(img->Size(2), 300);
 
-    size_t n = img->PixelIndex({256,256});
-    EXPECT_EQ(n, 256 + 256*512);
-    EXPECT_NEAR(img->FloatValueAtPixel(n), 0.141,1e-3);
+    
+    std::shared_ptr<FITScube> cimg = img->Window(50,25,60,75);
+    EXPECT_NE(cimg, nullptr);
+    EXPECT_EQ(cimg->Size(1), 60);
+    EXPECT_EQ(cimg->Size(2), 75);
+
+    for(size_t j=0; j<cimg->Size(2); j++)
+        for(size_t i=0; i<cimg->Size(1); i++)
+            EXPECT_EQ(cimg->Int16ValueAtPixel({i,j}), img->Int16ValueAtPixel({i+50,j+25}));
+    
 
     img.reset();
     ff.Close();
     EXPECT_FALSE(ff.isOpen());
+}
+
+TEST(FITSimg, Naming)
+{
+    verbose = verboseLevel::VERBOSE_NONE;
+
+    std::string src = "build/testdata/testkeys.fits";
+
+    // Use the copied file for all operations
+
+    FITSmanager ff(src);
+    EXPECT_TRUE(ff.isOpen());
+
+    std::shared_ptr<FITScube> img = ff.GetPrimary();
+    EXPECT_NE(img, nullptr);
+    EXPECT_EQ(img->Size(1), 300);
+    EXPECT_EQ(img->Size(2), 300);
+
+    EXPECT_EQ(img->GetName(), "NO NAME");
+    img->SetName("MyImage");
+
+    EXPECT_EQ(img->GetName(), "MyImage");
+    
+
+    img.reset();
+    ff.Close();
+    EXPECT_FALSE(ff.isOpen());
+}
+
+TYPED_TEST(FITSimgStatsTest, arrayRebinning)
+{
+    verbose = verboseLevel::VERBOSE_NONE;
+    using T = typename TestFixture::value_type;
+
+    this->EnsureOutDir();
+
+    const size_t N = TestFixture::N();
+    FITSimg<T> img(2, {N, N});
+    
+    auto data = img.template GetData<T>();
+    ASSERT_NE(data, nullptr);
+
+    // fill predictable pattern: value = (i % 256) + (j)
+    for (size_t j = 0; j < img.Size(2); ++j)
+        for (size_t i = 0; i < img.Size(1); ++i)
+        {
+            (*data)[i + j * img.Size(1)] = static_cast<T>(1);
+        }
+
+    std::shared_ptr<FITScube> rimg = img.Rebin({3,3},false);
+    EXPECT_NE(rimg, nullptr);
+    EXPECT_EQ(rimg->Size(1), N/3);
+    EXPECT_EQ(rimg->Size(2), N/3);
+    auto rdata = rimg->GetData<T>();
+    for(size_t j=0; j<rdata->size(); j++)
+        EXPECT_NEAR((*rdata)[j], (T)9, 1e-6);
+
+    std::shared_ptr<FITScube> mimg = img.Rebin({3,3},true);
+    EXPECT_NE(mimg, nullptr);
+    EXPECT_EQ(mimg->Size(1), N/3);
+    EXPECT_EQ(mimg->Size(2), N/3);
+    auto mdata = mimg->GetData<T>();
+    for(size_t j=0; j<mdata->size(); j++)
+        EXPECT_NEAR((*mdata)[j], (T)1, 1e-6);
+}
+
+
+TYPED_TEST(FITSimgStatsTest, Layer)
+{
+    verbose = verboseLevel::VERBOSE_NONE;
+    using T = typename TestFixture::value_type;
+
+    this->EnsureOutDir();
+
+    const size_t N = TestFixture::N();
+    FITSimg<T> img(2, {N, N});
+    
+    auto data = img.template GetData<T>();
+    ASSERT_NE(data, nullptr);
+
+    // fill predictable pattern: value = (i % 256) + (j)
+    size_t k = 0;
+    for (size_t j = 0; j < img.Size(2); ++j)
+        for (size_t i = 0; i < img.Size(1); ++i)
+        {
+            (*data)[i + j * img.Size(1)] = static_cast<T>(1);
+            k++ ;
+        }
+
+    for(size_t k = 2; k < 5; k++)
+    {
+        FITSimg<T> layer(2, {N,N});
+        auto ldata = layer.template GetData<T>();
+        ASSERT_NE(ldata, nullptr);
+        
+        for(size_t j=0; j<layer.Size(2); j++)
+            for(size_t i=0; i<layer.Size(1); i++)
+                (*ldata)[i + j * layer.Size(1)] = static_cast<T>(k);
+
+        img.AddLayer(layer);
+        EXPECT_EQ(img.Size(), (k)*N*N);
+        EXPECT_EQ(img.Size(3), (k));
+
+        for(size_t iz=0; iz<img.Size(3); iz++)
+            for(size_t iy=0; iy<img.Size(2); iy++)
+                for(size_t ix=0; ix<img.Size(1); ix++)
+                        EXPECT_EQ(img[img.PixelIndex({ix,iy,iz})], static_cast<T>(iz+1));
+    }
+
+    for(size_t k=0; k < img.Size(3); k++)
+    {
+        std::shared_ptr<FITScube> layer = img.Layer(k);
+        EXPECT_NE(layer, nullptr);
+        EXPECT_EQ(layer->Size(1), N);
+        EXPECT_EQ(layer->Size(2), N);
+
+        auto ldata = layer->GetData<T>();
+
+        for(size_t j=0; j<layer->Size(2); j++)
+            for(size_t i=0; i<layer->Size(1); i++)
+                EXPECT_EQ((*ldata)[layer->PixelIndex({i,j})], static_cast<T>(k+1));
+    }
+
+    EXPECT_ANY_THROW(img.Layer(img.Size(3)));
+
+    FITSimg<T> img2(2, {N+5,N+5});
+    auto idata = img2.template GetData<T>();
+    ASSERT_NE(idata, nullptr);
+
+    for(size_t k = 0; k < idata->size(); k++)
+        (*idata)[k] = static_cast<T>(5);
+
+    EXPECT_ANY_THROW(img.AddLayer(img2));
+
+    FITSimg<T> img3(2, {N,N+5});
+    EXPECT_ANY_THROW(img.AddLayer(img3));
+
+    FITSimg<T> img4(2, {N+5,N});
+    EXPECT_ANY_THROW(img.AddLayer(img4));
+
+    FITSimg<T> cube(3, {N+5,N+5,2});
+    auto cdata = cube.template GetData<T>();
+    ASSERT_NE(cdata, nullptr);
+
+    for(size_t k = 0; k < cdata->size(); k++)
+        (*cdata)[k] = static_cast<T>(10);
+
+    img2.AddLayer(cube);
+    EXPECT_EQ(img2.Size(), (3)*(N+5)*(N+5));
+    EXPECT_EQ(img2.Size(3), (3));
+
+    for(k = 0; k < img2.Size(3); k++)
+    {
+        std::shared_ptr<FITScube> layer = img2.Layer(k);
+        EXPECT_NE(layer, nullptr);
+        EXPECT_EQ(layer->Size(1), N+5);
+        EXPECT_EQ(layer->Size(2), N+5);
+
+        auto ldata = layer->GetData<T>();
+
+        for(size_t j=0; j<ldata->size(); j++)
+            if(k < 1)
+                EXPECT_EQ((*ldata)[j], static_cast<T>(5));
+            else
+                EXPECT_EQ((*ldata)[j], static_cast<T>(10));
+    }
+}
+
+template<typename A, typename B>
+struct TwoTypes { using T = A; using D = B; };
+
+template<typename Pair>
+class FITSimgMixTest : public ::testing::Test
+{
+    protected:
+        using value_type = typename Pair::T;
+        using other_type = typename Pair::D;
+        static size_t N() { return 10; }
+        void EnsureOutDir() const { std::filesystem::create_directories("build/testdata"); }
+};
+
+// instantiate the pair list: here all T are paired with double as D (adjust if you want other D per T)
+using MixTypes = ::testing::Types<
+    TwoTypes<uint8_t,double>,
+    TwoTypes<uint8_t,float>,
+    TwoTypes<uint8_t,uint64_t>,
+    TwoTypes<uint8_t,int64_t>,
+    TwoTypes<uint8_t,uint32_t>,
+    TwoTypes<uint8_t,int32_t>,
+    TwoTypes<uint8_t,uint16_t>,
+    TwoTypes<uint8_t,int16_t>,
+    TwoTypes<uint8_t,uint8_t>,
+    TwoTypes<uint8_t,int8_t>,
+    TwoTypes<int8_t,double>,
+    TwoTypes<int8_t,float>,
+    TwoTypes<int8_t,uint64_t>,
+    TwoTypes<int8_t,int64_t>,
+    TwoTypes<int8_t,uint32_t>,
+    TwoTypes<int8_t,int32_t>,
+    TwoTypes<int8_t,uint16_t>,
+    TwoTypes<int8_t,int16_t>,
+    TwoTypes<int8_t,uint8_t>,
+    TwoTypes<int8_t,int8_t>,
+    TwoTypes<uint16_t,double>,
+    TwoTypes<uint16_t,float>,
+    TwoTypes<uint16_t,uint64_t>,
+    TwoTypes<uint16_t,int64_t>,
+    TwoTypes<uint16_t,uint32_t>,
+    TwoTypes<uint16_t,int32_t>,
+    TwoTypes<uint16_t,uint16_t>,
+    TwoTypes<uint16_t,int16_t>,
+    TwoTypes<uint16_t,uint8_t>,
+    TwoTypes<uint16_t,int8_t>,
+    TwoTypes<int16_t,double>,
+    TwoTypes<int16_t,float>,
+    TwoTypes<int16_t,uint64_t>,
+    TwoTypes<int16_t,int64_t>,
+    TwoTypes<int16_t,uint32_t>,
+    TwoTypes<int16_t,int32_t>,
+    TwoTypes<int16_t,uint16_t>,
+    TwoTypes<int16_t,int16_t>,
+    TwoTypes<int16_t,uint8_t>,
+    TwoTypes<int16_t,int8_t>,
+    TwoTypes<uint32_t,double>,
+    TwoTypes<uint32_t,float>,
+    TwoTypes<uint32_t,uint64_t>,
+    TwoTypes<uint32_t,int64_t>,
+    TwoTypes<uint32_t,uint32_t>,
+    TwoTypes<uint32_t,int32_t>,
+    TwoTypes<uint32_t,uint16_t>,
+    TwoTypes<uint32_t,int16_t>,
+    TwoTypes<uint32_t,uint8_t>,
+    TwoTypes<uint32_t,int8_t>,
+    TwoTypes<int32_t,double>,
+    TwoTypes<int32_t,float>,
+    TwoTypes<int32_t,uint64_t>,
+    TwoTypes<int32_t,int64_t>,
+    TwoTypes<int32_t,uint32_t>,
+    TwoTypes<int32_t,int32_t>,
+    TwoTypes<int32_t,uint16_t>,
+    TwoTypes<int32_t,int16_t>,
+    TwoTypes<int32_t,uint8_t>,
+    TwoTypes<int32_t,int8_t>,
+    TwoTypes<uint64_t,double>,
+    TwoTypes<uint64_t,float>,
+    TwoTypes<uint64_t,uint64_t>,
+    TwoTypes<uint64_t,int64_t>,
+    TwoTypes<uint64_t,uint32_t>,
+    TwoTypes<uint64_t,int32_t>,
+    TwoTypes<uint64_t,uint16_t>,
+    TwoTypes<uint64_t,int16_t>,
+    TwoTypes<uint64_t,uint8_t>,
+    TwoTypes<uint64_t,int8_t>,
+    TwoTypes<int64_t,double>,
+    TwoTypes<int64_t,float>,
+    TwoTypes<int64_t,uint64_t>,
+    TwoTypes<int64_t,int64_t>,
+    TwoTypes<int64_t,uint32_t>,
+    TwoTypes<int64_t,int32_t>,
+    TwoTypes<int64_t,uint16_t>,
+    TwoTypes<int64_t,int16_t>,
+    TwoTypes<int64_t,uint8_t>,
+    TwoTypes<int64_t,int8_t>,
+    TwoTypes<float,double>,
+    TwoTypes<float,float>,
+    TwoTypes<float,uint64_t>,
+    TwoTypes<float,int64_t>,
+    TwoTypes<float,uint32_t>,
+    TwoTypes<float,int32_t>,
+    TwoTypes<float,uint16_t>,
+    TwoTypes<float,int16_t>,
+    TwoTypes<float,uint8_t>,
+    TwoTypes<float,int8_t>,
+    TwoTypes<double,double>,
+    TwoTypes<double,float>,
+    TwoTypes<double,uint64_t>,
+    TwoTypes<double,int64_t>,
+    TwoTypes<double,uint32_t>,
+    TwoTypes<double,int32_t>,
+    TwoTypes<double,uint16_t>,
+    TwoTypes<double,int16_t>,
+    TwoTypes<double,uint8_t>,
+    TwoTypes<double,int8_t>
+>;
+TYPED_TEST_SUITE(FITSimgMixTest, MixTypes);
+
+TYPED_TEST(FITSimgMixTest, opperators_scalar)
+{
+    verbose = verboseLevel::VERBOSE_NONE;
+    using T = typename TestFixture::value_type;
+    using D = typename TestFixture::other_type;
+    
+    this->EnsureOutDir();
+    const size_t N = TestFixture::N();
+    FITSimg<T> img(2, {N, N});
+
+    auto data = img.template GetData<T>();
+    ASSERT_NE(data, nullptr);
+
+    for(size_t k = 0; k < data->size(); k++)
+        (*data)[k] = static_cast<T>(10);
+
+    D val = 10;
+
+    img += val;
+    for(size_t k = 0; k < data->size(); k++)
+        EXPECT_EQ((*data)[k], static_cast<T>(20));
+
+    img -= val;
+    for(size_t k = 0; k < data->size(); k++)
+        EXPECT_EQ((*data)[k], static_cast<T>(10));
+
+    img *= val;
+    for(size_t k = 0; k < data->size(); k++)
+        EXPECT_EQ((*data)[k], static_cast<T>(100));
+
+    img /= val;
+    for(size_t k = 0; k < data->size(); k++)
+        EXPECT_EQ((*data)[k], static_cast<T>(10));
+}
+
+TYPED_TEST(FITSimgMixTest, opperators_array)
+{
+    verbose = verboseLevel::VERBOSE_NONE;
+    using T = typename TestFixture::value_type;
+    using D = typename TestFixture::other_type;
+    
+    this->EnsureOutDir();
+    const size_t N = TestFixture::N();
+    FITSimg<T> img(2, {N, N});
+
+    auto data = img.template GetData<T>();
+    ASSERT_NE(data, nullptr);
+
+    for(size_t k = 0; k < data->size(); k++)
+        (*data)[k] = static_cast<T>(10);
+
+    typename std::valarray<D> val(data->size());
+    val*=(D) 0;
+    val+=(D) 10;
+
+    img += val;
+    for(size_t k = 0; k < data->size(); k++)
+        EXPECT_EQ((*data)[k], static_cast<T>(20));
+
+    img -= val;
+    for(size_t k = 0; k < data->size(); k++)
+        EXPECT_EQ((*data)[k], static_cast<T>(10));
+
+    img *= val;
+    for(size_t k = 0; k < data->size(); k++)
+        EXPECT_EQ((*data)[k], static_cast<T>(100));
+
+    img /= val;
+    for(size_t k = 0; k < data->size(); k++)
+        EXPECT_EQ((*data)[k], static_cast<T>(10));
+}
+
+TYPED_TEST(FITSimgMixTest, opperators_img)
+{
+    verbose = verboseLevel::VERBOSE_NONE;
+    using T = typename TestFixture::value_type;
+    using D = typename TestFixture::other_type;
+    
+    this->EnsureOutDir();
+    const size_t N = TestFixture::N();
+    FITSimg<T> img(2, {N, N});
+
+    auto data = img.template GetData<T>();
+    ASSERT_NE(data, nullptr);
+
+    for(size_t k = 0; k < data->size(); k++)
+    {
+        (*data)[k] = static_cast<T>(10);
+        if(!(k%5)) img.MaskPixels({k});
+    }
+
+    pxMask mask = pxMask(img.GetMask());
+    
+
+    FITSimg<D> dmg(2, {N, N});
+    auto ddata = dmg.template GetData<D>();
+    ASSERT_NE(ddata, nullptr);
+
+    for(size_t k = 0; k < ddata->size(); k++)
+    {
+        (*ddata)[k] = static_cast<D>(10.0);
+        if(!(k%2)) dmg.MaskPixels({k});
+    }
+
+    img += dmg;
+    for(size_t k = 0; k < data->size(); k++)
+    {
+        EXPECT_EQ((*data)[k], img.Masked(k)?10:static_cast<T>(20));
+        if(!(k%5))
+            EXPECT_TRUE(img.Masked(k));
+        else if(!(k%2))
+            EXPECT_TRUE(img.Masked(k));
+        else
+        EXPECT_FALSE(img.Masked(k));
+    }
+    img.UnmaskPixels(img.GetMask()); // restore original mask
+    img.MaskPixels(mask);
+
+    img -= dmg;
+    for(size_t k = 0; k < data->size(); k++)
+    {
+        EXPECT_EQ((*data)[k], img.Masked(k)?10:static_cast<T>(10));
+        if(!(k%5))
+            EXPECT_TRUE(img.Masked(k));
+        else if(!(k%2))
+            EXPECT_TRUE(img.Masked(k));
+        else
+        EXPECT_FALSE(img.Masked(k));
+    }
+    img.UnmaskPixels(img.GetMask()); // restore original mask
+    img.MaskPixels(mask);
+
+    img *= dmg;
+    for(size_t k = 0; k < data->size(); k++)
+    {
+        EXPECT_EQ((*data)[k], img.Masked(k)?10:static_cast<T>(100));
+        if(!(k%5))
+            EXPECT_TRUE(img.Masked(k));
+        else if(!(k%2))
+            EXPECT_TRUE(img.Masked(k));
+        else
+        EXPECT_FALSE(img.Masked(k));
+    }
+    img.UnmaskPixels(img.GetMask()); // restore original mask
+    img.MaskPixels(mask);
+
+    img /= dmg;
+    for(size_t k = 0; k < data->size(); k++)
+    {
+        EXPECT_EQ((*data)[k], img.Masked(k)?10:static_cast<T>(10));
+
+        if(!(k%5))
+            EXPECT_TRUE(img.Masked(k));
+        else if(!(k%2))
+            EXPECT_TRUE(img.Masked(k));
+        else
+        EXPECT_FALSE(img.Masked(k));
+    }
+    img.UnmaskPixels(img.GetMask()); // restore original mask
+    img.MaskPixels(mask);
+}
+
+
+TYPED_TEST(FITSimgStatsTest, logical_scalar)
+{
+    verbose = verboseLevel::VERBOSE_NONE;
+    using T = typename TestFixture::value_type;
+    
+    this->EnsureOutDir();
+    const size_t N = TestFixture::N();
+    T value = 10;
+    FITSimg<T> img(2, {N, N});
+
+    auto data = img.template GetData<T>();
+    ASSERT_NE(data, nullptr);
+
+    for(size_t k = 0; k < data->size(); k++)
+    {
+        (*data)[k] = static_cast<T>(value);
+        if(!(k%5)) img.MaskPixels({k});
+    }
+
+    pxMask mask = pxMask(img.GetMask());
+    
+    std::vector<T> val({0,10,20});
+
+    bool state = false;
+    for(typename std::vector<T>::const_iterator it = val.begin(); it != val.end(); it++)
+    {
+        state = (value == *it);
+        
+        std::valarray<bool> res1 = (img == *it);
+        EXPECT_TRUE(res1.size() == img.Nelements());
+        for(size_t k = 0; k < res1.size(); k++)
+        {
+            if(!(k%5))
+                EXPECT_FALSE(res1[k]);
+            else
+                EXPECT_EQ(res1[k],state);
+        }
+
+        state = (value != *it);
+        res1 = (img != *it);
+        EXPECT_TRUE(res1.size() == img.Nelements());
+        for(size_t k = 0; k < res1.size(); k++)
+        {
+            if(!(k%5))
+                EXPECT_FALSE(res1[k]);
+            else
+                EXPECT_EQ(res1[k],state);
+        }
+
+        state = (value >= *it);
+        res1 = (img >= *it);
+        EXPECT_TRUE(res1.size() == img.Nelements());
+        for(size_t k = 0; k < res1.size(); k++)
+        {
+            if(!(k%5))
+                EXPECT_FALSE(res1[k]);
+            else
+                EXPECT_EQ(res1[k],state);
+        }
+
+        state = (value > *it);
+        res1 = (img > *it);
+        EXPECT_TRUE(res1.size() == img.Nelements());
+        for(size_t k = 0; k < res1.size(); k++)
+        {
+            if(!(k%5))
+                EXPECT_FALSE(res1[k]);
+            else
+                EXPECT_EQ(res1[k],state);
+        }
+
+        state = (value <= *it);
+        res1 = (img <= *it);
+        EXPECT_TRUE(res1.size() == img.Nelements());
+        for(size_t k = 0; k < res1.size(); k++)
+        {
+            if(!(k%5))
+                EXPECT_FALSE(res1[k]);
+            else
+                EXPECT_EQ(res1[k],state);
+        }
+
+        state = (value < *it);
+        res1 = (img < *it);
+        EXPECT_TRUE(res1.size() == img.Nelements());
+        for(size_t k = 0; k < res1.size(); k++)
+        {
+            if(!(k%5))
+                EXPECT_FALSE(res1[k]);
+            else
+                EXPECT_EQ(res1[k],state);
+        }
+
+        state = (*it == value);
+        res1 = (*it == img);
+        EXPECT_TRUE(res1.size() == img.Nelements());
+        for(size_t k = 0; k < res1.size(); k++)
+        {
+            if(!(k%5))
+                EXPECT_FALSE(res1[k]);
+            else
+                EXPECT_EQ(res1[k],state);
+        }
+
+        state = (*it != value);
+        res1 = (*it != img);
+        EXPECT_TRUE(res1.size() == img.Nelements());
+        for(size_t k = 0; k < res1.size(); k++)
+        {
+            if(!(k%5))
+                EXPECT_FALSE(res1[k]);
+            else
+                EXPECT_EQ(res1[k],state);
+        }
+
+        state = (*it >= value);
+        res1 = (*it >= img);
+        EXPECT_TRUE(res1.size() == img.Nelements());
+        for(size_t k = 0; k < res1.size(); k++)
+        {
+            if(!(k%5))
+                EXPECT_FALSE(res1[k]);
+            else
+                EXPECT_EQ(res1[k],state);
+        }
+
+        state = (*it > value);
+        res1 = (*it > img);
+        EXPECT_TRUE(res1.size() == img.Nelements());
+        for(size_t k = 0; k < res1.size(); k++)
+        {
+            if(!(k%5))
+                EXPECT_FALSE(res1[k]);
+            else
+                EXPECT_EQ(res1[k],state);
+        }
+
+        state = (*it <= value);
+        res1 = (*it <= img);
+        EXPECT_TRUE(res1.size() == img.Nelements());
+        for(size_t k = 0; k < res1.size(); k++)
+        {
+            if(!(k%5))
+                EXPECT_FALSE(res1[k]);
+            else
+                EXPECT_EQ(res1[k],state);
+        }
+
+        state = (*it < value);
+        res1 = (*it < img);
+        EXPECT_TRUE(res1.size() == img.Nelements());
+        for(size_t k = 0; k < res1.size(); k++)
+        {
+            if(!(k%5))
+                EXPECT_FALSE(res1[k]);
+            else
+                EXPECT_EQ(res1[k],state);
+        }
+    }
+}
+
+TYPED_TEST(FITSimgStatsTest, logical_img)
+{
+    verbose = verboseLevel::VERBOSE_NONE;
+    using T = typename TestFixture::value_type;
+    
+    this->EnsureOutDir();
+    const size_t N = TestFixture::N();
+    T value = 10;
+    FITSimg<T> img(2, {N, N});
+
+    auto data = img.template GetData<T>();
+    ASSERT_NE(data, nullptr);
+
+    for(size_t k = 0; k < data->size(); k++)
+    {
+        (*data)[k] = static_cast<T>(value);
+        if(!(k%5)) img.MaskPixels({k});
+    }
+
+    pxMask mask = pxMask(img.GetMask());
+    
+    std::vector<T> val({0,10,20});
+
+    bool state = false;
+    for(typename std::vector<T>::const_iterator it = val.begin(); it != val.end(); it++)
+    {
+        FITSimg<T> cmp(2, {N, N});
+        auto cdata = cmp.template GetData<T>();
+        ASSERT_NE(cdata, nullptr);
+        for(size_t k = 0; k < cdata->size(); k++)
+        {
+            (*cdata)[k] = static_cast<T>(*it);
+            if(!(k%3)) cmp.MaskPixels({k});
+        }
+        
+        state = (value == *it);
+        std::valarray<bool> res1 = (img == cmp);
+        EXPECT_TRUE(res1.size() == img.Nelements());
+        for(size_t k = 0; k < res1.size(); k++)
+        {
+            if(!(k%5) || !(k%3))
+                EXPECT_FALSE(res1[k]);
+            else
+                EXPECT_EQ(res1[k],state);
+        }
+
+        state = (value != *it);
+        res1 = (img != cmp);
+        EXPECT_TRUE(res1.size() == img.Nelements());
+        for(size_t k = 0; k < res1.size(); k++)
+        {
+            if(!(k%5) || !(k%3))
+                EXPECT_FALSE(res1[k]);
+            else
+                EXPECT_EQ(res1[k],state);
+        }
+
+        state = (value >= *it);
+        res1 = (img >= cmp);
+        EXPECT_TRUE(res1.size() == img.Nelements());
+        for(size_t k = 0; k < res1.size(); k++)
+        {
+            if(!(k%5) || !(k%3))
+                EXPECT_FALSE(res1[k]);
+            else
+                EXPECT_EQ(res1[k],state);
+        }
+
+        state = (value > *it);
+        res1 = (img > cmp);
+        EXPECT_TRUE(res1.size() == img.Nelements());
+        for(size_t k = 0; k < res1.size(); k++)
+        {
+            if(!(k%5) || !(k%3))
+                EXPECT_FALSE(res1[k]);
+            else
+                EXPECT_EQ(res1[k],state);
+        }
+
+        state = (value <= *it);
+        res1 = (img <= cmp);
+        EXPECT_TRUE(res1.size() == img.Nelements());
+        for(size_t k = 0; k < res1.size(); k++)
+        {
+            if(!(k%5) || !(k%3))
+                EXPECT_FALSE(res1[k]);
+            else
+                EXPECT_EQ(res1[k],state);
+        }
+
+        state = (value < *it);
+        res1 = (img < cmp);
+        EXPECT_TRUE(res1.size() == img.Nelements());
+        for(size_t k = 0; k < res1.size(); k++)
+        {
+            if(!(k%5) || !(k%3))
+                EXPECT_FALSE(res1[k]);
+            else
+                EXPECT_EQ(res1[k],state);
+        }
+    }
+}
+
+TYPED_TEST(FITSimgStatsTest, modifier)
+{
+    verbose = verboseLevel::VERBOSE_NONE;
+    using T = typename TestFixture::value_type;
+    
+    this->EnsureOutDir();
+    const size_t N = TestFixture::N();
+    FITSimg<T> img(2, {N, N});
+
+    auto data = img.template GetData<T>();
+    ASSERT_NE(data, nullptr);
+    for(size_t k = 0; k < data->size(); k++)
+        (*data)[k] = static_cast<T>(0);
+
+    std::shared_ptr<FITScube> imgptr(&img, [](FITScube*){/* no delete */});
+    EXPECT_NE(imgptr, nullptr);
+    EXPECT_EQ(imgptr->Size(1), N);
+    EXPECT_EQ(imgptr->Size(2), N);
+    EXPECT_EQ(imgptr->Nelements(), N*N);
+
+    uint8_t u8 = 25;
+    int8_t i8 = 5;
+    int16_t i16 = 10;
+    uint16_t u16 = 15;
+    int32_t i32 = 20;
+    uint32_t u32 = 25;
+    int64_t i64 = 30;
+    uint64_t u64 = 35;
+    float f = 40.5;
+    double d = 45.5;
+
+    imgptr->SetPixelValue(u8,{2,0});  EXPECT_EQ( imgptr->PixelIndex({2,0}), 2 + 0*N);
+    imgptr->SetPixelValue(i8,{3,5});  EXPECT_EQ( imgptr->PixelIndex({3,5}), 3 + 5*N);
+    imgptr->SetPixelValue(i16,{4,7}); EXPECT_EQ( imgptr->PixelIndex({4,7}), 4 + 7*N);
+    imgptr->SetPixelValue(u16,{5,9}); EXPECT_EQ( imgptr->PixelIndex({5,9}), 5 + 9*N);
+    imgptr->SetPixelValue(i32,{6,11});EXPECT_EQ( imgptr->PixelIndex({6,11}), 6 + 11*N);
+    imgptr->SetPixelValue(u32,{7,13});EXPECT_EQ( imgptr->PixelIndex({7,13}), 7 + 13*N);
+    imgptr->SetPixelValue(i64,{8,15});EXPECT_EQ( imgptr->PixelIndex({8,15}), 8 + 15*N);
+    imgptr->SetPixelValue(u64,{9,17});EXPECT_EQ( imgptr->PixelIndex({9,17}), 9 + 17*N);
+    imgptr->SetPixelValue(f,{0,19});  EXPECT_EQ( imgptr->PixelIndex({0,19}), 0 + 19*N);
+    imgptr->SetPixelValue(d,{8,10});  EXPECT_EQ( imgptr->PixelIndex({8,10}), 8 + 10*N);
+
+    EXPECT_EQ( (*data)[2 + 0*N], static_cast<T>(u8));
+    EXPECT_EQ( (*data)[3 + 5*N], static_cast<T>(i8));
+    EXPECT_EQ( (*data)[4 + 7*N], static_cast<T>(i16));
+    EXPECT_EQ( (*data)[5 + 9*N], static_cast<T>(u16));
+    EXPECT_EQ( (*data)[6 + 11*N],static_cast<T>(i32));
+    EXPECT_EQ( (*data)[7 + 13*N],static_cast<T>(u32));
+    EXPECT_EQ( (*data)[8 + 15*N],static_cast<T>(i64));
+    EXPECT_EQ( (*data)[9 + 17*N],static_cast<T>(u64));
+    
+    if constexpr (std::is_integral_v<T>)
+    {
+        EXPECT_EQ( (*data)[0 + 19*N],static_cast<T>(f+0.5));
+        EXPECT_EQ( (*data)[8 + 10*N],static_cast<T>(d+0.5));
+    }
+    else
+    {
+        EXPECT_NEAR( (*data)[0 + 19*N],static_cast<T>(f), 1e-5);
+        EXPECT_NEAR( (*data)[8 + 10*N],static_cast<T>(d), 1e-5);
+    }
+
+    EXPECT_EQ(imgptr->UByteValueAtPixel(2+0*N), static_cast<uint8_t>(u8));
+    EXPECT_EQ(imgptr->UByteValueAtPixel({2,0}), imgptr->UByteValueAtPixel(2+0*N));
+    EXPECT_EQ(imgptr->UInt8ValueAtPixel({2,0}), imgptr->UByteValueAtPixel(2+0*N));
+
+    EXPECT_EQ(imgptr->ByteValueAtPixel(3+5*N), static_cast<int8_t>(i8));
+    EXPECT_EQ(imgptr->ByteValueAtPixel({3,5}), imgptr->ByteValueAtPixel(3+5*N));
+    EXPECT_EQ(imgptr->Int8ValueAtPixel({3,5}), imgptr->ByteValueAtPixel(3+5*N));
+
+    EXPECT_EQ(imgptr->UShortValueAtPixel(5+9*N), static_cast<uint16_t>(u16));
+    EXPECT_EQ(imgptr->UShortValueAtPixel({5,9}), imgptr->UShortValueAtPixel(5+9*N));
+    EXPECT_EQ(imgptr->UInt16ValueAtPixel({5,9}), imgptr->UShortValueAtPixel(5+9*N));
+
+    EXPECT_EQ(imgptr->ShortValueAtPixel(4+7*N), static_cast<int16_t>(i16));
+    EXPECT_EQ(imgptr->ShortValueAtPixel({4,7}), imgptr->ShortValueAtPixel(4+7*N));
+    EXPECT_EQ(imgptr->Int16ValueAtPixel({4,7}), imgptr->ShortValueAtPixel(4+7*N));
+
+    EXPECT_EQ(imgptr->ULongValueAtPixel(7+13*N), static_cast<uint32_t>(u32));
+    EXPECT_EQ(imgptr->ULongValueAtPixel({7,13}), imgptr->ULongValueAtPixel(7+13*N));
+    EXPECT_EQ(imgptr->UInt32ValueAtPixel({7,13}), imgptr->ULongValueAtPixel(7+13*N));
+
+    EXPECT_EQ(imgptr->LongValueAtPixel(6+11*N), static_cast<int32_t>(i32));
+    EXPECT_EQ(imgptr->LongValueAtPixel({6,11}), imgptr->LongValueAtPixel(6+11*N));
+    EXPECT_EQ(imgptr->Int32ValueAtPixel({6,11}), imgptr->LongValueAtPixel(6+11*N));
+
+    EXPECT_EQ(imgptr->ULongLongValueAtPixel(9+17*N), static_cast<uint64_t>(u64));
+    EXPECT_EQ(imgptr->ULongLongValueAtPixel({9,17}), imgptr->ULongLongValueAtPixel(9+17*N));
+    EXPECT_EQ(imgptr->UInt64ValueAtPixel({9,17}), imgptr->ULongLongValueAtPixel(9+17*N));
+
+    EXPECT_EQ(imgptr->LongLongValueAtPixel(8+15*N), static_cast<int64_t>(i64));
+    EXPECT_EQ(imgptr->LongLongValueAtPixel({8,15}), imgptr->LongLongValueAtPixel(8+15*N));
+    EXPECT_EQ(imgptr->Int64ValueAtPixel({8,15}), imgptr->LongLongValueAtPixel(8+15*N));
+
+    if constexpr (std::is_integral_v<T>)
+    {
+        EXPECT_EQ(imgptr->FloatValueAtPixel(0+19*N), static_cast<float>(static_cast<int>(f+0.5)));
+        EXPECT_EQ(imgptr->FloatValueAtPixel({0,19}), imgptr->FloatValueAtPixel(0+19*N));
+
+        EXPECT_EQ(imgptr->DoubleValueAtPixel(8+10*N), static_cast<double>(static_cast<int>(d+0.5)));
+        EXPECT_EQ(imgptr->DoubleValueAtPixel({8,10}), imgptr->DoubleValueAtPixel(8+10*N));
+    }
+    else
+    {
+        EXPECT_NEAR(imgptr->FloatValueAtPixel(0+19*N), f, 1e-5);
+        EXPECT_NEAR(imgptr->FloatValueAtPixel({0,19}), f, 1e-5);
+
+        EXPECT_NEAR(imgptr->DoubleValueAtPixel(8+10*N), d, 1e-5);
+        EXPECT_NEAR(imgptr->DoubleValueAtPixel({8,10}), d, 1e-5);
+    }
+
+
+
+
 }

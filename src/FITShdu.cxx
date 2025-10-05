@@ -250,7 +250,7 @@ namespace DSL
             else if(num <= UINT32_MAX)
                 ftype = fULong;
             else if(num <= UINT64_MAX)
-                ftype = fULong;
+                ftype = fULongLong;
             else
                 throw FITSexception(BAD_KEYCHAR,"FITSkeyword","Process","numerical value out of range "+val+" ["+std::to_string(__LINE__)+"]");
         }
@@ -388,7 +388,7 @@ namespace DSL
 
                 case fULongLong: // larger unsigned
                 {
-                    uint64_t num = std::stoll(value);
+                    uint64_t num = std::stoull(value);
                     if(num > UINT64_MAX)
                         throw FITSexception(0, "FITSkeyword", "setValue", "Value out of range for fUInt: "+value);
                     fvalue.clear();
@@ -1053,14 +1053,14 @@ namespace DSL
         if( ibz != hdu.end() )
         {
             bzero = GetDoubleValueForKey("BZERO");
-            has_bzero = (std::abs(bzero) > std::numeric_limits<double>::epsilon());
+            has_bzero = true;// (std::abs(bzero) > std::numeric_limits<double>::epsilon());
         }
 
         FITSDictionary::const_iterator ibs = hdu.find("BSCALE");
         if( ibs != hdu.end() )
         {
             bscale = GetDoubleValueForKey("BSCALE");
-            has_bscale = (std::abs(bscale-1.0) > std::numeric_limits<double>::epsilon());
+            has_bscale = true; //(std::abs(bscale) > std::numeric_limits<double>::epsilon());
         }
 
         FITSDictionary::const_iterator ibb = hdu.find("BITPIX");
@@ -1494,7 +1494,7 @@ namespace DSL
                 if((verbose & DSL::verboseLevel::VERBOSE_DETAIL)==DSL::verboseLevel::VERBOSE_DETAIL)
                     std::cerr<<e.what()<<std::endl;
             }
-            
+
             it->second.setValue(value);
             return;
         }
@@ -1537,7 +1537,7 @@ namespace DSL
      */
     void FITShdu::ValueForKey(const key_code& keyword, const int8_t& value, const std::string& cmt)
     {
-        ValueForKey(keyword, std::to_string(value), fShort,cmt);
+        ValueForKey(keyword, std::to_string(value), fInt,cmt);
     }
     
     void FITShdu::ValueForKey(const key_code& keyword, const int8_t& value)

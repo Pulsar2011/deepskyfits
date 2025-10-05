@@ -17,6 +17,7 @@
 #include <fitsio.h>
 #include <limits>
 #include <iostream> // Add this for std::ostream
+#include <shared_mutex> // added to support thread-safe access to fptr
 
 #include "FITShdu.h"
 #include "FITSimg.h"
@@ -35,16 +36,9 @@ namespace DSL
 #pragma region - FITSmanager class definition
     class FITSmanager
     {
-        /**
-         * @class DSL::FITSmanager FITSmanager.h "fitsExtractor/FITSmanager.h"
-         * @author GILLARD William
-         * @version 1.0
-         * @date 31/03/2015
-         * @brief FITS file manager
-         * @details FITSmanager manage FITS file and access to the different HDU stored into the FITS file.
-         */
     private:
         std::shared_ptr<fitsfile> fptr;
+        mutable std::shared_mutex fptr_mtx;                //!< mutex to protect fptr for thread-safety
         static void CloseFile(fitsfile*);
         
         int num_hdu;                                        //!< Number of hdu in the fitsfile
@@ -54,18 +48,25 @@ namespace DSL
         void explore();                                     //<! Explore fits pointer and retrive basic information on its content
         
     public:
-        
-#pragma endregion
-#pragma region • ctor/dtor
         FITSmanager();                                                  //!< Default constructor
         FITSmanager(const std::string&);                                //!< Construct with FITS file name
         FITSmanager(const std::string&, const bool& readOnly);          //!< Construct with FITS file name
         FITSmanager(fitsfile&);                                         //!< Construct from an existing FITS file
         FITSmanager(const std::shared_ptr<fitsfile>&);                  //!< Construct from an existing FITS file
         FITSmanager(const FITSmanager&);                                //!< Copy constructor
-    
+
+        // Add assignment operators to allow `fm = FITSmanager::Create(...)`
+        FITSmanager& operator=(const FITSmanager& other);               //!< Copy assignment
+        FITSmanager& operator=(FITSmanager&& other) noexcept;           //!< Move assignment
+
         virtual ~FITSmanager();                                         //!< Destructor
 
+        // Query lock state (best-effort, non-blocking)
+        // Returns true if an exclusive lock appears to be held by someone (try_lock failed)
+        bool IsExclusivelyLocked() const;
+        // Returns true if a shared lock can be acquired (no exclusive owner at the moment)
+        bool CanAcquireSharedLock() const;
+        
 #pragma endregion
 #pragma region • Diagnoze
         inline const int Status() const {return fits_status;}
@@ -87,7 +88,7 @@ namespace DSL
 #pragma region • Writing FITS file to disk
         void Write();
         
-        inline bool isOpen(){return (fptr.use_count()>0);}
+        inline bool isOpen(){ std::shared_lock<std::shared_mutex> lk(fptr_mtx); return (fptr && fptr.use_count()>0); }
         
 #pragma endregion
 #pragma region • Accessing FITS HDU
@@ -133,3 +134,4 @@ namespace DSL
 }
 
 #endif /* defined(__DeepSkyLib__FITSmanager__) */
+
