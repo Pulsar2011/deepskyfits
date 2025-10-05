@@ -1053,7 +1053,7 @@ namespace DSL
         if( ibz != hdu.end() )
         {
             bzero = GetDoubleValueForKey("BZERO");
-            has_bzero = (std::abs(bzero) > std::numeric_limits<double>::epsilon());
+            has_bzero = true;// (std::abs(bzero) > std::numeric_limits<double>::epsilon());
         }
 
         FITSDictionary::const_iterator ibs = hdu.find("BSCALE");
