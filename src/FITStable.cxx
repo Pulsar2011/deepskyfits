@@ -14,6 +14,7 @@
 #include <iostream>     // std::cout
 #include <sstream>      // std::stringstrea
 #include <iomanip>      // std::setw
+#include <stdexcept>
 
 
 #include <limits>
@@ -28,7 +29,7 @@ namespace DSL
 {
     
 #pragma mark - cdescriptor class definition
-#pragma mark • ctor/dtor
+#pragma mark * ctor/dtor
     
     FITSform::FITSform(const size_t p,const std::string name, const dtype t, const std::string unit):fname(name),ftype(t),funit(unit),fscale(1),fzero(0),frepeat(1),fwidth(1),fpos(p)
     {};
@@ -46,7 +47,7 @@ namespace DSL
     FITSform::FITSform(const FITSform& col):fname(col.fname),ftype(col.ftype),funit(col.funit),fscale(col.fscale),fzero(col.fzero),frepeat(col.frepeat),fwidth(col.fwidth),fpos(col.fpos)
     {};
     
-#pragma mark • static member function
+#pragma mark * static member function
     const std::string FITSform::getDataType(const dtype & tt)
     {
         std::string ss = std::string();
@@ -275,7 +276,7 @@ namespace DSL
     }
  
     
-#pragma mark • modifier
+#pragma mark * modifier
     void FITSform::Dump( std::ostream& out) const
     {
         out<<"\033[31m- COL #\033[0m"<<fpos<<std::endl
@@ -297,7 +298,7 @@ namespace DSL
     
 #pragma mark - FITScolumn template specialization
     
-#pragma mark • initialization
+#pragma mark * initialization
     
     template class FITScolumn< FITSform::complex>;
     template class FITScolumn< FITSform::dblcomplex>;
@@ -306,7 +307,7 @@ namespace DSL
 
     
 #pragma mark - FITStable class implementation
-#pragma mark • template specialization
+#pragma mark * template specialization
     
     template< >
     FITScolumn<FITSform::complex>* FITStable::read(const FITSform& tform, const int64_t& row)
@@ -551,7 +552,7 @@ namespace DSL
         char   **array = new char* [1];
         array [0]      = new char [nelem];
         
-        int64_t n = 0;
+        size_t n = 0;
         for(typename FITScolumn<std::string>::const_iterator it = data->cbegin(); it != data->cend() && n < data->size(); it++)
         {
            
@@ -587,7 +588,7 @@ namespace DSL
         // FIX: Use dynamic allocation instead of VLA
         float* array = new float[nelem*2];
 
-        int64_t n = 0;
+        size_t n = 0;
         for(typename FITScolumn< std::vector<FITSform::complex> >::const_iterator it = data->cbegin(); it != data->cend(); it++)
         {
             if( n < static_cast<size_t>(first_row-1))
@@ -638,7 +639,7 @@ namespace DSL
         // FIX: Use dynamic allocation instead of VLA
         double* array = new double[nelem*2];
 
-        int64_t n = 0;
+        size_t n = 0;
         for(typename FITScolumn< std::vector<FITSform::dblcomplex> >::const_iterator it = data->cbegin(); it != data->cend(); it++)
         {
             if( n < static_cast<size_t>(first_row-1))
@@ -689,7 +690,7 @@ namespace DSL
         char   **array = new char* [1];
         array[0] = new char [nelem];
         
-        int64_t n = 0;
+        size_t n = 0;
         for(typename FITScolumn<std::vector<std::string> >::const_iterator it = data->cbegin(); it != data->cend() && n < data->size(); it++)
         {
             if(n < static_cast<size_t>(first_row-1))
@@ -749,7 +750,7 @@ namespace DSL
         return;
     }
     
-#pragma mark • private member function
+#pragma mark * private member function
  
 #if __cplusplus >= 201103L
     
@@ -1092,7 +1093,7 @@ namespace DSL
     
     
     
-#pragma mark • ctor/dtor
+#pragma mark * ctor/dtor
     
     /**
      @brief Constructor
@@ -1244,7 +1245,7 @@ namespace DSL
     }
     
     
-#pragma mark • Properties
+#pragma mark * Properties
     
     /**
      @brief Get the number of rows.
@@ -1466,7 +1467,7 @@ namespace DSL
         return tform;
     }
     
-#pragma mark • Accessing coulumn data
+#pragma mark * Accessing coulumn data
     /**
      @brief Get FITS column
      @details Search FITStable header block for a specific column and retrive the entire column
@@ -1523,7 +1524,7 @@ namespace DSL
         return readArray(form, start);
     }
     
-#pragma mark • Inserting/Updating data to column
+#pragma mark * Inserting/Updating data to column
 #pragma mark 1- Inseting new column
     
     
@@ -1768,7 +1769,7 @@ namespace DSL
 #pragma mark 3- Updating value from an existing column
     
     
-#pragma mark • Diagnoze
+#pragma mark * Diagnoze
     
     /**
      @brief Dumping this FITStable instance.

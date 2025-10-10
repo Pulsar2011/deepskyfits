@@ -50,7 +50,7 @@ namespace DSL
          **/
         
     private:
-#pragma mark • private member
+#pragma mark * private member
         const std::string fname;
         const dtype ftype;
         std::string funit;
@@ -64,24 +64,24 @@ namespace DSL
         size_t fpos;
 
     protected:
-#pragma mark • protected member function
+#pragma mark * protected member function
         inline FITSform():fname(),ftype(dtype::tnone),funit(),fscale(1),fzero(0),frepeat(1),fwidth(0),fpos(0) {};
         
         inline void setNelem(const int64_t& n) {frepeat = n;}
         inline void setWidth(const int64_t& w) {fwidth  = w;}
         
     public:
-#pragma mark • definition
+#pragma mark * definition
         typedef std::pair<float,float>   complex;
         typedef std::pair<double,double> dblcomplex;
         
-#pragma mark • static member function
+#pragma mark * static member function
         static const std::string getDataType(const dtype &);
         static const dtype getDataTypeID(const std::string &);
         
         const std::string getTTYPE() const;
         
-#pragma mark • ctor/dtor
+#pragma mark * ctor/dtor
         FITSform(const size_t, const std::string, const dtype, const std::string unit="");
         FITSform(const size_t, const std::string, const dtype, const double, const double, const std::string unit="");
         
@@ -92,7 +92,7 @@ namespace DSL
         
         virtual ~FITSform(){};
         
-#pragma mark • acessor
+#pragma mark * acessor
         inline const std::string& getName() const {return fname;}
         inline const dtype&       getType() const {return ftype;}
         inline const std::string& getUnit() const {return funit;}
@@ -103,11 +103,11 @@ namespace DSL
         inline const int64_t&    getNelem()  const {return frepeat;}
         inline const int64_t&    getWidth()  const {return fwidth;}
 
-#pragma mark • modifier
+#pragma mark * modifier
         inline void setUnit    (const std::string& s){funit.clear(); funit+=s;}
         inline void setPosition(const size_t& p){fpos = p;}
         
-#pragma mark • modifier
+#pragma mark * modifier
         virtual void Dump( std::ostream& ) const;
     };
 
@@ -126,7 +126,7 @@ namespace DSL
          **/
         
     private:
-#pragma mark • private member function
+#pragma mark * private member function
         FITScolumn();
         
         void Update(const std::string&);
@@ -158,7 +158,7 @@ namespace DSL
         
     public:
         
-#pragma mark • definition
+#pragma mark * definition
         typedef typename std::vector<T>  vec_data;
         typedef typename std::map<size_t,T>  col_map;
         typedef typename std::pair<size_t,T> col_data;
@@ -167,7 +167,7 @@ namespace DSL
         
         std::pair< typename FITScolumn<T>::iterator, bool > insert(const typename FITScolumn<T>::col_data&);
         
-#pragma mark • ctor/dtor
+#pragma mark * ctor/dtor
         FITScolumn(const std::string&, const dtype&, const std::string unit="", const size_t pos=0);
         FITScolumn(const std::string&, const dtype&, const double&, const double&, const std::string unit="", const size_t pos=0);
         FITScolumn(const FITScolumn&);
@@ -176,10 +176,10 @@ namespace DSL
         
         virtual ~FITScolumn();
         
-#pragma mark • accessor
+#pragma mark * accessor
 
         
-#pragma mark • diagnoze
+#pragma mark * diagnoze
         virtual void Dump( std::ostream& ) const;
         
     };
@@ -196,7 +196,7 @@ namespace DSL
          * @details This class provide foreground method to read and write FITS ASCII and BINARY tables. The FITStable class point toward the HDU block containing the requested tables and it is the reponsibility of the User to deleted and close the fits file that contains the ASCII and/or BINARY table.
          **/
     private:
-#pragma mark • private member
+#pragma mark * private member
         int tbl_status;
         const volatile ttype ftbl_type;
         const volatile std::string fextname;
@@ -209,7 +209,7 @@ namespace DSL
         void CloseFile(fitsfile* in);
 #endif
 
-#pragma mark • private member function
+#pragma mark * private member function
         void rload();
         const std::string getFileName(fitsfile *fptr) const;
         const std::string getExtName() const;
@@ -236,7 +236,7 @@ namespace DSL
         
     public:
 
-#pragma mark • ctor/dtor
+#pragma mark * ctor/dtor
         
 #if __cplusplus < 201103L
         FITStable(fitsfile *, const int&);
@@ -250,7 +250,7 @@ namespace DSL
         
         ~FITStable();
         
-#pragma mark • Properties
+#pragma mark * Properties
         size_t getNrows();
         size_t getNcols();
         
@@ -258,14 +258,14 @@ namespace DSL
         const FITSform columnProperties(const std::string&);
         const FITSform columnProperties(const size_t&);
         
-#pragma mark • Accessing coulumn data
+#pragma mark * Accessing coulumn data
         FITSform* readColumn(const std::string&);
         FITSform* readColumn(const size_t&);
         
         FITSform* readColumn(const std::string&, const size_t&);
         FITSform* readColumn(const size_t&, const size_t&);
         
-#pragma mark • Inserting/Updating data to column
+#pragma mark * Inserting/Updating data to column
 #pragma mark 1- Inseting new column
         
         void InsertColumn(const std::string&, const std::string&, const std::string& tunit=std::string(), int* colnum = NULL);
@@ -275,7 +275,7 @@ namespace DSL
         
 #pragma mark 3- Updating value from an existing column
         
-#pragma mark • Diagnoze
+#pragma mark * Diagnoze
         inline const int Status() const {return tbl_status;}
         void Dump( std::ostream& );
 
@@ -629,7 +629,7 @@ namespace DSL
     }
     
     
-#pragma mark • diagnose
+#pragma mark * diagnose
     template< typename T >
     void FITScolumn<T>::Dump( std::ostream& fout) const
     {

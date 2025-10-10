@@ -98,7 +98,7 @@ namespace DSL
         }
     }
     
-#pragma mark • ctor/dtor
+#pragma mark * ctor/dtor
     /**
      *  @details Construct KEYWORD container from value and comment.
      *  @param val KEYWORD physical value as string
@@ -178,7 +178,7 @@ namespace DSL
         ftype = fUndef;
     }
     
-#pragma mark • Processing
+#pragma mark * Processing
     /**
      *  @details Fill KEYWORD container.
      *  @param val KEYWORD physical value as string
@@ -270,7 +270,7 @@ namespace DSL
         }
     }
     
-#pragma mark • Modifier
+#pragma mark * Modifier
     /**
      *  Modify the value associated to the keyword.
      *  @param value The value to associate to the keyword.
@@ -435,7 +435,7 @@ namespace DSL
         }
     }
     
-#pragma mark • Dump
+#pragma mark * Dump
     /**
      *  @details Print out the KEYWORD physical value and its descritpion.
      *  @param out the output stream where value and descritpion are printed out.
@@ -465,7 +465,7 @@ namespace DSL
     }
     
 #pragma mark - FITShdu class implementation
-#pragma mark • ctor/dtor
+#pragma mark * ctor/dtor
     
     /**
      *  @details Allocate memory to an empty header data block
@@ -520,7 +520,7 @@ namespace DSL
         hdu.swap(other.hdu);
     }
 
-#pragma mark • Processing
+#pragma mark * Processing
     /**
      *  @details Read FITS header and extract value for each KEYWORD.
      *  @param h : Input header
@@ -613,7 +613,7 @@ namespace DSL
         }
     }
     
-#pragma mark • Dump
+#pragma mark * Dump
     /**
      *  @details Print out FITS HDU content.
      *  @param out the output stream where value and descritpion are printed out.
@@ -634,7 +634,7 @@ namespace DSL
         }
     }
 
-#pragma mark • Accessor
+#pragma mark * Accessor
     
     /**
      *  @details Retrive physical value for a specific KEYWORD.
@@ -941,7 +941,7 @@ namespace DSL
         
     }
     
-#pragma mark • I/O
+#pragma mark * I/O
     
     /**
      *  @details Write FITS header to the current HDU
@@ -1053,14 +1053,14 @@ namespace DSL
         if( ibz != hdu.end() )
         {
             bzero = GetDoubleValueForKey("BZERO");
-            has_bzero = true;// (std::abs(bzero) > std::numeric_limits<double>::epsilon());
+            has_bzero = (std::abs(bzero) > std::numeric_limits<double>::epsilon());
         }
 
         FITSDictionary::const_iterator ibs = hdu.find("BSCALE");
         if( ibs != hdu.end() )
         {
             bscale = GetDoubleValueForKey("BSCALE");
-            has_bscale = (std::abs(bscale) > std::numeric_limits<double>::epsilon());
+            has_bscale = (std::abs(bscale-1) > std::numeric_limits<double>::epsilon());
         }
 
         FITSDictionary::const_iterator ibb = hdu.find("BITPIX");
@@ -1445,7 +1445,7 @@ namespace DSL
         return;
     }
     
-#pragma mark • Modifier
+#pragma mark * Modifier
 
     /**
      *  Modify the value associated to a FITS keyword. If the keyword doesn't exists, a new filed is added to the disctionary with the given KEYWORD and its associated value.
@@ -1600,6 +1600,7 @@ namespace DSL
         ValueForKey(keyword, value, std::string());
     }
     
+#ifdef Darwinx86_64
     /**
      *  Modify the value associated to a FITS keyword. If the keyword doesn't exists, a new filed is added to the disctionary with the given KEYWORD and its associated value.
      *
@@ -1617,6 +1618,7 @@ namespace DSL
     {
         ValueForKey(keyword, value, std::string());
     }
+#endif
     
     /**
      *  Modify the value associated to a FITS keyword. If the keyword doesn't exists, a new filed is added to the disctionary with the given KEYWORD and its associated value.

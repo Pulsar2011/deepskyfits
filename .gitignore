@@ -29,6 +29,7 @@ DST_version.cxx
 gdb
 googletest
 CMakeDoxyfile.in
+.gitlab-ci-local
 
 *.html
 *.tex

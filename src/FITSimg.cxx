@@ -30,7 +30,7 @@ class FITSmanager;
     
     bool FITScube::debug = false;
 
-#pragma region • protected member function
+#pragma region * protected member function
     
     /**
      *  @brief construct NAXIS size std::vector for n dimension
@@ -62,7 +62,7 @@ class FITSmanager;
     }
 
 #pragma endregion
-#pragma region • Initialization
+#pragma region * Initialization
 
     void FITScube::init()
     {
@@ -79,7 +79,7 @@ class FITSmanager;
     }
     
 #pragma endregion
-#pragma region • ctor/dtor
+#pragma region * ctor/dtor
     /**
      *  @details Create a new empty FITS cube
      */
@@ -119,7 +119,7 @@ class FITSmanager;
         hdu.swap(tmp);
         
         //- GET BASIC INFORMATION RELATED TO THE IMAGE
-        //  • GET NUMBER OF AXIS
+        //  * GET NUMBER OF AXIS
         uint64_t number_axis = hdu.GetUInt64ValueForKey("NAXIS");
         
         if( number_axis < 1 )
@@ -128,7 +128,7 @@ class FITSmanager;
             throw FITSexception(img_status,"FITScube","ctor","Current HDU doesn't contain data");
         }
         
-        //  • GET AXIS DIMENSSION
+        //  * GET AXIS DIMENSSION
         for(long long unsigned int iAxe = 1; iAxe <= number_axis; iAxe++)
             Naxis.push_back(static_cast<size_t>( hdu.GetUInt64ValueForKey("NAXIS"+std::to_string(iAxe))));
         
@@ -138,7 +138,7 @@ class FITSmanager;
             throw FITSexception(img_status,"FITScube","ctor","PROBLEM READING AXIS.");
         }
         
-        //  • GET DATA TYPE
+        //  * GET DATA TYPE
         if( fits_get_img_type(fptr.get(), &BITPIX, &img_status) )
         {
             throw FITSexception(img_status,"FITScube","ctor");
@@ -162,7 +162,7 @@ class FITSmanager;
                 eqBITPIX = 80;
         }
         
-        //  • GET EXTENSION NAME
+        //  * GET EXTENSION NAME
         name.clear();
         
         if(hdu.Exists("EXTNAME"))
@@ -358,7 +358,7 @@ class FITSmanager;
     }
     
 #pragma endregion
-#pragma region • accessor        
+#pragma region * accessor        
     /**
      *  Obtain the number of pixel along one of the dimension of the FITS datacube
      *  @param i: the dimension one are interested in, starting from 1 for the NAXIS1 of the FITS datacube
@@ -523,7 +523,7 @@ class FITSmanager;
     }
     
 #pragma endregion
-#pragma region • I/O
+#pragma region * I/O
     
     /**
      *  @details Write DataCube to the current HDU of a fits file
@@ -601,7 +601,7 @@ class FITSmanager;
   
     
 #pragma endregion
-#pragma region • Modifier
+#pragma region * Modifier
     
     /**
      *  Modify the pixel length of an axis of a FITS datacube. To be used with care and only when images are croped.
@@ -752,7 +752,7 @@ class FITSmanager;
 
 #pragma endregion
 
-#pragma region • Data operation
+#pragma region * Data operation
 
 
 #pragma endregion
@@ -767,7 +767,9 @@ template class FITSimg<int32_t>;
 template class FITSimg<uint32_t>;
 template class FITSimg<int64_t>;
 template class FITSimg<uint64_t>;
+#ifdef Darwinx86_64
 template class FITSimg<size_t>;
+#endif
 template class FITSimg<float>;
 template class FITSimg<double>;
 #pragma endregion

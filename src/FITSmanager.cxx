@@ -68,7 +68,7 @@ namespace DSL
         return os;
     }
 
-#pragma region • Initialization
+#pragma region * Initialization
 
     /**
      * @details Explore the content of a FITS file to retrive basic informations.
@@ -94,13 +94,13 @@ namespace DSL
         }
         
         if((verbose & verboseLevel::VERBOSE_BASIC)== verboseLevel::VERBOSE_BASIC)
-            // avoid calling GetFileName() here (would try to lock same mutex) — use raw overload
+            // avoid calling GetFileName() here (would try to lock same mutex) -- use raw overload
             std::cout<<std::endl<<"\033[32mOPEN\033[0m file \033[33m"<<GetFileName(fptr.get())<<"\033[0m"<<std::endl
                 <<" \033[31m`--\033[0m Number of HDU in Fits file : \033[32m"<<num_hdu<<"\033[0m"<<std::endl;
     }
     
 #pragma endregion
-#pragma region • ctor/dtor
+#pragma region * ctor/dtor
     /**
      *  @details Construct FITSmanager object and initialyse value to
      */
@@ -222,7 +222,7 @@ namespace DSL
     }
 
 #pragma endregion
-#pragma region • Diagnoze
+#pragma region * Diagnoze
     
     const std::string FITSmanager::GetFileName() const
     {
@@ -281,7 +281,7 @@ namespace DSL
     }
     
 #pragma endregion
-#pragma region • Accessing FITS file
+#pragma region * Accessing FITS file
     /**
      *  @details Create a new empty FITS file.
      *  @param fileName Name of the file to be created
@@ -451,7 +451,7 @@ namespace DSL
     }
     
 #pragma endregion
-#pragma region • Writing FITS file to disk
+#pragma region * Writing FITS file to disk
     void FITSmanager::Write()
     {
         // flush is an operation on the file -> take exclusive lock to avoid concurrent modifications
@@ -470,7 +470,7 @@ namespace DSL
 
     
 #pragma endregion
-#pragma region • Accessing FITS HDU
+#pragma region * Accessing FITS HDU
     /**
      *  @details Retrive primary header of the FITS file
      *  @return Pointer to the primary header
@@ -505,7 +505,7 @@ namespace DSL
     }
     
 #pragma endregion
-#pragma region • Accessing FITS image
+#pragma region * Accessing FITS image
     const std::shared_ptr<FITScube> FITSmanager::GetPrimary()
     {
         return GetImageAtIndex(1);
@@ -616,7 +616,7 @@ namespace DSL
     }
     
 #pragma endregion
-#pragma region • Accessing FITS table
+#pragma region * Accessing FITS table
     
     /**
      @brief Access FITS table from HDU index
@@ -672,7 +672,7 @@ namespace DSL
     }
     
 #pragma endregion
-#pragma region • Accessing File block
+#pragma region * Accessing File block
     int FITSmanager::MoveToPrimary()
     {
         return MoveToHDU(1);
@@ -718,7 +718,7 @@ namespace DSL
     }
     
 #pragma endregion
-#pragma region • Modifying File
+#pragma region * Modifying File
     /**
      *  @details Append image extention to the end of the fits file.
      *  @param img Image data cube to be added to the fits file.
@@ -800,7 +800,7 @@ namespace DSL
     }
     
 #pragma endregion
-#pragma region • Modifying specific header keyword   
+#pragma region * Modifying specific header keyword   
     
     void FITSmanager::AppendKeyToPrimary(std::string key, const FITSkeyword &val)
     {

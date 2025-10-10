@@ -5,6 +5,7 @@
 #include <string>
 #include <limits>
 #include <fstream>
+#include <filesystem>
 
 using namespace DSL;
 
@@ -72,11 +73,20 @@ TEST(FITSmanager, default_ctor)
 
 TEST(FITSmanager, ctor_file)
 {
+#ifdef Darwinx86_64
     FITSmanager fm("build/testdata/rosat_pspc_rdf2_3_bk1.fits");
+#else
+    FITSmanager fm("testdata/rosat_pspc_rdf2_3_bk1.fits");
+#endif
     ASSERT_TRUE(fm.isOpen());
     ASSERT_EQ(fm.NumberOfHeader(), 1);
     ASSERT_EQ(fm.Status(), 0);
+
+#ifdef Darwinx86_64
     ASSERT_EQ(fm.GetFileName(), "build/testdata/rosat_pspc_rdf2_3_bk1.fits");
+#else
+    ASSERT_EQ(fm.GetFileName(), "testdata/rosat_pspc_rdf2_3_bk1.fits");
+#endif
     const std::shared_ptr<fitsfile>& hdu_ref = fm.CurrentHDU();
     
     fm.Close();
@@ -85,22 +95,38 @@ TEST(FITSmanager, ctor_file)
     ASSERT_EQ(hdu_ref.get(), nullptr);
     ASSERT_EQ(hdu_ref.use_count(), 0);
 
+#ifdef Darwinx86_64
     ASSERT_ANY_THROW(FITSmanager("build/testdata/rosat_pspc_rdf2_3_bk1"));
+#else
+    ASSERT_ANY_THROW(FITSmanager("testdata/rosat_pspc_rdf2_3_bk1"));
+#endif
 }
 
 TEST(FITSmanager, ctor_cpy)
 {
+#ifdef Darwinx86_64
     FITSmanager fm("build/testdata/rosat_pspc_rdf2_3_bk1.fits");
+#else
+    FITSmanager fm("testdata/rosat_pspc_rdf2_3_bk1.fits");
+#endif
     ASSERT_TRUE(fm.isOpen());
     ASSERT_EQ(fm.NumberOfHeader(), 1);
     ASSERT_EQ(fm.Status(), 0);
+#ifdef Darwinx86_64
     ASSERT_EQ(fm.GetFileName(), "build/testdata/rosat_pspc_rdf2_3_bk1.fits");
+#else
+    ASSERT_EQ(fm.GetFileName(), "testdata/rosat_pspc_rdf2_3_bk1.fits");
+#endif
 
     FITSmanager fm_cpy(fm);
     ASSERT_TRUE(fm_cpy.isOpen());
     ASSERT_EQ(fm_cpy.NumberOfHeader(), 1);
     ASSERT_EQ(fm_cpy.Status(), 0);
+#ifdef Darwinx86_64
     ASSERT_EQ(fm_cpy.GetFileName(), "build/testdata/rosat_pspc_rdf2_3_bk1.fits");
+#else
+    ASSERT_EQ(fm_cpy.GetFileName(), "testdata/rosat_pspc_rdf2_3_bk1.fits");
+#endif
     
     const std::shared_ptr<fitsfile>& hdu_ref = fm.CurrentHDU();
     const std::shared_ptr<fitsfile>& hdu_cpy = fm_cpy.CurrentHDU();
@@ -127,18 +153,31 @@ TEST(FITSmanager, ctor_cpy)
 
 TEST(FITSmanager, ctor_fits)
 {
+#ifdef Darwinx86_64
     FITSmanager fm("build/testdata/rosat_pspc_rdf2_3_bk1.fits");
+#else
+    FITSmanager fm("testdata/rosat_pspc_rdf2_3_bk1.fits");
+#endif
     ASSERT_TRUE(fm.isOpen());
     ASSERT_EQ(fm.NumberOfHeader(), 1);
     ASSERT_EQ(fm.Status(), 0);
+#ifdef Darwinx86_64
     ASSERT_EQ(fm.GetFileName(), "build/testdata/rosat_pspc_rdf2_3_bk1.fits");
+#else
+    ASSERT_EQ(fm.GetFileName(), "testdata/rosat_pspc_rdf2_3_bk1.fits");
+#endif
 
     const std::shared_ptr<fitsfile>& hdu_ref = fm.CurrentHDU();
     FITSmanager fm_cpy(hdu_ref);
     ASSERT_TRUE(fm_cpy.isOpen());
     ASSERT_EQ(fm_cpy.NumberOfHeader(), 1);
     ASSERT_EQ(fm_cpy.Status(), 0);
+
+#ifdef Darwinx86_64
     ASSERT_EQ(fm_cpy.GetFileName(), "build/testdata/rosat_pspc_rdf2_3_bk1.fits");
+#else
+    ASSERT_EQ(fm_cpy.GetFileName(), "testdata/rosat_pspc_rdf2_3_bk1.fits");
+#endif
     
     const std::shared_ptr<fitsfile>& hdu_cpy = fm_cpy.CurrentHDU();
     ASSERT_EQ(hdu_ref.use_count(), 2); 
@@ -166,7 +205,11 @@ TEST(FITSmanager, ctor_cfitsio)
 {
     fitsfile * fits = NULL;
     int fits_status = 0;
+#ifdef Darwinx86_64
     EXPECT_EQ(fits_open_file(&fits, "build/testdata/rosat_pspc_rdf2_3_bk1.fits", true, &fits_status),0);
+#else
+    EXPECT_EQ(fits_open_file(&fits, "testdata/rosat_pspc_rdf2_3_bk1.fits", true, &fits_status),0);
+#endif
     EXPECT_EQ(fits_status, 0);
 
     FITSmanager fm(*fits);
@@ -176,10 +219,16 @@ TEST(FITSmanager, ctor_cfitsio)
     ASSERT_EQ(fm.NumberOfHeader(), 1);
     ASSERT_EQ(fm.Status(), 0);
     
+#ifdef Darwinx86_64
     ASSERT_EQ(fm.GetFileName(), "build/testdata/rosat_pspc_rdf2_3_bk1.fits");
     ASSERT_EQ(fm.GetFileName(fits), "build/testdata/rosat_pspc_rdf2_3_bk1.fits");
     ASSERT_EQ(fm.GetFileName(hdu_ref), "build/testdata/rosat_pspc_rdf2_3_bk1.fits");
-
+#else
+    ASSERT_EQ(fm.GetFileName(), "testdata/rosat_pspc_rdf2_3_bk1.fits");
+    ASSERT_EQ(fm.GetFileName(fits), "testdata/rosat_pspc_rdf2_3_bk1.fits");
+    ASSERT_EQ(fm.GetFileName(hdu_ref), "testdata/rosat_pspc_rdf2_3_bk1.fits");
+#endif
+    ASSERT_NE(hdu_ref.get(), nullptr);
     ASSERT_EQ(hdu_ref.use_count(), 1);
 
     fm.Close();
@@ -199,11 +248,19 @@ TEST(FITSmanager, open_close)
     ASSERT_EQ(fm.Status(), 0);
     ASSERT_EQ(fm.GetFileName().size(), 0);
 
+#ifdef Darwinx86_64
     fm.OpenFile("build/testdata/rosat_pspc_rdf2_3_bk1.fits");
+#else
+    fm.OpenFile("testdata/rosat_pspc_rdf2_3_bk1.fits");
+#endif  
     ASSERT_TRUE(fm.isOpen());
     ASSERT_EQ(fm.NumberOfHeader(), 1);
     ASSERT_EQ(fm.Status(), 0);
+#ifdef Darwinx86_64
     ASSERT_EQ(fm.GetFileName(), "build/testdata/rosat_pspc_rdf2_3_bk1.fits");
+#else
+    ASSERT_EQ(fm.GetFileName(), "testdata/rosat_pspc_rdf2_3_bk1.fits");
+#endif  
 
     fm.Close();
     ASSERT_FALSE(fm.isOpen());
@@ -211,11 +268,19 @@ TEST(FITSmanager, open_close)
     ASSERT_EQ(fm.Status(), 0);
     ASSERT_EQ(fm.GetFileName().size(), 0);
 
+#ifdef Darwinx86_64
     FITSmanager fm2 = fm.Open("build/testdata/rosat_pspc_rdf2_3_im2.fits");
+#else
+    FITSmanager fm2 = fm.Open("testdata/rosat_pspc_rdf2_3_im2.fits");
+#endif  
     ASSERT_TRUE(fm2.isOpen());
     ASSERT_EQ  (fm2.NumberOfHeader(), 3);
     ASSERT_EQ  (fm2.Status(), 0);
+#ifdef Darwinx86_64
     ASSERT_EQ  (fm2.GetFileName(), "build/testdata/rosat_pspc_rdf2_3_im2.fits");
+#else
+    ASSERT_EQ  (fm2.GetFileName(), "testdata/rosat_pspc_rdf2_3_im2.fits");
+#endif  
 
     fm2.Close();
     ASSERT_FALSE(fm2.isOpen());
@@ -240,7 +305,12 @@ TEST(FITSmanager, exception_manager)
     ASSERT_ANY_THROW(fm.AppendKeyToHeader(1, "KEY", TSTRING, "VAL", "CMT"));
     ASSERT_ANY_THROW(fm.AppendKey("KEY", TSTRING, "VAL", "CMT"));
 
+#ifdef Darwinx86_64
     fm.Open("build/testdata/rosat_pspc_rdf2_3_bk1.fits");
+#else
+    fm.Open("testdata/rosat_pspc_rdf2_3_bk1.fits");
+#endif
+    ASSERT_TRUE(fm.isOpen());
     ASSERT_ANY_THROW(fm.GetHeaderAtIndex(2));
     ASSERT_ANY_THROW(fm.GetImageAtIndex(2));
     ASSERT_ANY_THROW(fm.GetTableAtIndex(2));
@@ -258,11 +328,21 @@ TEST(FITSmanager, move_between_hdu)
 {
     int hdu_num=0;
     int status=0;
+
+#ifdef Darwinx86_64
     FITSmanager ffm("build/testdata/rosat_pspc_rdf2_3_im2.fits");
+#else
+    FITSmanager ffm("testdata/rosat_pspc_rdf2_3_im2.fits");
+#endif
     ASSERT_EQ(ffm.NumberOfHeader(), 3);
     
     const std::shared_ptr<fitsfile>& this_hdu = ffm.CurrentHDU();
+#ifdef Darwinx86_64
     ASSERT_EQ(ffm.GetFileName(this_hdu), "build/testdata/rosat_pspc_rdf2_3_im2.fits");
+#else
+    ASSERT_EQ(ffm.GetFileName(this_hdu), "testdata/rosat_pspc_rdf2_3_im2.fits");
+#endif
+    
 
     EXPECT_ANY_THROW(ffm.MoveToHDU(0));
 
@@ -294,7 +374,11 @@ TEST(FITSmanager, move_between_hdu)
 
 TEST(FITSmanager, create_fitsfile)
 {
+#ifdef Darwinx86_64
     const std::string testfile = "build/testdata/test_create_fitsfile.fits";
+#else
+    const std::string testfile = "testdata/test_create_fitsfile.fits";
+#endif
     std::remove(testfile.c_str());
 
     FITSmanager fm = FITSmanager::Create(testfile, false);
@@ -349,7 +433,11 @@ TEST(FITSmanager, create_fitsfile)
 
 TEST(FITSmanager, ReadingImage)
 {    
+#ifdef Darwinx86_64
     std::string src = "build/testdata/rosat_pspc_rdf2_3_bk1.fits";
+#else
+    std::string src = "testdata/rosat_pspc_rdf2_3_bk1.fits";
+#endif
 
     // Use the copied file for all operations
     FITSmanager ff(src);
@@ -376,10 +464,18 @@ class FITSimgTest : public ::testing::Test
         std::string MakeFilename() const
         {
             std::ostringstream ss;
+#ifdef Darwinx86_64
             ss << "build/testdata/test_" << typeid(T).name() << ".fits";
+#else
+            ss << "testdata/test_" << typeid(T).name() << ".fits";
+#endif
             return ss.str();
         }
+#ifdef Darwinx86_64
         void EnsureOutDir() const { std::filesystem::create_directories("build/testdata"); }
+#else
+        void EnsureOutDir() const { std::filesystem::create_directories("testdata"); }
+#endif
 };
 
 using StatTypes = ::testing::Types<uint8_t,int8_t,int16_t,uint16_t,int32_t,uint32_t,int64_t,uint64_t,float,double>;

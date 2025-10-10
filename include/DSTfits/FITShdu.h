@@ -20,9 +20,6 @@
 #include <vector>
 #include <limits>
 #include <fitsio.h>
-
-#include <DSTfits/FITSdata.h>
-
 #include <DSTfits/FITSdata.h>
 
 namespace DSL
@@ -49,7 +46,7 @@ namespace DSL
         public:
             static std::string GetDataType(const key_type&);
 
-#pragma region  • ctor/dtor
+#pragma region  * ctor/dtor
             FITSkeyword(const std::string&, const std::string&);                        //!< Constructor
             FITSkeyword(const std::string&, const std::string&, const key_type&);       //!< Constructor
             FITSkeyword(const std::string&);                                            //!< Constructor
@@ -58,7 +55,7 @@ namespace DSL
             ~FITSkeyword();                                                             //!< Destructor
         
 #pragma endregion
-#pragma region  • Accessor
+#pragma region  * Accessor
             inline std::string& value()   {return fvalue;}                 //!< Get pointer to the FITS KEYWORD value
             inline std::string& comment() {return fcomment;}               //!< Get pointer to the FITS KEYWORD description
             inline key_type&    type()    {return ftype;}                  //!< Get type of the FITS KEYWORD value
@@ -68,12 +65,12 @@ namespace DSL
             inline const key_type&    type()    const {return ftype;}      //!< Get type of the FITS KEYWORD value
         
 #pragma endregion
-#pragma region  • Modifier
+#pragma region  * Modifier
             void setValue(const std::string&);                         //!< Set value for key
             void setType(const key_type& t) { ftype = t; }             //!< Set type for key
         
 #pragma endregion
-#pragma region  • Dump
+#pragma region  * Dump
             void Dump( std::ostream& ) const;                   //!< Print out FITS KEYWORD value and descritpion
     
         private:
@@ -87,7 +84,7 @@ namespace DSL
             }
 
 #pragma endregion
-#pragma region  • Processing
+#pragma region  * Processing
             void Process(const std::string&, const std::string&);             //!< Retrive FITS KEYWORD value and description
 #pragma endregion
     };
@@ -118,11 +115,11 @@ namespace DSL
         FITSDictionary hdu;                 //!< FITS KEYWORD manager
     
     protected:
-#pragma region  • Processing
+#pragma region  * Processing
         void Process(const std::string&);          //!< Decipher FITS HEADER
         
 #pragma endregion
-#pragma region  • I/O
+#pragma region  * I/O
         void        WriteCharValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;
         void        WriteBoolValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;    //!< Write KEYWORD boolean value to the HDU
         void        WriteInt8ValueForKey(FITSDictionary::const_iterator, const std::shared_ptr<fitsfile>& fptr) const;   //!< Write KEYWORD short value to the HDU
@@ -138,7 +135,7 @@ namespace DSL
         
     public:
 #pragma endregion
-#pragma region  • ctor/dtor
+#pragma region  * ctor/dtor
         FITShdu();                                              //!< Default constructor
         FITShdu(const std::shared_ptr<fitsfile>& fptr);         //!< Construct from fitsfile
         FITShdu(const FITShdu &);                               //!< Copy constructor
@@ -147,7 +144,7 @@ namespace DSL
         void swap(FITShdu& other) noexcept;                        //!< Swap content of two FITShdu objects
         
 #pragma endregion
-#pragma region  • Accessor
+#pragma region  * Accessor
         bool     GetBoolValueForKey  (const std::string&) const;   //!< Retrive KEYWORD boolean value
         uint8_t  GetUInt8ValueForKey (const std::string&) const;   //!< Retrive KEYWORD unsigned short value
         int8_t   GetInt8ValueForKey  (const std::string&) const;   //!< Retrive KEYWORD short value
@@ -172,13 +169,15 @@ namespace DSL
 
 
 #pragma endregion
-#pragma region  • Modifier
+#pragma region  * Modifier
 
         void ValueForKey(const key_code&, const std::string&, const key_type& tk);                      //!< Set value for key
         void ValueForKey(const key_code&, const std::string&, const key_type& tk, const std::string&);  //!< Set value for key
         void ValueForKey(const key_code&, const std::string&, const std::string&);                      //!< Set value for key
         void ValueForKey(const key_code&, const std::string&);                                          //!< Set value for key
+#ifdef Darwinx86_64
         void ValueForKey(const key_code&, const size_t&     , const std::string&);                      //!< Set value for key
+#endif
         void ValueForKey(const key_code&, const bool&       , const std::string&);                      //!< Set value for key
         void ValueForKey(const key_code&, const float&      , const std::string&);                      //!< Set value for key
         void ValueForKey(const key_code&, const double&     , const std::string&);                      //!< Set value for key
@@ -191,7 +190,9 @@ namespace DSL
         void ValueForKey(const key_code&, const  int32_t&   , const std::string&);                      //!< Set value for key
         void ValueForKey(const key_code&, const  int64_t&   , const std::string&);                      //!< Set value for key
        
+#ifdef Darwinx86_64
         void ValueForKey(const key_code&, const size_t&   );                                            //!< Set value for key
+#endif
         void ValueForKey(const key_code&, const bool&     );                                            //!< Set value for key
         void ValueForKey(const key_code&, const float&    );                                            //!< Set value for key
         void ValueForKey(const key_code&, const double&   );                                            //!< Set value for key
@@ -207,11 +208,11 @@ namespace DSL
         void DeleteKey(const key_code&);
 
 #pragma endregion
-#pragma region  • I/O
+#pragma region  * I/O
         void Write(const std::shared_ptr<fitsfile>& ) const;
         
 #pragma endregion
-#pragma region  • Dump
+#pragma region  * Dump
         void Dump( std::ostream& ) const;               //!< Print out KEYWORD and their associated value and description.
         
 #pragma endregion

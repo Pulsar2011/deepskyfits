@@ -48,7 +48,7 @@ namespace DSL
          * @details This parent class is used to acces FITS data cube of any base type, plot and process data in from the FITS datacube. This class is purely virtual class which call the methods of its child class accouting for the base type of the raw data.
          */
     protected:
-#pragma region • Protected member
+#pragma region * Protected member
         pxMask mask;
         FITShdu hdu;                              //!< Header of the image
         std::unique_ptr<DSL::FitsArrayBase> data; // Polymorphic valarray wrapper
@@ -79,22 +79,22 @@ namespace DSL
         }
 
 #pragma endregion
-#pragma region • Protected member function
+#pragma region * Protected member function
         static std::vector<size_t> Build_axis(const size_t&, const std::initializer_list<size_t>&);
         
     private:
 #pragma endregion
-#pragma region • Initialization
+#pragma region * Initialization
         void init();                    //!< Initialization
         virtual void WriteDataCube(const std::shared_ptr<fitsfile>&) =0; //!< pur virtual class methods used by child classes to write data to a fits file on disk
 
 #pragma endregion
-#pragma region • Purely virtual & protected methos
+#pragma region * Purely virtual & protected methos
     protected:
         virtual void img_init() =0;      //!< Child class initialization
         
 #pragma endregion
-#pragma region • ctor/dtor
+#pragma region * ctor/dtor
     protected:
         FITScube(const std::shared_ptr<fitsfile>& );            //!< Constructor
         FITScube();
@@ -131,11 +131,11 @@ namespace DSL
         static FITScube* DoubleFITSimg     (const std::vector<size_t>& );
 
 #pragma endregion
-#pragma region • Static member
+#pragma region * Static member
         static bool debug;
         
 #pragma endregion
-#pragma region • Accessor
+#pragma region * Accessor
         size_t Size(const size_t& i = 0) const ;                       //!< Get number of pixel of the axe
         size_t           Nelements() const;                            //!< Get total number of pixel
         inline const int Status()          const {return img_status;}  //!< Get fits error status
@@ -241,6 +241,8 @@ namespace DSL
         virtual double Get25thpercentil()          const =0;
         virtual double Get75thpercentil()          const =0;
         virtual double Get95thpercentil()          const =0;
+        virtual double GetKurtosis()               const =0;
+        virtual double GetSkewness()               const =0;
         
         inline std::valarray<bool> GetMask() const {return mask;}
         
@@ -306,13 +308,13 @@ namespace DSL
         }
 
 #pragma endregion
-#pragma region • I/O
+#pragma region * I/O
         
         void Write(const std::shared_ptr<fitsfile>& );                          //!< Write FITS image to a fitsfile
         void Write(std::string, bool replace = false);  //!< Write FITS image to a new fitsfile
         
 #pragma endregion
-#pragma region • Modifier
+#pragma region * Modifier
         void SetAxisLength(const size_t& n, const size_t& size);
         void DeleteLastAxis();
         void BitPerPixel(const int& n) {BitPerPixel(n,0);}
@@ -327,7 +329,9 @@ namespace DSL
         virtual void SetPixelValue(const  int32_t&, const std::vector<size_t>&) =0;
         virtual void SetPixelValue(const uint64_t&, const std::vector<size_t>&) =0;
         virtual void SetPixelValue(const  int64_t&, const std::vector<size_t>&) =0;
+#ifdef Darwinx86_64
         virtual void SetPixelValue(const   size_t&, const std::vector<size_t>&) =0;
+#endif
         virtual void SetPixelValue(const    float&, const std::vector<size_t>&) =0;
         virtual void SetPixelValue(const   double&, const std::vector<size_t>&) =0;
         virtual void SetPixelValue(const  uint8_t&, const size_t&)        =0;
@@ -338,7 +342,9 @@ namespace DSL
         virtual void SetPixelValue(const  int32_t&, const size_t&)        =0;
         virtual void SetPixelValue(const uint64_t&, const size_t&)        =0;
         virtual void SetPixelValue(const  int64_t&, const size_t&)        =0;
+#ifdef Darwinx86_64
         virtual void SetPixelValue(const   size_t&, const size_t&)        =0;
+#endif
         virtual void SetPixelValue(const    float&, const size_t&)        =0;
         virtual void SetPixelValue(const   double&, const size_t&)        =0;
 
@@ -351,7 +357,9 @@ namespace DSL
         virtual void Bscale(const  int32_t& )  =0;
         virtual void Bscale(const uint64_t& )  =0;
         virtual void Bscale(const  int64_t& )  =0;
+#ifdef Darwinx86_64
         virtual void Bscale(const size_t&   )  =0;
+#endif
         virtual void Bscale(const float&    )  =0;
         virtual void Bscale(const double&   )  =0;
         
@@ -363,7 +371,9 @@ namespace DSL
         virtual void Bzero(const  int32_t& )   =0;
         virtual void Bzero(const uint64_t& )   =0;
         virtual void Bzero(const  int64_t& )   =0;
+#ifdef Darwinx86_64
         virtual void Bzero(const size_t&   )   =0;
+#endif
         virtual void Bzero(const float&    )   =0;
         virtual void Bzero(const double&   )   =0;
 
@@ -375,14 +385,16 @@ namespace DSL
         virtual void Blank(const  int32_t& )   =0;
         virtual void Blank(const uint64_t& )   =0;
         virtual void Blank(const  int64_t& )   =0;
+#ifdef Darwinx86_64
         virtual void Blank(const size_t&   )   =0;
+#endif
         virtual void Blank(const float&    )   =0;
         virtual void Blank(const double&   )   =0;
         
 #pragma endregion
-#pragma region • Operator
+#pragma region * Operator
 
-#pragma region — Operator +=
+#pragma region -- Operator +=
         virtual void operator+=(const  uint8_t& val){};
         virtual void operator+=(const   int8_t& val){};
         virtual void operator+=(const uint16_t& val){};
@@ -391,7 +403,9 @@ namespace DSL
         virtual void operator+=(const  int32_t& val){};
         virtual void operator+=(const uint64_t& val){};
         virtual void operator+=(const  int64_t& val){};
+#ifdef Darwinx86_64
         virtual void operator+=(const   size_t& val){};
+#endif
         virtual void operator+=(const    float& val){};
         virtual void operator+=(const   double& val){};
 
@@ -403,14 +417,16 @@ namespace DSL
         virtual void operator+=(const std::valarray< int32_t>& val){};
         virtual void operator+=(const std::valarray<uint64_t>& val){};
         virtual void operator+=(const std::valarray< int64_t>& val){};
+#ifdef Darwinx86_64
         virtual void operator+=(const std::valarray<  size_t>& val){};
+#endif
         virtual void operator+=(const std::valarray<   float>& val){};
         virtual void operator+=(const std::valarray<  double>& val){};
 
         virtual void operator+=(const FITScube&){};
 
 #pragma endregion
-#pragma region — Operator -=
+#pragma region -- Operator -=
         virtual void operator-=(const  uint8_t& val){};
         virtual void operator-=(const   int8_t& val){};
         virtual void operator-=(const uint16_t& val){};
@@ -419,7 +435,9 @@ namespace DSL
         virtual void operator-=(const  int32_t& val){};
         virtual void operator-=(const uint64_t& val){};
         virtual void operator-=(const  int64_t& val){};
+#ifdef Darwinx86_64
         virtual void operator-=(const   size_t& val){};
+#endif
         virtual void operator-=(const    float& val){};
         virtual void operator-=(const   double& val){};
 
@@ -431,13 +449,15 @@ namespace DSL
         virtual void operator-=(const std::valarray< int32_t>& val){};
         virtual void operator-=(const std::valarray<uint64_t>& val){};
         virtual void operator-=(const std::valarray< int64_t>& val){};
+#ifdef Darwinx86_64
         virtual void operator-=(const std::valarray<  size_t>& val){};
+#endif
         virtual void operator-=(const std::valarray<   float>& val){};
         virtual void operator-=(const std::valarray<  double>& val){};
 
         virtual void operator-=(const FITScube&){};
 #pragma endregion
-#pragma region — Operator *=
+#pragma region -- Operator *=
         virtual void operator*=(const  uint8_t& val){};
         virtual void operator*=(const   int8_t& val){};
         virtual void operator*=(const uint16_t& val){};
@@ -446,7 +466,9 @@ namespace DSL
         virtual void operator*=(const  int32_t& val){};
         virtual void operator*=(const uint64_t& val){};
         virtual void operator*=(const  int64_t& val){};
+#ifdef Darwinx86_64
         virtual void operator*=(const   size_t& val){};
+#endif
         virtual void operator*=(const    float& val){};
         virtual void operator*=(const   double& val){};
 
@@ -458,13 +480,15 @@ namespace DSL
         virtual void operator*=(const std::valarray< int32_t>& val){};
         virtual void operator*=(const std::valarray<uint64_t>& val){};
         virtual void operator*=(const std::valarray< int64_t>& val){};
+#ifdef Darwinx86_64
         virtual void operator*=(const std::valarray<  size_t>& val){};
+#endif
         virtual void operator*=(const std::valarray<   float>& val){};
         virtual void operator*=(const std::valarray<  double>& val){};
 
         virtual void operator*=(const FITScube&){};
 #pragma endregion
-#pragma region — Operator /=
+#pragma region -- Operator /=
         virtual void operator/=(const  uint8_t& val){};
         virtual void operator/=(const   int8_t& val){};
         virtual void operator/=(const uint16_t& val){};
@@ -473,7 +497,9 @@ namespace DSL
         virtual void operator/=(const  int32_t& val){};
         virtual void operator/=(const uint64_t& val){};
         virtual void operator/=(const  int64_t& val){};
+#ifdef Darwinx86_64
         virtual void operator/=(const   size_t& val){};
+#endif
         virtual void operator/=(const    float& val){};
         virtual void operator/=(const   double& val){};
 
@@ -485,7 +511,9 @@ namespace DSL
         virtual void operator/=(const std::valarray< int32_t>& val){};
         virtual void operator/=(const std::valarray<uint64_t>& val){};
         virtual void operator/=(const std::valarray< int64_t>& val){};
+#ifdef Darwinx86_64
         virtual void operator/=(const std::valarray<  size_t>& val){};
+#endif
         virtual void operator/=(const std::valarray<   float>& val){};
         virtual void operator/=(const std::valarray<  double>& val){};
 
@@ -493,7 +521,7 @@ namespace DSL
 #pragma endregion
     
 #pragma endregion
-#pragma region • Altere data
+#pragma region * Altere data
         
         void MaskPixels(const std::initializer_list<size_t>&);
         void MaskPixels(const std::valarray<bool>&);
@@ -508,7 +536,7 @@ namespace DSL
         
         
 #pragma endregion
-#pragma region • Pure virtual methods
+#pragma region * Pure virtual methods
         
         virtual std::shared_ptr<FITScube> Layer(const size_t&) const  =0;
         virtual std::shared_ptr<FITScube> Window (size_t, size_t, size_t, size_t) const =0;
@@ -538,18 +566,18 @@ namespace DSL
         T BZERO;    //!< Data offset
         T BLANK;    //!< Transparent pixel reference value
 
-#pragma region • Initialization
+#pragma region * Initialization
         virtual void img_init();
         void template_init();
         
 #pragma endregion
-#pragma region • I/O
+#pragma region * I/O
         void WriteDataCube(const std::shared_ptr<fitsfile>& );  //!< Write data to Fits HDU
         template<typename S> void WriteData(const std::shared_ptr<fitsfile>& , int);
     
     public:
 #pragma endregion
-#pragma region • ctor/dtor
+#pragma region * ctor/dtor
         
         FITSimg(const std::shared_ptr<fitsfile>& fptr  );      //!< Default constructor
         FITSimg(const FITSimg<T>&);     //!< Copy constructor
@@ -558,7 +586,7 @@ namespace DSL
         virtual ~FITSimg();             //!< Destructor
         
 #pragma endregion
-#pragma region • Modifier
+#pragma region * Modifier
         void Bscale(const  uint8_t& );
         void Bscale(const   int8_t& );
         void Bscale(const uint16_t& );
@@ -567,7 +595,9 @@ namespace DSL
         void Bscale(const  int32_t& );
         void Bscale(const uint64_t& );
         void Bscale(const  int64_t& );
+#ifdef Darwinx86_64
         void Bscale(const size_t&   );
+#endif
         void Bscale(const float&    );
         void Bscale(const double&   );
         
@@ -579,7 +609,9 @@ namespace DSL
         void Bzero(const  int32_t& );
         void Bzero(const uint64_t& );
         void Bzero(const  int64_t& );
+#ifdef Darwinx86_64
         void Bzero(const size_t&   );
+#endif
         void Bzero(const float&    );
         void Bzero(const double&   );
 
@@ -591,7 +623,9 @@ namespace DSL
         void Blank(const  int32_t& );
         void Blank(const uint64_t& );
         void Blank(const  int64_t& );
+#ifdef Darwinx86_64
         void Blank(const size_t&   );
+#endif
         void Blank(const float&    );
         void Blank(const double&   );
         
@@ -599,7 +633,7 @@ namespace DSL
 
 #pragma endregion
 
-#pragma region • Statistical property
+#pragma region * Statistical property
         double GetSum ()                   const;
         double GetMean()                   const;
         double GetQuadraticMean()          const;
@@ -619,7 +653,7 @@ namespace DSL
         double GetSkewness()               const;
 
 #pragma endregion
-#pragma region • data operation
+#pragma region * data operation
 
         
     private:
@@ -687,7 +721,7 @@ namespace DSL
         float        FloatValueAtPixel   (const std::initializer_list<size_t>&) const ;
         double       DoubleValueAtPixel  (const std::initializer_list<size_t>&) const ;
 
-#pragma region — Operator +=
+#pragma region -- Operator +=
         template<typename S>
         void operator+= (const S&);///< Apply positive offset to data
 
@@ -699,7 +733,9 @@ namespace DSL
         void operator+=(const  int32_t& val){return operator+=< int32_t>(val);}
         void operator+=(const uint64_t& val){return operator+=<uint64_t>(val);}
         void operator+=(const  int64_t& val){return operator+=< int64_t>(val);}
+#ifdef Darwinx86_64
         void operator+=(const   size_t& val){return operator+=<  size_t>(val);}
+#endif
         void operator+=(const    float& val){return operator+=<   float>(val);}
         void operator+=(const   double& val){return operator+=<  double>(val);}
 
@@ -714,7 +750,9 @@ namespace DSL
         void operator+=(const std::valarray< int32_t>& val){return operator+=< int32_t>(val);}
         void operator+=(const std::valarray<uint64_t>& val){return operator+=<uint64_t>(val);}
         void operator+=(const std::valarray< int64_t>& val){return operator+=< int64_t>(val);}
+#ifdef Darwinx86_64
         void operator+=(const std::valarray<  size_t>& val){return operator+=<  size_t>(val);}
+#endif
         void operator+=(const std::valarray<   float>& val){return operator+=<   float>(val);}
         void operator+=(const std::valarray<  double>& val){return operator+=<  double>(val);}
 
@@ -724,7 +762,7 @@ namespace DSL
         void operator+=(const FITScube&);
 
 #pragma endregion
-#pragma region — Operator -=
+#pragma region -- Operator -=
         template<typename S>
         void operator-= (const S&);///< Apply negative offset to data
 
@@ -736,7 +774,9 @@ namespace DSL
         void operator-=(const  int32_t& val){return operator-=< int32_t>(val);}
         void operator-=(const uint64_t& val){return operator-=<uint64_t>(val);}
         void operator-=(const  int64_t& val){return operator-=< int64_t>(val);}
+#ifdef Darwinx86_64
         void operator-=(const   size_t& val){return operator-=<  size_t>(val);}
+#endif
         void operator-=(const    float& val){return operator-=<   float>(val);}
         void operator-=(const   double& val){return operator-=<  double>(val);}
 
@@ -751,7 +791,9 @@ namespace DSL
         void operator-=(const std::valarray< int32_t>& val){return operator-=< int32_t>(val);}
         void operator-=(const std::valarray<uint64_t>& val){return operator-=<uint64_t>(val);}
         void operator-=(const std::valarray< int64_t>& val){return operator-=< int64_t>(val);}
+#ifdef Darwinx86_64
         void operator-=(const std::valarray<  size_t>& val){return operator-=<  size_t>(val);}
+#endif
         void operator-=(const std::valarray<   float>& val){return operator-=<   float>(val);}
         void operator-=(const std::valarray<  double>& val){return operator-=<  double>(val);}
 
@@ -761,7 +803,7 @@ namespace DSL
         void operator-=(const FITScube&);
 
 #pragma endregion
-#pragma region — Operator *=
+#pragma region -- Operator *=
         template<typename S>
         void operator*= (const S&);///< Scale up data
 
@@ -773,7 +815,9 @@ namespace DSL
         void operator*=(const  int32_t& val){return operator*=< int32_t>(val);}
         void operator*=(const uint64_t& val){return operator*=<uint64_t>(val);}
         void operator*=(const  int64_t& val){return operator*=< int64_t>(val);}
+#ifdef Darwinx86_64
         void operator*=(const   size_t& val){return operator*=<  size_t>(val);}
+#endif
         void operator*=(const    float& val){return operator*=<   float>(val);}
         void operator*=(const   double& val){return operator*=<  double>(val);}
 
@@ -788,7 +832,9 @@ namespace DSL
         void operator*=(const std::valarray< int32_t>& val){return operator*=< int32_t>(val);}
         void operator*=(const std::valarray<uint64_t>& val){return operator*=<uint64_t>(val);}
         void operator*=(const std::valarray< int64_t>& val){return operator*=< int64_t>(val);}
+#ifdef Darwinx86_64
         void operator*=(const std::valarray<  size_t>& val){return operator*=<  size_t>(val);}
+#endif
         void operator*=(const std::valarray<   float>& val){return operator*=<   float>(val);}
         void operator*=(const std::valarray<  double>& val){return operator*=<  double>(val);}
 
@@ -798,7 +844,7 @@ namespace DSL
         void operator*=(const FITScube&);
 
 #pragma endregion
-#pragma region — Operator /=
+#pragma region -- Operator /=
         template<typename S>
         void operator/= (const S&);///< Scale down data
 
@@ -810,7 +856,9 @@ namespace DSL
         void operator/=(const  int32_t& val){return operator/=< int32_t>(val);};
         void operator/=(const uint64_t& val){return operator/=<uint64_t>(val);};
         void operator/=(const  int64_t& val){return operator/=< int64_t>(val);};
+#ifdef Darwinx86_64
         void operator/=(const   size_t& val){return operator/=<  size_t>(val);};
+#endif
         void operator/=(const    float& val){return operator/=<   float>(val);};
         void operator/=(const   double& val){return operator/=<  double>(val);};
 
@@ -825,7 +873,9 @@ namespace DSL
         void operator/=(const std::valarray< int32_t>& val){return operator/=< int32_t>(val);}
         void operator/=(const std::valarray<uint64_t>& val){return operator/=<uint64_t>(val);}
         void operator/=(const std::valarray< int64_t>& val){return operator/=< int64_t>(val);}
+#ifdef Darwinx86_64
         void operator/=(const std::valarray<  size_t>& val){return operator/=<  size_t>(val);}
+#endif
         void operator/=(const std::valarray<   float>& val){return operator/=<   float>(val);}
         void operator/=(const std::valarray<  double>& val){return operator/=<  double>(val);}
 
@@ -844,7 +894,9 @@ namespace DSL
         void SetPixelValue(const  int32_t& val, const std::vector<size_t>& vPx) {this->template SetPixelValue< int32_t>(val,vPx);}
         void SetPixelValue(const uint64_t& val, const std::vector<size_t>& vPx) {this->template SetPixelValue<uint64_t>(val,vPx);}
         void SetPixelValue(const  int64_t& val, const std::vector<size_t>& vPx) {this->template SetPixelValue< int64_t>(val,vPx);}
+#ifdef Darwinx86_64
         void SetPixelValue(const   size_t& val, const std::vector<size_t>& vPx) {this->template SetPixelValue<  size_t>(val,vPx);}
+#endif
         void SetPixelValue(const    float& val, const std::vector<size_t>& vPx) {this->template SetPixelValue<   float>(val,vPx);}
         void SetPixelValue(const   double& val, const std::vector<size_t>& vPx) {this->template SetPixelValue<  double>(val,vPx);}
         void SetPixelValue(const  uint8_t& val, const size_t& iPx)              {this->template SetPixelValue< uint8_t>(val,iPx);}
@@ -855,7 +907,9 @@ namespace DSL
         void SetPixelValue(const  int32_t& val, const size_t& iPx)              {this->template SetPixelValue< int32_t>(val,iPx);}
         void SetPixelValue(const uint64_t& val, const size_t& iPx)              {this->template SetPixelValue<uint64_t>(val,iPx);}
         void SetPixelValue(const  int64_t& val, const size_t& iPx)              {this->template SetPixelValue< int64_t>(val,iPx);}
+#ifdef Darwinx86_64
         void SetPixelValue(const   size_t& val, const size_t& iPx)              {this->template SetPixelValue<  size_t>(val,iPx);}
+#endif
         void SetPixelValue(const    float& val, const size_t& iPx)              {this->template SetPixelValue<   float>(val,iPx);}
         void SetPixelValue(const   double& val, const size_t& iPx)              {this->template SetPixelValue<  double>(val,iPx);}
         
@@ -866,20 +920,20 @@ namespace DSL
         void SetPixelValue(const S&, const size_t&);
 
 #pragma endregion
-#pragma region • Accessor
+#pragma region * Accessor
 
         const T& ReadBscale() const {return BSCALE;}
         const T& ReadBzero () const {return BZERO ;}
         const T& ReadBlank () const {return BLANK ;}
     
 #pragma endregion
-#pragma region • Display methods
+#pragma region * Display methods
 
 #pragma endregion
-#pragma region • Data export methods
+#pragma region * Data export methods
         
 #pragma endregion
-#pragma region • Extraction method
+#pragma region * Extraction method
         std::shared_ptr<FITScube> Layer(const size_t&) const;
         std::shared_ptr<FITScube> Window (size_t, size_t, size_t, size_t) const;
         std::shared_ptr<FITScube> Rebin  (const std::vector<size_t>&, bool doMean=false ) const;
@@ -893,7 +947,7 @@ namespace DSL
 #pragma endregion
 #pragma region - FITSimg class implementation
     
-#pragma region • Initialization
+#pragma region * Initialization
 
     template< typename T >
     void FITSimg<T>::template_init()
@@ -952,8 +1006,9 @@ namespace DSL
         else if constexpr (std::is_same_v<T, uint64_t> || std::is_same_v<T, size_t>)
         {
             BitPerPixel(64, ULONGLONG_IMG); // unsigned 64 uses equiv 80
-            Bscale(static_cast<T>(1));
-            Bzero (static_cast<T>((T)9223372036854775808));
+            Bscale((1));
+            //Bzero (((T)9223372036854775808));
+            Bzero(static_cast<T>(static_cast<uint64_t>(1) << 63));
         }
         else if constexpr (std::is_same_v<T, float>)
         {
@@ -986,7 +1041,7 @@ namespace DSL
     }
     
 #pragma endregion
-#pragma region • I/O
+#pragma region * I/O
 
     /**
      *  @details Read the RAW data from the FITS file and extract the pixel content
@@ -1000,7 +1055,7 @@ namespace DSL
         if(fptr == nullptr || fptr.use_count() < 1)
             return;
             
-        // • GET THE WHOLE IMAGE DATA
+        // * GET THE WHOLE IMAGE DATA
         //    - GET PIXEL DIMENSION
         
         if((verbose&verboseLevel::VERBOSE_HDU)==verboseLevel::VERBOSE_HDU)
@@ -1123,17 +1178,21 @@ namespace DSL
                      <<"    |- NAXIS         : "<<num_axis<<std::endl;
             
             for(size_t i=0; i < Naxis.size()-1; i++)
+            {
                 std::cerr<<"    |    |- NAXIS["<<i<<"] : "<<Naxis[i]<<std::endl;
                 std::cerr<<"    |    `- NAXIS["<<Naxis.size()-1<<"] : "<<Naxis[Naxis.size()-1]<<std::endl
                          <<"    |- START COO     : "<<std::endl;
+            }
             
-            for(size_t i=0; i < num_axis-1; i++)
+            for(long i=0; i < num_axis-1; i++)
+            {
                 std::cerr<<"    |   |- NAXIS"<<i<<"[0] : "<<fpixel[i]<<std::endl;
                 std::cerr<<"    |   `- NAXIS"<<num_axis-1<<"[0] : "<<fpixel[num_axis-1]<<std::endl
                          <<"    |- DATA SIZE     : "<<array_size<<std::endl
                          <<"    |- ARRAY[0]      : "<<array[0]<<std::endl
                          <<"    |- null_array[0] : "<<null_array[0]<<std::endl
                          <<"    `- HAS NULL      : "<<any_null;
+            }
             
             std::cerr<<"\033[0m"<<std::endl;
             throw;
@@ -1305,7 +1364,7 @@ namespace DSL
     }
 
 #pragma endregion
-#pragma region • ctor/dtor
+#pragma region * ctor/dtor
     /**
      *  @details Read current HDU of the fitsfile to extract a 2D images
      *  @param fptr: Pointer to the fitfile
@@ -1336,16 +1395,16 @@ namespace DSL
         if(img_status)
             return;
         
-        //  • GET BSCALE
+        //  * GET BSCALE
         BSCALE = static_cast<T>((hdu.Exists("BSCALE"))? hdu.GetDoubleValueForKey("BSCALE"):1.);
         
-        //  • GET BZERO
+        //  * GET BZERO
         BZERO = static_cast<T>((hdu.Exists("BZERO"))? hdu.GetDoubleValueForKey("BZERO"):0.);
         
-        //  • GET BLANCK
+        //  * GET BLANCK
         BLANK = (hdu.Exists("BLANK"))? static_cast<T>(hdu.GetUInt16ValueForKey("BLANK")):std::numeric_limits<uint16_t>::quiet_NaN();
         
-        // • GET THE WHOLE IMAGE DATA
+        // * GET THE WHOLE IMAGE DATA
         switch (eqBITPIX)
         {
             case SBYTE_IMG:
@@ -1484,9 +1543,9 @@ namespace DSL
     }
     
 #pragma endregion
-#pragma region • modifier
+#pragma region * modifier
 
-#pragma region — Bscale
+#pragma region -- Bscale
     template< typename T >
     void FITSimg<T>::Bscale(const uint8_t& _bs )
     {
@@ -1543,12 +1602,14 @@ namespace DSL
         hdu.ValueForKey("BSCALE",BSCALE);
     }
 
+#ifdef Darwinx86_64
     template< typename T >
     void FITSimg<T>::Bscale(const size_t& _bs )
     {
         BSCALE = _bs;
         hdu.ValueForKey("BSCALE",BSCALE);
     }
+#endif
 
     template< typename T >
     void FITSimg<T>::Bscale(const float& _bs )
@@ -1565,7 +1626,7 @@ namespace DSL
     }
 
 #pragma endregion
-#pragma region — Bzero
+#pragma region -- Bzero
     template< typename T >
     void FITSimg<T>::Bzero(const uint8_t& _bs )
     {
@@ -1622,12 +1683,14 @@ namespace DSL
         hdu.ValueForKey("BZERO", BZERO);
     }
 
+#ifdef Darwinx86_64
     template< typename T >
     void FITSimg<T>::Bzero(const size_t& _bs )
     {
         BZERO = _bs;
         hdu.ValueForKey("BZERO", BZERO);
     }
+#endif
 
     template< typename T >
     void FITSimg<T>::Bzero(const float& _bs )
@@ -1644,7 +1707,7 @@ namespace DSL
     }
 #pragma endregion
 
-#pragma region — Blank
+#pragma region -- Blank
 
     template< typename T >
     void FITSimg<T>::Blank(const uint8_t& nanVal)
@@ -1702,12 +1765,14 @@ namespace DSL
         hdu.ValueForKey("BLANK",BLANK);
     }
 
+#ifdef Darwinx86_64
     template< typename T >
     void FITSimg<T>::Blank(const size_t& nanVal)
     {
         BLANK = nanVal;
         hdu.ValueForKey("BLANK",BLANK);
     }
+#endif
 
     template< typename T >
     void FITSimg<T>::Blank(const float& nanVal)
@@ -1806,7 +1871,7 @@ namespace DSL
     }
     
 #pragma endregion
-#pragma region • Image Statistic
+#pragma region * Image Statistic
 
 /**
      *  @details Compute the sum of all unmasked pixel values
@@ -2122,7 +2187,7 @@ namespace DSL
 
 
 #pragma endregion
-#pragma region • data operation
+#pragma region * data operation
     
     /**
      *  @brief Assignement opperator
@@ -2613,8 +2678,12 @@ namespace DSL
             if(mask.size() != n)
                 throw FITSexception(SHARED_BADARG,"FITScube::operator*=","mask/data size mismatch");
 
-            std::valarray<bool> keep = !mask; 
-            arr[keep] = ((std::valarray<T>)arr[keep]) * val[keep]; // branchless version
+            std::valarray<bool> keep = !mask;
+            for (size_t i = 0; i < n; ++i)
+            {
+                if(keep[i])
+                    arr[i] = arr[i] * static_cast<T>(val[i]); // safe conversion
+            }
         });
     }
     
@@ -2641,7 +2710,12 @@ namespace DSL
                 throw FITSexception(SHARED_BADARG,"FITScube::operator/=","mask/data size mismatch");
             
             std::valarray<bool> keep = !mask; 
-            arr[keep] = ((std::valarray<T>)arr[keep]) / val[keep]; // branchless version
+
+            for (size_t i = 0; i < n; ++i)
+            {
+                if(keep[i])
+                    arr[i] = arr[i] / static_cast<T>(val[i]); // safe conversion
+            }
         });
     }
     
@@ -2667,8 +2741,12 @@ namespace DSL
             if(mask.size() != n)
                 throw FITSexception(SHARED_BADARG,"FITScube::operator/=","mask/data size mismatch");
 
-            std::valarray<bool> keep = !mask; 
-            arr[keep] = ((std::valarray<T>)arr[keep]) + val[keep]; // branchless version
+            std::valarray<bool> keep = !mask;
+            for (size_t i = 0; i < n; ++i)
+            {
+                if(keep[i])
+                    arr[i] = arr[i] + static_cast<T>(val[i]); // safe conversion
+            }
         });
     }
     
@@ -2695,7 +2773,11 @@ namespace DSL
                 throw FITSexception(SHARED_BADARG,"FITScube::operator/=","mask/data size mismatch");
 
             std::valarray<bool> keep = !mask; 
-            arr[keep] = ((std::valarray<T>)arr[keep]) - val[keep]; // branchless version
+            for (size_t i = 0; i < n; ++i)
+            {
+                if(keep[i])
+                    arr[i] = arr[i] - static_cast<T>(val[i]); // safe conversion
+            }
         });
     }
 
@@ -2830,7 +2912,9 @@ namespace DSL
         if (const auto *p_i32 = dynamic_cast<const FITSimg< int32_t> *>(&img)) { this->template operator*=(*p_i32); return; }
         if (const auto *p_u64 = dynamic_cast<const FITSimg<uint64_t> *>(&img)) { this->template operator*=(*p_u64); return; }
         if (const auto *p_i64 = dynamic_cast<const FITSimg< int64_t> *>(&img)) { this->template operator*=(*p_i64); return; }
+#ifdef Darwinx86_64
         if (const auto *p_sz  = dynamic_cast<const FITSimg<  size_t> *>(&img)) { this->template operator*=(*p_sz);  return; }
+#endif
         if (const auto *p_f   = dynamic_cast<const FITSimg<   float> *>(&img)) { this->template operator*=(*p_f);   return; }
         if (const auto *p_d   = dynamic_cast<const FITSimg<  double> *>(&img)) { this->template operator*=(*p_d);   return; }
 
@@ -2855,7 +2939,9 @@ namespace DSL
         if (const auto *p_i32 = dynamic_cast<const FITSimg< int32_t> *>(&img)) { this->template operator/=(*p_i32); return; }
         if (const auto *p_u64 = dynamic_cast<const FITSimg<uint64_t> *>(&img)) { this->template operator/=(*p_u64); return; }
         if (const auto *p_i64 = dynamic_cast<const FITSimg< int64_t> *>(&img)) { this->template operator/=(*p_i64); return; }
+#ifdef Darwinx86_64
         if (const auto *p_sz  = dynamic_cast<const FITSimg<  size_t> *>(&img)) { this->template operator/=(*p_sz);  return; }
+#endif
         if (const auto *p_f   = dynamic_cast<const FITSimg<   float> *>(&img)) { this->template operator/=(*p_f);   return; }
         if (const auto *p_d   = dynamic_cast<const FITSimg<  double> *>(&img)) { this->template operator/=(*p_d);   return; }
 
@@ -2880,7 +2966,9 @@ namespace DSL
         if (const auto *p_i32 = dynamic_cast<const FITSimg< int32_t> *>(&img)) { this->template operator+=(*p_i32); return; }
         if (const auto *p_u64 = dynamic_cast<const FITSimg<uint64_t> *>(&img)) { this->template operator+=(*p_u64); return; }
         if (const auto *p_i64 = dynamic_cast<const FITSimg< int64_t> *>(&img)) { this->template operator+=(*p_i64); return; }
+#ifdef Darwinx86_64
         if (const auto *p_sz  = dynamic_cast<const FITSimg<  size_t> *>(&img)) { this->template operator+=(*p_sz);  return; }
+#endif
         if (const auto *p_f   = dynamic_cast<const FITSimg<   float> *>(&img)) { this->template operator+=(*p_f);   return; }
         if (const auto *p_d   = dynamic_cast<const FITSimg<  double> *>(&img)) { this->template operator+=(*p_d);   return; }
 
@@ -2905,7 +2993,9 @@ namespace DSL
         if (const auto *p_i32 = dynamic_cast<const FITSimg< int32_t> *>(&img)) { this->template operator-=(*p_i32); return; }
         if (const auto *p_u64 = dynamic_cast<const FITSimg<uint64_t> *>(&img)) { this->template operator-=(*p_u64); return; }
         if (const auto *p_i64 = dynamic_cast<const FITSimg< int64_t> *>(&img)) { this->template operator-=(*p_i64); return; }
+#ifdef Darwinx86_64
         if (const auto *p_sz  = dynamic_cast<const FITSimg<  size_t> *>(&img)) { this->template operator-=(*p_sz);  return; }
+#endif
         if (const auto *p_f   = dynamic_cast<const FITSimg<   float> *>(&img)) { this->template operator-=(*p_f);   return; }
         if (const auto *p_d   = dynamic_cast<const FITSimg<  double> *>(&img)) { this->template operator-=(*p_d);   return; }
 
@@ -2979,15 +3069,15 @@ namespace DSL
     }
     
 #pragma endregion
-#pragma region • Accessor    
+#pragma region * Accessor    
     
 #pragma endregion
 
-#pragma region • Data export methods
+#pragma region * Data export methods
 
 #pragma endregion
 #pragma endregion
-#pragma region • Extraction method
+#pragma region * Extraction method
     
     /**
      *  Extract layer from a 3D FITS cube.
