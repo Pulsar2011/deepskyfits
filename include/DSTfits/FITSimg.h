@@ -241,6 +241,8 @@ namespace DSL
         virtual double Get25thpercentil()          const =0;
         virtual double Get75thpercentil()          const =0;
         virtual double Get95thpercentil()          const =0;
+        virtual double GetKurtosis()               const =0;
+        virtual double GetSkewness()               const =0;
         
         inline std::valarray<bool> GetMask() const {return mask;}
         
