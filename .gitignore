@@ -39,6 +39,10 @@ moc_*
 ui_*
 *.*_parameters
 
+#--------------- WCS lib
+wcslib
+wcslib-*.bz2
+
 #--------------- ROOT JUNK
 *.d
 *Dict*

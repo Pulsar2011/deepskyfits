@@ -188,6 +188,7 @@ file(GLOB MINUIT2_HEADER "include/Minuit2/Minuit2/*.h")
 file(GLOB MINUITF_HEADER "include/Minuit2/Fit/*.h")
 file(GLOB MINUITM_HEADER "include/Minuit2/Math/*.h")
 
+
 #-------------------- Configuration de la bibliothèque
 
 include(ExternalProject)
@@ -207,7 +208,66 @@ ExternalProject_Add(
     BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a
 )
 
-# Link DSTfits to cfitsio static library
+#-------------------- Configuration de la bibliothèque WCSFIT
+
+set(WCSLIB_VERSION 8.4)
+set(WCSLIB_URL "https://www.atnf.csiro.au/computing/software/wcs/WCS/wcslib-${WCSLIB_VERSION}.tar.bz2")
+set(WCSLIB_INSTALL_DIR ${CMAKE_SOURCE_DIR}/build/wcslib)
+set(WCSLIB_SRC_DIR ${CMAKE_SOURCE_DIR}/wcslib/wcslib-${WCSLIB_VERSION})
+
+# Ensure download dir exists and add a download target using wget (fallback to file(DOWNLOAD) if wget missing)
+file(MAKE_DIRECTORY "${CMAKE_SOURCE_DIR}/wcslib")
+file(MAKE_DIRECTORY "${WCSLIB_INSTALL_DIR}")
+set(WCSLIB_TARBALL "${CMAKE_SOURCE_DIR}/wcslib-${WCSLIB_VERSION}.tar.bz2")
+
+# Custom target to download wcslib tarball (only download if missing)
+add_custom_target(download_wcslib
+    COMMAND /usr/bin/env bash -c "if [ ! -f \"${WCSLIB_TARBALL}\" ]; then echo 'Downloading wcslib to ${WCSLIB_TARBALL}...' && wget -O \"${WCSLIB_TARBALL}\" \"${WCSLIB_URL}\"; else echo 'wcslib tarball already exists: ${WCSLIB_TARBALL}'; fi"
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/wcslib"
+    COMMENT "Download wcslib tarball if missing"
+    VERBATIM
+)
+
+add_custom_target(extract_wcslib
+  COMMAND ${CMAKE_COMMAND} -E echo "Extracting ${WCSLIB_TARBALL} to ${CMAKE_SOURCE_DIR}/wcslib"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/wcslib"
+  COMMAND /usr/bin/env tar -xjf "${WCSLIB_TARBALL}" -C "${CMAKE_SOURCE_DIR}/wcslib"
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/wcslib"
+  VERBATIM
+)
+
+# ExternalProject to configure/build/install wcslib from the extracted source
+ExternalProject_Add(
+  wcslib_external
+  SOURCE_DIR      ${WCSLIB_SRC_DIR}
+  PREFIX          ${CMAKE_SOURCE_DIR}/build/wcslib
+  DOWNLOAD_COMMAND ""                         # download handled by download_wcslib
+  UPDATE_COMMAND   ""                         # no update step
+  CONFIGURE_COMMAND ${CMAKE_COMMAND} -E chdir ${WCSLIB_SRC_DIR} ./configure --prefix=${WCSLIB_INSTALL_DIR}  --with-cfitsioinc=${CFITSIO_INCLUDE_DIR} --with-cfitsiolib=${CMAKE_SOURCE_DIR}/build/lib --disable-shared
+  BUILD_COMMAND     ${CMAKE_MAKE_PROGRAM} -j ${CMAKE_BUILD_PARALLEL_LEVEL}
+  INSTALL_COMMAND   ${CMAKE_MAKE_PROGRAM} install
+  BUILD_IN_SOURCE   1
+  BUILD_BYPRODUCTS  ${WCSLIB_INSTALL_DIR}/lib/libwcs.a
+)
+
+# extraction must run before building wcslib
+
+# expose include/lib paths for targets
+set(WCSLIB_INCLUDE_DIR "${WCSLIB_INSTALL_DIR}/include" CACHE PATH "wcslib include dir")
+set(WCSLIB_LIBRARY     "${WCSLIB_INSTALL_DIR}/lib/libwcs-${WCSLIB_VERSION}.a" CACHE FILEPATH "wcslib static library")
+
+# ensure DSTfits waits for wcslib to be built and links to it
+
+add_dependencies(wcslib_external cfitsio_external extract_wcslib)
+add_dependencies(extract_wcslib download_wcslib)
+
+
+# Provide explicit cfitsio static library path variable for later linking
+set(CFITSIO_OUTPUT_LIB "${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a" CACHE FILEPATH "cfitsio static archive produced by external build")
+file(GLOB WCSLIB_HEADER "build/wcslib/include/wcslib-${WCSLIB_VERSION}/*.h")
+
+#-------------------- Configuration de la bibliothèque
+
 add_library(
     DSTfits
     SHARED
@@ -216,7 +276,11 @@ add_library(
     ${version_file}
 )
 
-add_dependencies(DSTfits cfitsio_external)
+# target-level configuration must come after the target is created
+add_dependencies(DSTfits cfitsio_external wcslib_external)
+target_include_directories(DSTfits PRIVATE ${WCSLIB_INCLUDE_DIR})
+target_include_directories(DSTfits PRIVATE ${CFITSIO_INCLUDE_DIR})
+
 include_directories(include/cfitsio)
 
 #-------------------- Configuration des test
@@ -234,11 +298,12 @@ include_directories(${PARENT_PATH_OF_GTEST}/googltest/googltest/include)
 enable_testing()
 
 target_link_libraries(DSTfits
-    PRIVATE ${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a
+    PRIVATE ${CFITSIO_OUTPUT_LIB}
     PRIVATE Minuit2
     PRIVATE bz2
     PRIVATE curl
     PRIVATE z
+    PRIVATE ${WCSLIB_LIBRARY}
 )
 
 #-------------------- Download sample FITS files for testing
@@ -314,15 +379,14 @@ cmake.check_depends
 CMakeCache.txt
 cmake.check_cache
 CMakeTmp
+CMakeDoxyfile.in
 ${version_file}
 Makefile
 CMakeFiles
 *.cmake
-./build/cfitsio
-./build/lib
-./build/exe
-./build/test
+./build
 ./doc
+./wcslib*
 ./googletest/CMakeFiles
 ./googletest/Makefile
 ./googletest/*.cmake
@@ -352,6 +416,7 @@ if(CMAKE_INSTALL_PREFIX)
     INSTALL(FILES ${MINUIT2_HEADER} DESTINATION include/Minuit2/Minuit2)
     INSTALL(FILES ${MINUITF_HEADER} DESTINATION include/Minuit2/Fit)
     INSTALL(FILES ${MINUITM_HEADER} DESTINATION include/Minuit2/Math)
+    INSTALL(FILES ${WCSLIB_HEADER} DESTINATION include/wcslib)
 
     # Core library built by this project
     INSTALL(TARGETS DSTfits
@@ -363,6 +428,9 @@ if(CMAKE_INSTALL_PREFIX)
     # cfitsio is built via ExternalProject -> not a CMake target; install the produced archive directly
     set(CFITSIO_OUTPUT_LIB ${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a)
     INSTALL(FILES ${CFITSIO_OUTPUT_LIB} DESTINATION lib)
+
+    set(WCSLIB_OUTPUT_LIB ${CMAKE_SOURCE_DIR}/build/wcslib/lib/libwcs-${WCSLIB_VERSION}.a)
+    INSTALL(FILES ${WCSLIB_OUTPUT_LIB} DESTINATION lib)
 
     # Minuit2 libraries: install if targets exist, otherwise fallback to copying built files
     if(TARGET Minuit2)
