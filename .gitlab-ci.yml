@@ -16,12 +16,16 @@ variables:
 stages:
 - .pre
 - build 
+- test
+- deploy
 
 before_script:
   - apt-get update
   - apt-get install -y cmake make
   - apt-get install -y libgsl-dev
+  - apt-get install -y doxygen graphviz
   - apt-get install -y build-essential clang pkg-config autoconf automake libtool ca-certificates
+  - apt-get install -y gdb libboost-filesystem-dev libboost-chrono-dev libboost-thread-dev libboost-regex-dev
 
 deps:
   stage: .pre
@@ -36,12 +40,36 @@ build:
     - export CFLAGS="-fPIC -O3" CXXFLAGS="-fPIC -O3"
     - cmake -DWITH_DEBUG=YES -Wno-dev -DCMAKE_CXX_STANDARD=23 -DCMAKE_CXX_STANDARD_REQUIRED=ON -DCMAKE_CXX_EXTENSIONS=OFF ..
     - make -j "$(nproc --all)" 
-    - make -j "$(nproc --all)" || (echo "make failed -- dumping cfitsio config.log(s)"; find .. -type f -name config.log -maxdepth 4 -exec sh -c 'echo "=== {} ==="; sed -n "1,200p" "{}"' \; ; false)
-    - ctest --output-on-failure
-    - ls
-    - ls testdata
+    #- make -j "$(nproc --all)" || (echo "make failed -- dumping cfitsio config.log(s)"; find .. -type f -name config.log -maxdepth 4 -exec sh -c 'echo "=== {} ==="; sed -n "1,200p" "{}"' \; ; false)
+    #- ctest --output-on-failure
+    #- ls
+    #- ls testdata
   artifacts:
     expire_in: 2 hrs
     paths:
     - build
+  
+test:
+  stage: test
+  dependencies:
+    - build
+  script:
+  - cd build
+  - ctest --output-on-failure
+
+create-pages:
+  stage: deploy
+  dependencies:
+    - build
+  script:
+    - mkdir .public
+    - cd build
+    - cmake ..
+    - make doc
+    - mv doc/* ../.public
+    - cd ..
+    - mv .public public
+  pages:
+    expire_in: 1 week
+
 
