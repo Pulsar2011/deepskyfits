@@ -306,15 +306,15 @@ TEST(FITSmanager, exception_manager)
     ASSERT_ANY_THROW(fm.AppendKey("KEY", TSTRING, "VAL", "CMT"));
 
 #ifdef Darwinx86_64
-    fm.Open("build/testdata/rosat_pspc_rdf2_3_bk1.fits");
+    fm.OpenFile("build/testdata/rosat_pspc_rdf2_3_im2.fits");
 #else
-    fm.Open("testdata/rosat_pspc_rdf2_3_bk1.fits");
+    fm.OpenFile("testdata/rosat_pspc_rdf2_3_im2.fits");
 #endif
     ASSERT_TRUE(fm.isOpen());
-    ASSERT_ANY_THROW(fm.GetHeaderAtIndex(2));
+    ASSERT_ANY_THROW(fm.GetHeaderAtIndex(4));
     ASSERT_ANY_THROW(fm.GetImageAtIndex(2));
-    ASSERT_ANY_THROW(fm.GetTableAtIndex(2));
-    ASSERT_ANY_THROW(fm.MoveToHDU(2));
+    ASSERT_ANY_THROW(fm.GetTableAtIndex(4));
+    ASSERT_ANY_THROW(fm.MoveToHDU(4));
 
     fm.Close();
     ASSERT_ANY_THROW(fm.AppendKeyToHeader(1, "KEY", TSTRING, "VAL", "CMT"));

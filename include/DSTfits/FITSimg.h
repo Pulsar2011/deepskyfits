@@ -31,6 +31,7 @@
 #include "FITSexception.h"
 #include "FITSstatistic.h"
 #include "FITSdata.h" // <- add include for FitsArrayBase / FitsArray
+#include "FITSwcs.h"
 
 namespace DSL
 {
@@ -57,6 +58,8 @@ namespace DSL
         int eqBITPIX, BITPIX;                 //!< Type of data contained into the image
         std::string name;                         //!< Extension name
         int img_status;
+
+        FITSwcs fwcs;
 
         // helper: call fn with std::valarray<T>& when underlying storage is T; returns true if matched
         template<typename U, typename Fn>
@@ -131,10 +134,7 @@ namespace DSL
         static FITScube* DoubleFITSimg     (const std::vector<size_t>& );
 
 #pragma endregion
-#pragma region * Static member
-        static bool debug;
-        
-#pragma endregion
+
 #pragma region * Accessor
         size_t Size(const size_t& i = 0) const ;                       //!< Get number of pixel of the axe
         size_t           Nelements() const;                            //!< Get total number of pixel
