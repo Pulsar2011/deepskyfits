@@ -18,6 +18,10 @@
 #include <iostream>
 #include <sstream>
 
+// WCSLIB includes
+#include <wcslib/wcs.h>
+#include <wcslib/wcshdr.h>
+
 
 namespace DSL
 {
@@ -79,44 +83,74 @@ namespace DSL
         static_ss = ss;
         return static_ss.c_str();
     }
-        
-        FITSwarning::FITSwarning():std::exception(),cname(),cfun(),msg()
-        {};
-        
-        FITSwarning::FITSwarning(const std::string &name):std::exception(),cname(name),cfun(),msg()
-        {};
-        
-        FITSwarning::FITSwarning(const std::string &name, const std::string &fun):std::exception(),cname(name),cfun(fun),msg()
-        {};
-        
-        FITSwarning::FITSwarning(const std::string &name, const std::string &fun, const std::string& m):std::exception(),cname(name),cfun(fun),msg(m)
-        {};
-        
-        const char* FITSwarning::what() const noexcept
-        {
-            std::string stream = std::string();
-            
-            stream+="\n";
-            stream+="\033[37;44mWARNING";
-            
-            if(cname.size() > 1)
-            {
-                stream+=" ["+cname;
-                if(cfun.size() > 1)
-                    stream+="::"+cfun;
-                stream+="]: ";
-            }
-            
-            stream+=" !!!\033[0m\n";
-            
-            if(msg.size() > 1)
-                stream+="     "+msg+"\033[0m\n";
-            
-            stream+="\n";
 
-            static std::string static_stream;
-            static_stream = stream;
-            return static_stream.c_str();  
+    const char* WCSexception::what() const noexcept
+    {        
+        std::string ss = std::string("\n");
+        
+        ss += "\033[1;35;47m***";
+        
+        if(cname.size() > 1)
+        {
+            ss += " ["+cname;
+            if(cfun.size() > 1)
+                ss += "::"+ cfun;
+            ss+="]: ";
         }
+        
+        ss+="Errors *** ";
+        
+        if(msg.size() > 1)
+            ss+=msg+"\n";
+        
+        ss += "\033[1;35;47mWCS Error Code: " + std::to_string(err) + "\n";
+        ss += "Message: " + std::string(wcs_errmsg[err]) + "\n";
+        
+        ss += "\033[0m\n";
+
+        // FIX: Use static buffer to avoid returning pointer to local variable
+        static std::string static_ss;
+        static_ss = ss;
+        return static_ss.c_str();
+    }
+        
+    FITSwarning::FITSwarning():std::exception(),cname(),cfun(),msg()
+    {};
+    
+    FITSwarning::FITSwarning(const std::string &name):std::exception(),cname(name),cfun(),msg()
+    {};
+    
+    FITSwarning::FITSwarning(const std::string &name, const std::string &fun):std::exception(),cname(name),cfun(fun),msg()
+    {};
+    
+    FITSwarning::FITSwarning(const std::string &name, const std::string &fun, const std::string& m):std::exception(),cname(name),cfun(fun),msg(m)
+    {};
+    
+    const char* FITSwarning::what() const noexcept
+    {
+        std::string stream = std::string();
+        
+        stream+="\n";
+        stream+="\033[37;44mWARNING";
+        
+        if(cname.size() > 1)
+        {
+            stream+=" ["+cname;
+            if(cfun.size() > 1)
+                stream+="::"+cfun;
+            stream+="]: ";
+        }
+        
+        stream+=" !!!\033[0m\n";
+        
+        if(msg.size() > 1)
+            stream+="     "+msg+"\033[0m\n";
+        
+        stream+="\n";
+
+        static std::string static_stream;
+        static_stream = stream;
+        return static_stream.c_str();  
+    }
         
 }

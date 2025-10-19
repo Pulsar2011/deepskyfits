@@ -595,7 +595,6 @@ TEST(FITShdu_out, asString)
     {
         if(k < 3)
         {
-            size_t pos = (k+1) * 80;
             std::string thisStr = out.substr(k*80, 80);
             EXPECT_EQ(thisStr.find("AKEY"+std::to_string(k+1)), 0);
             EXPECT_EQ(thisStr.find("="), 9-1);
@@ -607,13 +606,15 @@ TEST(FITShdu_out, asString)
             out.erase(0, (k) * 80);
             std::string thisStr = out.substr(0, out.find("HISTORY")-1);
             EXPECT_EQ(thisStr.find("COMMENT"), 0);
-            EXPECT_EQ(thisStr.find("          "), 80);
+            thisStr.erase(0,80);
+            EXPECT_EQ(thisStr.find("COMMENT "), 0);
         }
         else if(k==4)
         {
             out.erase(0, out.find("HISTORY"));
-            EXPECT_EQ(out.find("HISTORY   "), 0);
-            EXPECT_EQ(out.find("          "), 80);
+            EXPECT_EQ(out.find("HISTORY "), 0);
+            out.erase(0,80);
+            EXPECT_EQ(out.find("HISTORY "), 0);
         }
     }
 

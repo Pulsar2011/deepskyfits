@@ -261,12 +261,11 @@ namespace DSL
         try
         {
             if(fvalue.size()+fcomment.size() >= 80)
-                throw FITSwarning("FITSkeyword","Process","Comment string is too long. The comment string will be trunctated as \n       \033[33m'"+fcomment+"'\033[33m");
+                throw FITSwarning("FITSkeyword","Process","FITS key card string is too long. It may be troncated later.\n       \033[33m'"+fvalue+" / "+fcomment+"'\033[33m");
         }
         catch(std::exception &e)
         {
             std::cerr<<e.what()<<std::flush;
-            fcomment.resize(80-fvalue.size()-1);
         }
     }
     
@@ -463,6 +462,43 @@ namespace DSL
         
         out<<tmp_string<<" \033[34m["<<ftype<<": "<<FITSkeyword::GetDataType(ftype)<<"]\033[0m";
     }
+
+    /**
+     * @brief 
+     * 
+     */
+    std::string FITSkeyword::asString() const
+    {
+        std::string tmp_string = std::string();
+        
+        if(ftype == fChar || ftype == fUndef)
+        {
+            tmp_string += "'"+fvalue+"'";
+            while ((tmp_string.size()+10)<30)
+                tmp_string+=" ";
+        }
+        else
+        {
+            while((tmp_string.size()+10+fvalue.size()) < 30)
+                tmp_string+=" ";
+
+            tmp_string += fvalue;
+        }
+        
+        if(tmp_string.size()+10 > 90)
+            return tmp_string;
+
+        tmp_string += " / ";
+        tmp_string += fcomment;
+
+        while( ((tmp_string.size()+10)%80))
+            tmp_string+=" ";
+
+        if(tmp_string.size()+10 > 80)
+            tmp_string.resize(80-10);  
+
+        return tmp_string;
+    }
     
 #pragma mark - FITShdu class implementation
 #pragma mark * ctor/dtor
@@ -632,6 +668,70 @@ namespace DSL
             iKey->second.Dump( out );
             out<<std::endl;
         }
+    }
+
+    /**
+     * @details Return FITS HDU content as a string.
+     * @return string containing the FITS HDU KEY CARDS
+     */
+    std::string FITShdu::asString() const
+    {
+        std::string out = std::string();
+        for(FITSDictionary::const_iterator iKey = hdu.cbegin(); iKey != hdu.cend(); iKey++)
+        {
+            std::string tmp_string = std::string();
+
+            if(iKey->first.size() > 8)
+                tmp_string += iKey->first.substr(0,8);
+            else
+                 tmp_string += iKey->first;
+
+            while (tmp_string.size() < 8)
+                tmp_string += " ";
+            
+            if(iKey->first == "COMMENT" || iKey->first == "HISTORY")
+                tmp_string += "  ";
+            else
+                tmp_string += "= ";
+
+            tmp_string += iKey->second.asString();
+
+            if(iKey->first == "COMMENT" || iKey->first == "HISTORY")
+            {
+                while(tmp_string.find_first_of("'") != std::string::npos)
+                    tmp_string.erase(tmp_string.find_first_of("'"), 1);
+                
+                if(tmp_string.size() > 80)
+                {
+                    size_t pos =1;
+                    while ((tmp_string.size()%80))
+                    {
+                        if(pos*80 < tmp_string.size())
+                            tmp_string.insert(pos*80, iKey->first+std::string("  "));
+                        else
+                        {
+                            while ((tmp_string.size()%80))
+                                tmp_string+=" ";
+                            continue;
+                        }
+
+                        if((verbose&verboseLevel::VERBOSE_DEBUG)==verboseLevel::VERBOSE_DEBUG)
+                            std::cout<<"\033[34m[DEBUG]\033[0m FITShdu::asString() - Long COMMENT/HISTORY string detected. Inserted line break at pos "<<pos*80<<"."<<std::endl
+                            <<tmp_string<<std::endl;
+                        pos++;
+                    }
+                }
+            }
+
+            out += tmp_string;
+        }
+
+        std::string endStr = "END     ";
+        while ((out.size()+endStr.size()) % 2880)
+            out += " ";
+        out += endStr;
+
+        return out;
     }
 
 #pragma mark * Accessor

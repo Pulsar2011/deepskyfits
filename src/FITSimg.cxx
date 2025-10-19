@@ -27,8 +27,6 @@ namespace DSL
 class FITSmanager;
 
 #pragma region - FITScube class implementation
-    
-    bool FITScube::debug = false;
 
 #pragma region * protected member function
     
@@ -83,7 +81,7 @@ class FITSmanager;
     /**
      *  @details Create a new empty FITS cube
      */
-    FITScube::FITScube()
+    FITScube::FITScube():fwcs()
     {
         init();
     }
@@ -92,10 +90,11 @@ class FITSmanager;
      *  @details Read current HDU of the fitsfile to extract a 2D images
      *  @param fptr: Pointer to the fitfile
      */
-    FITScube::FITScube(const std::shared_ptr<fitsfile>& fptr)
+    FITScube::FITScube(const std::shared_ptr<fitsfile>& fptr):fwcs()
     {
         init();
-        
+
+
         if(fptr == nullptr || fptr.use_count() < 1)
         {
             img_status = SHARED_NULPTR;
@@ -117,6 +116,10 @@ class FITSmanager;
         
         FITShdu tmp(fptr);
         hdu.swap(tmp);
+
+        FITSwcs _wcs(fptr);
+        std::swap(fwcs, _wcs);
+        
         
         //- GET BASIC INFORMATION RELATED TO THE IMAGE
         //  * GET NUMBER OF AXIS
@@ -183,7 +186,7 @@ class FITSmanager;
      * @details Copie constructor
      * @param cube: FITS data cube to be copied.
      */
-    FITScube::FITScube(const FITScube& cube)
+    FITScube::FITScube(const FITScube& cube):fwcs()
     {
         if(mask.size() > 1)
             mask.~valarray<bool>();
