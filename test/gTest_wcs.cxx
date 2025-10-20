@@ -22,7 +22,11 @@ TEST(FITS_wcs, readFromHdu)
     verbose |= verboseLevel::VERBOSE_WCS;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
+#ifdef Darwinx86_64
     FITSmanager fm("build/testdata/DSS.fits", true);
+#else
+    FITSmanager fm("testdata/DSS.fits", true);
+#endif
 
     std::shared_ptr<FITShdu> hdu = fm.GetPrimaryHeader();
     FITShdu hdu_ref = FITShdu(*hdu);
@@ -50,7 +54,11 @@ TEST(FITS_wcs, readFromPHdu)
     verbose |= verboseLevel::VERBOSE_WCS;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
+#ifdef Darwinx86_64
     FITSmanager fm("build/testdata/DSS.fits", true);
+#else
+    FITSmanager fm("testdata/DSS.fits", true);
+#endif
 
     std::shared_ptr<FITShdu> hdu = fm.GetPrimaryHeader();
 
@@ -78,7 +86,11 @@ TEST(FITS_wcs, readFromFitfile)
     verbose |= verboseLevel::VERBOSE_WCS;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
+#ifdef Darwinx86_64
     FITSmanager fm("build/testdata/DSS.fits", true);
+#else
+    FITSmanager fm("testdata/DSS.fits", true);
+#endif
     int hdu_num = 0;
 
     fm.MoveToPrimary();
