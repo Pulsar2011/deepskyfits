@@ -113,3 +113,131 @@ TEST(FITS_wcs, readFromFitfile)
     EXPECT_NEAR(wcs.CRPIX(2,1), 446.000000,1e-7);
     EXPECT_NEAR(wcs.CRPIX(2,2), 447.000000,1e-7);
 }
+
+TEST(FITS_wcs, ConvertBackToString)
+{
+    verbose |= verboseLevel::VERBOSE_WCS;
+
+    // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
+#ifdef Darwinx86_64
+    FITSmanager fm("build/testdata/DSS.fits", true);
+#else
+    FITSmanager fm("testdata/DSS.fits", true);
+#endif  
+
+    std::shared_ptr<FITShdu> hdu = fm.GetPrimaryHeader();
+    FITSwcs wcs(hdu);
+
+    EXPECT_EQ(wcs.getStatus(), WCSERR_SUCCESS);
+    EXPECT_EQ(wcs.getNumberOfWCS(), 3);
+
+    std::string wcs_header = wcs.asString();
+    EXPECT_TRUE(wcs_header.find("WCSAXES " )!= std::string::npos);
+    EXPECT_TRUE(wcs_header.find("WCSAXESA")!= std::string::npos);
+    EXPECT_TRUE(wcs_header.find("WCSAXESB")!= std::string::npos);
+    EXPECT_TRUE(wcs_header.find("CRPIX1" )!= std::string::npos);
+    EXPECT_TRUE(wcs_header.find("CRPIX1A")!= std::string::npos);
+    EXPECT_TRUE(wcs_header.find("CRPIX1B")!= std::string::npos);
+    EXPECT_TRUE(wcs_header.find("CRPIX2" )!= std::string::npos);
+    EXPECT_TRUE(wcs_header.find("CRPIX2A")!= std::string::npos);
+    EXPECT_TRUE(wcs_header.find("CRPIX2B")!= std::string::npos);
+    EXPECT_TRUE(wcs_header.find("CRVAL1" )!= std::string::npos);
+    EXPECT_TRUE(wcs_header.find("CRVAL1A")!= std::string::npos);
+    EXPECT_TRUE(wcs_header.find("CRVAL1B")!= std::string::npos);
+    EXPECT_TRUE(wcs_header.find("CRVAL2" )!= std::string::npos);
+    EXPECT_TRUE(wcs_header.find("CRVAL2A")!= std::string::npos);
+    EXPECT_TRUE(wcs_header.find("CRVAL2B")!= std::string::npos);
+
+    wcs_header.clear();
+    wcs_header = wcs.asString(0);
+    EXPECT_TRUE (wcs_header.find("WCSAXES ")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("WCSAXESA")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("WCSAXESB")!= std::string::npos);
+    EXPECT_TRUE (wcs_header.find("CRPIX1 ")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRPIX1A")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRPIX1B")!= std::string::npos);
+    EXPECT_TRUE (wcs_header.find("CRPIX2 ")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRPIX2A")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRPIX2B")!= std::string::npos);
+    EXPECT_TRUE (wcs_header.find("CRVAL1 ")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRVAL1A")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRVAL1B")!= std::string::npos);
+    EXPECT_TRUE (wcs_header.find("CRVAL2 ")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRVAL2A")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRVAL2B")!= std::string::npos);
+
+    wcs_header.clear();
+    wcs_header = wcs.asString(1);
+    EXPECT_FALSE(wcs_header.find("WCSAXES " )!= std::string::npos);
+    EXPECT_TRUE (wcs_header.find("WCSAXESA")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("WCSAXESB")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRPIX1 ")!= std::string::npos);
+    EXPECT_TRUE (wcs_header.find("CRPIX1A")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRPIX1B")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRPIX2 ")!= std::string::npos);
+    EXPECT_TRUE (wcs_header.find("CRPIX2A")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRPIX2B")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRVAL1 ")!= std::string::npos);
+    EXPECT_TRUE (wcs_header.find("CRVAL1A")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRVAL1B")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRVAL2 ")!= std::string::npos);
+    EXPECT_TRUE (wcs_header.find("CRVAL2A")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRVAL2B")!= std::string::npos);
+
+    wcs_header.clear();
+    wcs_header = wcs.asString(2);
+    EXPECT_FALSE(wcs_header.find("WCSAXES ")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("WCSAXESA")!= std::string::npos);
+    EXPECT_TRUE (wcs_header.find("WCSAXESB")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRPIX1 ")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRPIX1A")!= std::string::npos);
+    EXPECT_TRUE (wcs_header.find("CRPIX1B")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRPIX2 ")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRPIX2A")!= std::string::npos);
+    EXPECT_TRUE (wcs_header.find("CRPIX2B")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRVAL1 ")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRVAL1A")!= std::string::npos);
+    EXPECT_TRUE (wcs_header.find("CRVAL1B")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRVAL2 ")!= std::string::npos);
+    EXPECT_FALSE(wcs_header.find("CRVAL2A")!= std::string::npos);
+    EXPECT_TRUE (wcs_header.find("CRVAL2B")!= std::string::npos);
+}
+
+TEST(FITS_wcs, ConvertBackToHdu)
+{
+    verbose |= verboseLevel::VERBOSE_WCS;
+
+    // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
+#ifdef Darwinx86_64
+    FITSmanager fm("build/testdata/DSS.fits", true);
+#else
+    FITSmanager fm("testdata/DSS.fits", true);
+#endif  
+
+    std::shared_ptr<FITShdu> hdu = fm.GetPrimaryHeader();
+    FITSwcs wcs(hdu);
+
+    EXPECT_EQ(wcs.getStatus(), WCSERR_SUCCESS);
+    EXPECT_EQ(wcs.getNumberOfWCS(), 3);
+
+    int idx = -1;
+    while(idx < wcs.getNumberOfWCS())
+    {
+        FITShdu wcs_header = wcs.asFITShdu();
+        for(FITSDictionary::const_iterator i = hdu->begin(); i != hdu->end(); ++i)
+        {
+            std::string key = i->first;
+            if(hdu->Exists(key))
+            {
+
+                std::string val_ref = i->second.value();
+                EXPECT_EQ(val_ref, hdu->GetEntry(key)->second.value()) << "Mismatch for key " << key <<" = " << val_ref<<" | "<< hdu->GetEntry(key)->second.value(); 
+            }
+            else
+            {
+                FAIL() << "Key " << key << " missing in WCS header";
+            }
+        }
+        idx++;
+    }
+}

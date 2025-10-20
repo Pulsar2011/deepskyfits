@@ -9,6 +9,7 @@
 //  Licence text: https://creativecommons.org/licenses/by-nc/4.0/
 
 #include <stdexcept>
+#include <thread>
 
 #include <fitsio.h>
 
@@ -294,6 +295,407 @@ namespace DSL
 
             return fwcs.get()[wcsIndex].cdelt[ axis-1 ];
         }
+
+#pragma endregion
+#pragma region * Conversion
+
+        worldVectors FITSwcs::pixel2world(const size_t& wcsIndex, const pixelVectors& px)
+        {
+            if(fwcs == nullptr)
+            {
+                std::string errmsg = wcs_errmsg[WCSERR_UNSET];
+                throw WCSexception(WCSERR_UNSET,"FITSwcs","pix2world",errmsg);
+            }
+
+            if(wcsIndex >= static_cast<size_t>(fnwcs))
+            {
+                std::string errmsg = wcs_errmsg[WCSERR_BAD_PARAM];
+                throw WCSexception(WCSERR_BAD_PARAM,"FITSwcs","pix2world",errmsg);
+            }
+
+            if(px .size() == 0)
+            {
+                std::string errmsg = wcs_errmsg[WCSERR_BAD_PIX];
+                throw WCSexception(WCSERR_BAD_PIX,"FITSwcs","pix2world",errmsg);
+            }
+
+            if(px[0].size() == 0)
+            {
+                std::string errmsg = wcs_errmsg[WCSERR_BAD_PIX];
+                throw WCSexception(WCSERR_BAD_PIX,"FITSwcs","pix2world",errmsg);
+            }
+
+            // Use heap-backed flattened arrays to avoid VLAs (Clang warns about VLA extension)
+            const int npix  = static_cast<const int>(px.size());
+            const int ncoord = static_cast<const int>(px[0].size());
+            std::vector<double> pixC(static_cast<size_t>(npix) * ncoord);
+
+            // Parallel fill: split rows among threads; each thread writes a disjoint range -> no data races
+            unsigned int hw = std::thread::hardware_concurrency();
+            int nthreads = (hw == 0) ? 1 : static_cast<int>(std::min<unsigned int>(static_cast<unsigned int>(npix), hw));
+
+            if (nthreads <= 1)
+            {
+                for (int i = 0; i < npix; ++i)
+                    for (int j = 0; j < ncoord; ++j)
+                        pixC[static_cast<size_t>(i) * ncoord + j] = px[static_cast<size_t>(i)][static_cast<size_t>(j)];
+            }
+            else
+            {
+                // Define number of worker threads
+                std::vector<std::thread> workers;
+                workers.reserve(static_cast<size_t>(nthreads));
+
+                // Worker lambda to fill a chunk of rows
+                auto worker = [&](int start, int end){
+                    for (int ii = start; ii < end; ++ii)
+                    {
+                        const size_t base = static_cast<size_t>(ii) * ncoord;
+                        for (int j = 0; j < ncoord; ++j)
+                            pixC[base + j] = px[static_cast<size_t>(ii)][static_cast<size_t>(j)];
+                    }
+                };
+
+                // Divide work among threads
+                int chunk = npix / nthreads;
+                int rem = npix % nthreads;
+                int cur = 0;
+                for (int t = 0; t < nthreads; ++t)
+                {
+                    int start = cur;
+                    int size = chunk + (t < rem ? 1 : 0);
+                    int end = start + size;
+                    workers.emplace_back(worker, start, end);
+                    cur = end;
+                }
+
+                // Wait for all threads to finish
+                for (auto &th : workers) th.join();
+            }
+
+            std::vector<double> imgcrd_vec(static_cast<size_t>(npix) * ncoord);
+            std::vector<double> phi_vec(static_cast<size_t>(npix) * ncoord);
+            std::vector<double> theta_vec(static_cast<size_t>(npix) * ncoord);
+            std::vector<double> world_vec(static_cast<size_t>(npix) * ncoord);
+            std::vector<int> stat_vec(static_cast<size_t>(npix));
+
+            // wcsp2s expects (const struct wcsprm*, ncoord, npix, pixC, imgcrd, phi, theta, world, stat)
+            // pass flattened buffers by casting to the expected pointer-to-array type (this is the usual approach
+            // when wrapping C APIs that use runtime 2D array params).
+            
+            if( (fwcs_status = wcsp2s(&fwcs.get()[wcsIndex],
+                                      ncoord,
+                                      npix,
+                                      pixC.data(),
+                                      imgcrd_vec.data(),
+                                      phi_vec.data(),
+                                      theta_vec.data(),
+                                      world_vec.data(),
+                                      stat_vec.data())) )
+            {
+                std::string errmsg = wcs_errmsg[fwcs_status];
+                throw WCSexception(fwcs_status,"FITSwcs","pix2world",errmsg);
+            }
+
+            // Parallelize building the worldVectors output.
+            // Preallocate and let each thread write distinct indices (no synchronization needed).
+            worldVectors wv(static_cast<size_t>(npix)); // each slot will be filled (or left empty on error)
+
+            // Reuse earlier computed of number of threads nthreads
+            if (nthreads <= 1)
+            {
+
+                for (int i = 0; i < npix; ++i)
+                {
+                    if (stat_vec[static_cast<size_t>(i)] > 0)
+                    {
+                        WCSexception e(stat_vec[static_cast<size_t>(i)],"FITSwcs","pix2world","Error converting pixel to world coordinates");
+                        if((verbose & verboseLevel::VERBOSE_DEBUG)==(verboseLevel::VERBOSE_WCS&verboseLevel::VERBOSE_BASIC))
+                            std::cerr << e.what() << std::endl;
+                        
+                        // leave wv[i] empty
+                        continue;
+                    }
+                    
+                    //Reserve and fill in the world coordinates
+                    wv[static_cast<size_t>(i)].reserve(static_cast<size_t>(ncoord));
+                    const size_t base = static_cast<size_t>(i) * ncoord;
+                    for (int j = 0; j < ncoord; ++j)
+                        wv[static_cast<size_t>(i)].push_back(world_vec[base + j]);
+                }
+            }
+            else
+            {
+                // Define number of worker threads
+                std::vector<std::thread> workers;
+                workers.reserve(static_cast<size_t>(nthreads));
+
+                // Worker lambda to fill a chunk of rows
+                auto worker = [&](int start, int end){
+                    for (int ii = start; ii < end; ++ii)
+                    {
+                        if (stat_vec[static_cast<size_t>(ii)] > 0)
+                        {
+                            WCSexception e(stat_vec[static_cast<size_t>(ii)],"FITSwcs","pix2world","Error converting pixel to world coordinates");
+                            if((verbose & verboseLevel::VERBOSE_DEBUG)==(verboseLevel::VERBOSE_WCS&verboseLevel::VERBOSE_BASIC))
+                                std::cerr << e.what() << std::endl;
+
+                            continue; // leave wv[ii] empty
+                        }
+
+                        //Reserve and fill in the world coordinates
+                        const size_t base = static_cast<size_t>(ii) * ncoord;
+                        auto &out = wv[static_cast<size_t>(ii)];
+                        out.reserve(static_cast<size_t>(ncoord));
+                        for (int j = 0; j < ncoord; ++j)
+                            out.push_back(world_vec[base + j]);
+                    }
+                };
+
+                // Divide work among threads
+                int chunk = npix / nthreads;
+                int rem = npix % nthreads;
+                int cur = 0;
+                for (int t = 0; t < nthreads; ++t)
+                {
+                    int start = cur;
+                    int size = chunk + (t < rem ? 1 : 0);
+                    int end = start + size;
+                    workers.emplace_back(worker, start, end);
+                    cur = end;
+                }
+
+                // Wait for all threads to finish
+                for (auto &th : workers) th.join();
+            }
+
+            return wv;
+        }
+
+        pixelVectors FITSwcs::world2pixel(const size_t& wcsIndex, const worldVectors& px)
+        {
+            if(fwcs == nullptr)
+            {
+                std::string errmsg = wcs_errmsg[WCSERR_UNSET];
+                throw WCSexception(WCSERR_UNSET,"FITSwcs","world2pixel",errmsg);
+            }
+
+            if(wcsIndex >= static_cast<size_t>(fnwcs))
+            {
+                std::string errmsg = wcs_errmsg[WCSERR_BAD_PARAM];
+                throw WCSexception(WCSERR_BAD_PARAM,"FITSwcs","world2pixel",errmsg);
+            }
+
+            if(px .size() == 0)
+            {
+                std::string errmsg = wcs_errmsg[WCSERR_BAD_PIX];
+                throw WCSexception(WCSERR_BAD_PIX,"FITSwcs","world2pixel",errmsg);
+            }
+
+            if(px[0].size() == 0)
+            {
+                std::string errmsg = wcs_errmsg[WCSERR_BAD_PIX];
+                throw WCSexception(WCSERR_BAD_PIX,"FITSwcs","world2pixel",errmsg);
+            }
+
+            // Use heap-backed flattened arrays to avoid VLAs (Clang warns about VLA extension)
+            const int npix  = static_cast<const int>(px.size());
+            const int ncoord = static_cast<const int>(px[0].size());
+            std::vector<double> worldC(static_cast<size_t>(npix) * ncoord);
+
+            // Parallel fill: split rows among threads; each thread writes a disjoint range -> no data races
+            unsigned int hw = std::thread::hardware_concurrency();
+            int nthreads = (hw == 0) ? 1 : static_cast<int>(std::min<unsigned int>(static_cast<unsigned int>(npix), hw));
+
+            if (nthreads <= 1)
+            {
+                for (int i = 0; i < npix; ++i)
+                    for (int j = 0; j < ncoord; ++j)
+                        worldC[static_cast<size_t>(i) * ncoord + j] = px[static_cast<size_t>(i)][static_cast<size_t>(j)];
+            }
+            else
+            {
+                // Define number of worker threads
+                std::vector<std::thread> workers;
+                workers.reserve(static_cast<size_t>(nthreads));
+
+                // Worker lambda to fill a chunk of rows
+                auto worker = [&](int start, int end){
+                    for (int ii = start; ii < end; ++ii)
+                    {
+                        const size_t base = static_cast<size_t>(ii) * ncoord;
+                        for (int j = 0; j < ncoord; ++j)
+                            worldC[base + j] = px[static_cast<size_t>(ii)][static_cast<size_t>(j)];
+                    }
+                };
+
+                // Divide work among threads
+                int chunk = npix / nthreads;
+                int rem = npix % nthreads;
+                int cur = 0;
+                for (int t = 0; t < nthreads; ++t)
+                {
+                    int start = cur;
+                    int size = chunk + (t < rem ? 1 : 0);
+                    int end = start + size;
+                    workers.emplace_back(worker, start, end);
+                    cur = end;
+                }
+
+                // Wait for all threads to finish
+                for (auto &th : workers) th.join();
+            }
+
+            std::vector<double> imgcrd_vec(static_cast<size_t>(npix) * ncoord);
+            std::vector<double> phi_vec(static_cast<size_t>(npix) * ncoord);
+            std::vector<double> theta_vec(static_cast<size_t>(npix) * ncoord);
+            std::vector<double> pixel_vec(static_cast<size_t>(npix) * ncoord);
+            std::vector<int> stat_vec(static_cast<size_t>(npix));
+
+            // wcss2p expects (const struct wcsprm*, ncoord, npix, pixC, imgcrd, phi, theta, world, stat)
+            // pass flattened buffers by casting to the expected pointer-to-array type (this is the usual approach
+            // when wrapping C APIs that use runtime 2D array params).
+            if( (fwcs_status = wcss2p(&fwcs.get()[wcsIndex],
+                                      ncoord,
+                                      npix,
+                                      worldC.data(),
+                                      phi_vec.data(),
+                                      theta_vec.data(),
+                                      imgcrd_vec.data(),
+                                      pixel_vec.data(),
+                                      stat_vec.data())) )
+            {
+                std::string errmsg = wcs_errmsg[fwcs_status];
+                throw WCSexception(fwcs_status,"FITSwcs","world2pixel",errmsg);
+            }
+
+            // Parallelize building the worldVectors output.
+            // Preallocate and let each thread write distinct indices (no synchronization needed).
+            pixelVectors wv(static_cast<size_t>(npix)); // each slot will be filled (or left empty on error)
+
+            // Reuse earlier computed of number of threads nthreads
+            if (nthreads <= 1)
+            {
+
+                for (int i = 0; i < npix; ++i)
+                {
+                    if (stat_vec[static_cast<size_t>(i)] > 0)
+                    {
+                        WCSexception e(stat_vec[static_cast<size_t>(i)],"FITSwcs","world2pixel","Error converting world to pixel coordinates");
+                        if((verbose & verboseLevel::VERBOSE_DEBUG)==(verboseLevel::VERBOSE_WCS&verboseLevel::VERBOSE_BASIC))
+                            std::cerr << e.what() << std::endl;
+                        
+                        // leave wv[i] empty
+                        continue;
+                    }
+                    
+                    //Reserve and fill in the pixel coordinates
+                    wv[static_cast<size_t>(i)].reserve(static_cast<size_t>(ncoord));
+                    const size_t base = static_cast<size_t>(i) * ncoord;
+                    for (int j = 0; j < ncoord; ++j)
+                        wv[static_cast<size_t>(i)].push_back(pixel_vec[base + j]);
+                }
+            }
+            else
+            {
+                // Define number of worker threads
+                std::vector<std::thread> workers;
+                workers.reserve(static_cast<size_t>(nthreads));
+
+                // Worker lambda to fill a chunk of rows
+                auto worker = [&](int start, int end){
+                    for (int ii = start; ii < end; ++ii)
+                    {
+                        if (stat_vec[static_cast<size_t>(ii)] > 0)
+                        {
+                            WCSexception e(stat_vec[static_cast<size_t>(ii)],"FITSwcs","world2pixel","Error converting world to pixel coordinates");
+                            if((verbose & verboseLevel::VERBOSE_DEBUG)==(verboseLevel::VERBOSE_WCS&verboseLevel::VERBOSE_BASIC))
+                                std::cerr << e.what() << std::endl;
+
+                            continue; // leave wv[ii] empty
+                        }
+
+                        //Reserve and fill in the world coordinates
+                        const size_t base = static_cast<size_t>(ii) * ncoord;
+                        auto &out = wv[static_cast<size_t>(ii)];
+                        out.reserve(static_cast<size_t>(ncoord));
+                        for (int j = 0; j < ncoord; ++j)
+                            out.push_back(pixel_vec[base + j]);
+                    }
+                };
+
+                // Divide work among threads
+                int chunk = npix / nthreads;
+                int rem = npix % nthreads;
+                int cur = 0;
+                for (int t = 0; t < nthreads; ++t)
+                {
+                    int start = cur;
+                    int size = chunk + (t < rem ? 1 : 0);
+                    int end = start + size;
+                    workers.emplace_back(worker, start, end);
+                    cur = end;
+                }
+
+                // Wait for all threads to finish
+                for (auto &th : workers) th.join();
+            }
+            
+            return wv;
+        }
+
+        std::string FITSwcs::asString(const int& wcsIndex)
+        {
+            if(fwcs == nullptr)
+            {
+                std::string errmsg = wcs_errmsg[WCSERR_UNSET];
+                throw WCSexception(WCSERR_UNSET,"FITSwcs","asHeader",errmsg);
+            }
+
+            if(wcsIndex >= fnwcs)
+            {
+                std::string errmsg = wcs_errmsg[WCSERR_UNSET];
+                throw WCSexception(WCSERR_BAD_PARAM,"FITSwcs","asHeader",errmsg);
+            }
+
+            
+            int nkeyrec = 0;
+            fwcs_status = 0;
+
+            if(wcsIndex < 0)
+            {
+                std::string hdr = std::string();
+                for(int i = 0; i < fnwcs; i++)
+                    hdr += asString(i);
+
+                return hdr;
+            }
+
+            char* header = nullptr;
+            fwcs_status = wcshdo(WCSHDO_all,&fwcs.get()[wcsIndex],&nkeyrec,&header);
+                
+            if (fwcs_status > 0)
+            {
+                std::string errmsg = wcs_errmsg[fwcs_status];
+                throw WCSexception(fwcs_status,"FITSwcs","asHeader",errmsg);
+            }
+
+            std::string shdr(header);
+            free(header);
+
+            return shdr;
+        }
+
+        FITShdu FITSwcs::asFITShdu(const int& wcsIndex)
+        {
+            std::string header = asString(wcsIndex);
+            FITShdu shdr(header);
+
+            return shdr;
+        }
+
+
+#pragma endregion
 
 }
 #pragma endregion

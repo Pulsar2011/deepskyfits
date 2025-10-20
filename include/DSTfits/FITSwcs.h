@@ -25,6 +25,12 @@
 
 namespace DSL
 {
+    typedef std::vector<double> pixelCoords;
+    typedef std::vector<double> worldCoords;
+
+    typedef std::vector<pixelCoords> pixelVectors;
+    typedef std::vector<worldCoords> worldVectors;
+
 #pragma region - FITSwcs class definition
     /**
      *  @class FITSwcs
@@ -128,10 +134,39 @@ namespace DSL
 
             double CDELT(const size_t&) const; //!< Get the CRPIX value for a given WCS index and axis
             double CDELT(const size_t&, const size_t&) const; //!< Get the CRPIX value for a given WCS index and axis
-
-            
             
 #pragma endregion
+
+#pragma region * Conversion
+            /**
+             * @brief Convert pixel coordinates to world coordinates
+             * 
+             * @param wcsIndex World Coordinate System index
+             * @param npixels Number of pixel coordinates
+             * @param pixcrd Array of pixel coordinates
+             * @param world Array to store world coordinates
+             */
+            worldVectors pixel2world(const size_t&, const pixelVectors&);
+
+            /**
+             * @brief Convert world coordinates to pixel coordinates
+             * 
+             * @param wcsIndex World Coordinate System index
+             * @param npixels Number of world coordinates
+             * @param world Array of world coordinates
+             * @param pixcrd Array to store pixel coordinates
+             */
+            pixelVectors world2pixel(const size_t& wcsIndex, const worldVectors&);
+
+            /**
+             * @brief Convert wcs to header string
+             * 
+             * @param wcsIndex Index of the WCS to convert. Default value is 0, all WCS present in the structure will be converted to aa header string.
+             * @return std::string 
+             */
+            std::string asString(const int& wcsIndex=-1); //!< Get WCS header as a string for a given WCS index
+            FITShdu asFITShdu(const int& wcsIndex=-1); //!< Get WCS header as a string for a given WCS index
+#pragma region 
     };
 #pragma endregion
 
