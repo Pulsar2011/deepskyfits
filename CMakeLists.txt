@@ -92,7 +92,7 @@ ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 #-------------------- DARWIN specifics
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 	# Mac OS X specific code
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -m64 -fPIC")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -fPIC")
 
 	set(OperatingSystem "Mac OS X")
 	ADD_DEFINITIONS(-DDarwinx86_64)
@@ -151,7 +151,8 @@ message("-- CMAKE SOURCE DIR  : " ${CMAKE_SOURCE_DIR})
 #-------------------- Find GSL dependencies
 find_package(GSL REQUIRED)
 include_directories(AFTER ${GSL_INCLUDE_DIRS})
-link_directories(${GSL_LIBRARY})
+#link_directories(${GSL_LIBRARY})
+
 if(${GSL_FOUND})
     message("${Blue}-- GSL INC DIR ${ColourReset} ${GSL_INCLUDE_DIRS}")
     message("${Blue}-- GSL LIBRARY DIR ${ColourReset} ${GSL_LIBRARY}")
@@ -314,7 +315,10 @@ target_link_libraries(DSTfits
     PRIVATE curl
     PRIVATE z
     PRIVATE ${WCSLIB_LIBRARY}
+    PRIVATE GSL::gsl
+    PRIVATE GSL::gslcblas
 )
+
 
 #-------------------- Download sample FITS files for testing
 set(TESTDATA_DIR ${CMAKE_SOURCE_DIR}/build/testdata)

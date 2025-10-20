@@ -532,6 +532,15 @@ namespace DSL
         if(header)
             free(header);
     }
+
+    /**
+     *  @brief Constructor
+     *  @param h The FITS header as a string
+     */
+    FITShdu::FITShdu(const std::string & h)
+    {
+        Process( h );
+    }
     
     /**
      *  @brief Constructor
