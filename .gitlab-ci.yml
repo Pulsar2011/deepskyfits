@@ -39,11 +39,7 @@ build:
     - cd build
     - export CFLAGS="-fPIC -O3" CXXFLAGS="-fPIC -O3"
     - cmake -DWITH_DEBUG=YES -Wno-dev -DCMAKE_CXX_STANDARD=23 -DCMAKE_CXX_STANDARD_REQUIRED=ON -DCMAKE_CXX_EXTENSIONS=OFF ..
-    - make -j "$(nproc --all)" 
-    #- make -j "$(nproc --all)" || (echo "make failed -- dumping cfitsio config.log(s)"; find .. -type f -name config.log -maxdepth 4 -exec sh -c 'echo "=== {} ==="; sed -n "1,200p" "{}"' \; ; false)
-    #- ctest --output-on-failure
-    #- ls
-    #- ls testdata
+    - make -j "$(nproc --all)"
   artifacts:
     expire_in: 2 hrs
     paths:
@@ -59,16 +55,16 @@ test:
 
 create-pages:
   stage: deploy
-  dependencies:
-    - build
+  needs:
+    - job: build
+      artifacts: true
   script:
-    - mkdir .public
-    - cd build
-    - cmake ..
+    - mkdir public
+    - ls -l
+    - cmake .
     - make doc
-    - mv doc/* ../.public
-    - cd ..
-    - mv .public public
+    - mv doc/html/* ./public
+    - ls public
   pages:
     expire_in: 1 week
 

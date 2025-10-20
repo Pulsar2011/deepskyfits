@@ -251,7 +251,7 @@ ExternalProject_Add(
 )
 
 add_custom_target(tofits
-    COMMAND /usr/bin/env bash -c "cat \"${CMAKE_SOURCE_DIR}/wcslib/wcslib-8.4/C/test/DSS.keyrec\" | \"${CMAKE_SOURCE_DIR}/build/wcslib/bin/tofits\" > \"${CMAKE_SOURCE_DIR}/build/testdata/DSS.fits\""
+    COMMAND /usr/bin/env bash -c "${CMAKE_SOURCE_DIR}/build/wcslib/bin/tofits <${CMAKE_SOURCE_DIR}/wcslib/wcslib-8.4/C/test/DSS.keyrec> ${CMAKE_SOURCE_DIR}/build/testdata/DSS.fits"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     COMMENT "Run tofit: ${CMAKE_SOURCE_DIR}/build/wcslib/bin/tofits <${CMAKE_SOURCE_DIR}/wcslib/wcslib-8.4/C/test/DSS.keyrec> ${CMAKE_SOURCE_DIR}/build/testdata/DSS.fits"
     VERBATIM
