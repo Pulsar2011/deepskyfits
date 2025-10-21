@@ -195,7 +195,9 @@ namespace DSL
                 
         bool has_only_digits = false;
         
-        if(std::regex_match ( fvalue.begin(), fvalue.end(), std::regex("[+-]*[0-9]+[\\.]*[0-9]*([eE][+-][0-9]+)*")))
+        // Accept integers, decimals and scientific notation: optional sign, digits, optional ".digits", optional exponent
+        static const std::regex numeric_re(R"(^[+-]?(?:\d+)(?:\.\d*)?(?:[eE][+-]?\d+)?$)");
+        if (std::regex_match(fvalue, numeric_re))
             has_only_digits = true;
 
 
