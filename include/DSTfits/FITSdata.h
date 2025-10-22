@@ -32,6 +32,7 @@ namespace DSL
         VERBOSE_NONE    = 0x00,
         VERBOSE_BASIC   = 0x01,
         VERBOSE_DETAIL  = 0xF0,
+        VERBOSE_ALL     = 0x0F,
         VERBOSE_HDU     = 0x02,
         VERBOSE_IMG     = 0x04,
         VERBOSE_TBL     = 0x08,
