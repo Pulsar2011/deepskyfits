@@ -87,7 +87,7 @@ namespace DSL
             /**
              *  @details Default constructor
              */
-            FITSwcs():fwcs(nullptr), fwcs_status(0),fnwcs(0) {};
+            FITSwcs():fwcs(nullptr), fwcs_status(WCSERR_UNSET),fnwcs(0) {};
 
             /**
              *  @brief Constructor from a FITS HDU
@@ -125,6 +125,7 @@ namespace DSL
 
             inline int getStatus() const { return fwcs_status; }   //!< Get the WCS status
             inline int getNumberOfWCS() const { return fnwcs; }    //!< Get the number of WCS structures
+            size_t getNumberOfAxis(const size_t&) const;              //!< Get the number of WCS structures
             
             double CRPIX(const size_t&) const; //!< Get the CRPIX value for a given WCS index and axis
             double CRPIX(const size_t&, const size_t&) const; //!< Get the CRPIX value for a given WCS index and axis
@@ -134,10 +135,47 @@ namespace DSL
 
             double CDELT(const size_t&) const; //!< Get the CRPIX value for a given WCS index and axis
             double CDELT(const size_t&, const size_t&) const; //!< Get the CRPIX value for a given WCS index and axis
+
+            std::vector< std::string > CTYPE(const size_t&) const; //!< Get the CTYPE values for a given WCS index
             
 #pragma endregion
 
 #pragma region * Conversion
+
+            /**
+             * @brief Change the celestial coordinate system to new references
+             * 
+             * @param wcsIndex World Coordinate System index
+             * @param newRefPole Longitude and latitude in the new celestial coordinate system of the pole in the old reference system [deg]
+             * @param oldLon Longitude in the original celestial coordinate system of the pole of the new system [deg]
+             * @param newTYPE Pair of strings defining the new celestial coordinate types for the new system (e.g. ("RA","DEC"), ("GLON","GLAT"), ("ELON","ELAT"), ...)
+             * @param alt Code for alternate coordinate descriptions (i.e. the 'a' in keyword names such as CTYPEia). This is blank for the primary coordinate description, or one of the 26 upper-case letters, A-Z. May be set to the null pointer, or null string if no change is required.
+             */
+            void changeCelestialCorrds(const size_t& wcsIndex,
+                const worldCoords& newRefPole,
+                const double& oldLon,
+                const std::pair<std::string,std::string>& newTYPE,
+                const std::string& alt);
+
+            /**
+             * @brief Change the celestial coordinate system to new references
+             * 
+             * @param wcsIndex World Coordinate System index
+             * @param newRefPole Longitude and latitude in the new celestial coordinate system of the pole in the old reference system [deg]
+             * @param oldLon Longitude in the original celestial coordinate system of the pole of the new system [deg]
+             * @param newTYPE Pair of strings defining the new celestial coordinate types for the new system (e.g. ("RA","DEC"), ("GLON","GLAT"), ("ELON","ELAT"), ...)
+             * @param radsys New reference frame (e.g. "FK5", "FK4", "ICRS", "GALACTIC", "ECLIPTIC", ...). Used when transforming to equatorial coordinates, identified by \c newTYPE ( \c "RA" ; \c "DEC" ). May be set to empty string to preserve the current value. 
+             * @param equinox Equinox of the new reference frame in years. Used when transforming to equatorial coordinates, identified by \c newTYPE ( \c "RA" ; \c "DEC" ). 
+             * @param alt Code for alternate coordinate descriptions (i.e. the 'a' in keyword names such as CTYPEia). This is blank for the primary coordinate description, or one of the 26 upper-case letters, A-Z. May be set to the null pointer, or null string if no change is required.
+             */
+            void changeCelestialCorrds(const size_t& wcsIndex,
+                const worldCoords& newRefPole,
+                const double& oldLon,
+                const std::pair<std::string,std::string>& newTYPE,
+                const std::string& radsys,
+                const double& equinox,
+                const std::string& alt);
+
             /**
              * @brief Convert pixel coordinates to world coordinates
              * 
@@ -161,12 +199,22 @@ namespace DSL
             /**
              * @brief Convert wcs to header string
              * 
-             * @param wcsIndex Index of the WCS to convert. Default value is 0, all WCS present in the structure will be converted to aa header string.
+             * @param wcsIndex Index of the WCS to convert. Default value is -1, all WCS present in the structure will be converted to aa header string.
              * @return std::string 
              */
             std::string asString(const int& wcsIndex=-1); //!< Get WCS header as a string for a given WCS index
+
+            /**
+             * @brief Convert wcs to header 
+             * 
+             * @param wcsIndex Index of the WCS to convert. Default value is -1, all WCS present in the structure will be converted to a FITS header.
+             * @return FITShdu dictionary with WCS keycards 
+             */
             FITShdu asFITShdu(const int& wcsIndex=-1); //!< Get WCS header as a string for a given WCS index
-#pragma region 
+#pragma endregion 
+#pragma region * I/O
+            void Dump(const int& wcsIndex=-1) const; //!< Dump WCS information to an output stream
+#pragma endregion
     };
 #pragma endregion
 

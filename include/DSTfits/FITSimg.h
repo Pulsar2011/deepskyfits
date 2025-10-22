@@ -3377,7 +3377,7 @@ namespace DSL
 
                 copy->SetPixelValue(val.sum()/((doMean)?bin_size:1.), n);
 
-                while(msk[pos] && pos < msk.size())
+                while(pos < msk.size() && msk[pos])
                     pos++;
 
                 if( pos 
