@@ -282,6 +282,26 @@ TEST(FITSkeyword_datatype, tt2string)
     EXPECT_EQ(FITSkeyword::GetDataType(fUndef),    std::string("UNDEF"));
 }
 
+TEST(FITSkeyword_asString, ProducesOutput)
+{
+    FITSkeyword k1(std::string("TESTCASE"), std::string("an string"), key_type::fChar);
+    std::string s1 = k1.asString();
+    EXPECT_EQ(s1.size()+10, 80)<< s1 <<"["<<s1.size()<<"]";
+    EXPECT_EQ(s1.find("/"), 32-10-1)<< s1;
+    EXPECT_EQ(s1.find("an string"), 32-10+1)<< s1;
+    EXPECT_EQ(s1.find("'TESTCASE'"), 0)<< s1;
+
+    FITSkeyword k2(std::string("12345678"), std::string("an integer"), key_type::fInt);
+    std::string s2 = k2.asString();
+    EXPECT_EQ(s2.size()+10, 80)<< s2 <<"["<<s2.size()<<"]";
+    EXPECT_EQ(s2.find("/"), 32-10-1)<<s2;
+    EXPECT_EQ(s2.find("12345678"), 32-10-8-2)<<s2 << std::endl << "0123456789012345678901234567890123456789";
+
+    FITSkeyword k3(std::string("This is a very very very long comment string which will be subdivided in multiple different lines such that each line is 80 char long, with the exception of the first line whiche will be shorter than 80. Every 80 char their should be 8 space char to mark begining of a new line"), key_type::fChar);
+    std::string s3 = k3.asString();
+    EXPECT_EQ((s3.size()+10)>80, 1)<< s3 <<"["<<s3.size()<<"]";
+}
+
 #pragma endregion
 #pragma region FITSDictionary
 
@@ -320,6 +340,49 @@ TEST(FITShdu_Constructor, DefaultAndCopy)
     EXPECT_NEAR(copy.GetDoubleValueForKey("TEST_DBL"), 3.14159, 1e-7);
     EXPECT_EQ(copy.GetValueForKey("TEST_STR"), std::string("hello"));
     EXPECT_TRUE(copy.GetBoolValueForKey("TEST_BOOL"));
+}
+
+TEST(FITShdu_Constructor, FromFITSDictionary)
+{
+    FITSDictionary fakeHdu;
+    fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("SIMPLE"),FITSkeyword("T","file does conform to FITS standard")));
+    fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("BITPIX"),FITSkeyword("16","number of bits per data pixel")));
+    fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("NAXIS"),FITSkeyword("2","number of data axes")));
+    fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("NAXIS1"),FITSkeyword("100","length of data axis 1")));
+    fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("NAXIS2"),FITSkeyword("100","length of data axis 2")));
+
+    FITShdu hdu(fakeHdu);
+    EXPECT_EQ(hdu.GetValueForKey("SIMPLE"), "T");
+    EXPECT_EQ(hdu.GetInt16ValueForKey("BITPIX"), 16);
+    EXPECT_EQ(hdu.GetUInt64ValueForKey("NAXIS"), 2);
+    EXPECT_EQ(hdu.GetUInt64ValueForKey("NAXIS1"), 100);
+    EXPECT_EQ(hdu.GetUInt64ValueForKey("NAXIS2"), 100);
+}
+
+TEST(FITShdu_Constructor, FromString)
+{
+    FITSDictionary fakeHdu;
+    fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("SIMPLE"),FITSkeyword("T","file does conform to FITS standard")));
+    fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("BITPIX"),FITSkeyword("16","number of bits per data pixel")));
+    fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("NAXIS"),FITSkeyword("2","number of data axes")));
+    fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("NAXIS1"),FITSkeyword("100","length of data axis 1")));
+    fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("NAXIS2"),FITSkeyword("100","length of data axis 2")));
+
+    FITShdu hdu_ref(fakeHdu);
+    EXPECT_EQ(hdu_ref.GetValueForKey("SIMPLE"), "T");
+    EXPECT_EQ(hdu_ref.GetInt16ValueForKey("BITPIX"), 16);
+    EXPECT_EQ(hdu_ref.GetUInt64ValueForKey("NAXIS"), 2);
+    EXPECT_EQ(hdu_ref.GetUInt64ValueForKey("NAXIS1"), 100);
+    EXPECT_EQ(hdu_ref.GetUInt64ValueForKey("NAXIS2"), 100);
+
+    std::string header_str = hdu_ref.asString();
+    FITShdu hdu(header_str);
+
+    EXPECT_EQ(hdu.GetValueForKey("SIMPLE"), "T");
+    EXPECT_EQ(hdu.GetInt16ValueForKey("BITPIX"), 16);
+    EXPECT_EQ(hdu.GetUInt64ValueForKey("NAXIS"), 2);
+    EXPECT_EQ(hdu.GetUInt64ValueForKey("NAXIS1"), 100);
+    EXPECT_EQ(hdu.GetUInt64ValueForKey("NAXIS2"), 100);
 }
 
 TEST(FITShdu_Constructor, FromFitsFile)
@@ -556,5 +619,48 @@ TEST(FITShdu_swap, swapBetweenHdu)
     EXPECT_EQ   (hdu2.GetInt8ValueForKey("KEY1"), 1);
     EXPECT_NEAR (hdu2.GetDoubleValueForKey("KEY2"), 2.0, 1e-10);
 }   
+
+TEST(FITShdu_out, asString)
+{
+    FITShdu hdu;
+    hdu.ValueForKey("AKEY1", (int8_t) 1, "first key");
+    hdu.ValueForKey("AKEY2", (float) 2.0, "second key");
+    hdu.ValueForKey("AKEY3", std::string("this is my value3"), "third key");
+    hdu.ValueForKey("COMMENT", std::string("this is now a very very long comment string to test how does the parser format the string when the commant string is longer than the 80 char allowed for standard FITS keys cards"));
+    hdu.ValueForKey("HISTORY", std::string("this is now a very very long comment string to test how does the parser format the string when the commant string is longer than the 80 char allowed for standard FITS keys cards"));
+
+    std::string out = hdu.asString();
+    EXPECT_EQ(out.size()%2880, 0);
+    std::string endStr = out.substr(out.size()-8,3);
+    EXPECT_EQ(endStr.compare("END"),0)<< endStr;
+
+    for (size_t k = 0; k < 5; k++)
+    {
+        if(k < 3)
+        {
+            std::string thisStr = out.substr(k*80, 80);
+            EXPECT_EQ(thisStr.find("AKEY"+std::to_string(k+1)), 0);
+            EXPECT_EQ(thisStr.find("="), 9-1);
+            EXPECT_EQ(thisStr.find("/"), 32-1);
+        }
+        else if(k==3)
+        {
+
+            out.erase(0, (k) * 80);
+            std::string thisStr = out.substr(0, out.find("HISTORY")-1);
+            EXPECT_EQ(thisStr.find("COMMENT"), 0);
+            thisStr.erase(0,80);
+            EXPECT_EQ(thisStr.find("COMMENT "), 0);
+        }
+        else if(k==4)
+        {
+            out.erase(0, out.find("HISTORY"));
+            EXPECT_EQ(out.find("HISTORY "), 0);
+            out.erase(0,80);
+            EXPECT_EQ(out.find("HISTORY "), 0);
+        }
+    }
+
+}
 
 #pragma endregion

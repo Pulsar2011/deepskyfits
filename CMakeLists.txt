@@ -92,7 +92,7 @@ ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 #-------------------- DARWIN specifics
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 	# Mac OS X specific code
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -m64 -fPIC")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -fPIC")
 
 	set(OperatingSystem "Mac OS X")
 	ADD_DEFINITIONS(-DDarwinx86_64)
@@ -103,7 +103,7 @@ if(WITH_DEBUG)
 	message("${Blue}-- DEBUG MODE ACTIVATED${ColourReset}")
 	add_definitions(-D__DEBUG__)
 	set(CMAKE_BUILD_TYPE DEBUG)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0 -fsanitize=address -fno-omit-frame-pointer")
 else(WITH_DEBUG)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
 endif(WITH_DEBUG)
@@ -151,7 +151,8 @@ message("-- CMAKE SOURCE DIR  : " ${CMAKE_SOURCE_DIR})
 #-------------------- Find GSL dependencies
 find_package(GSL REQUIRED)
 include_directories(AFTER ${GSL_INCLUDE_DIRS})
-link_directories(${GSL_LIBRARY})
+#link_directories(${GSL_LIBRARY})
+
 if(${GSL_FOUND})
     message("${Blue}-- GSL INC DIR ${ColourReset} ${GSL_INCLUDE_DIRS}")
     message("${Blue}-- GSL LIBRARY DIR ${ColourReset} ${GSL_LIBRARY}")
@@ -247,8 +248,17 @@ ExternalProject_Add(
   BUILD_COMMAND     ${CMAKE_MAKE_PROGRAM} -j ${CMAKE_BUILD_PARALLEL_LEVEL}
   INSTALL_COMMAND   ${CMAKE_MAKE_PROGRAM} install
   BUILD_IN_SOURCE   1
-  BUILD_BYPRODUCTS  ${WCSLIB_INSTALL_DIR}/lib/libwcs.a
+  BUILD_BYPRODUCTS  ${WCSLIB_INSTALL_DIR}/lib/libwcs.a ${WCSLIB_INSTALL_DIR}/bin/tofits
 )
+
+add_custom_target(tofits
+    COMMAND /usr/bin/env bash -c "${CMAKE_SOURCE_DIR}/build/wcslib/bin/tofits <${CMAKE_SOURCE_DIR}/wcslib/wcslib-8.4/C/test/DSS.keyrec> ${CMAKE_SOURCE_DIR}/build/testdata/DSS.fits"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Run tofit: ${CMAKE_SOURCE_DIR}/build/wcslib/bin/tofits <${CMAKE_SOURCE_DIR}/wcslib/wcslib-8.4/C/test/DSS.keyrec> ${CMAKE_SOURCE_DIR}/build/testdata/DSS.fits"
+    VERBATIM
+)
+
+add_dependencies(tofits wcslib_external)
 
 # extraction must run before building wcslib
 
@@ -282,6 +292,7 @@ target_include_directories(DSTfits PRIVATE ${WCSLIB_INCLUDE_DIR})
 target_include_directories(DSTfits PRIVATE ${CFITSIO_INCLUDE_DIR})
 
 include_directories(include/cfitsio)
+include_directories(build/wcslib/include)
 
 #-------------------- Configuration des test
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build/lib)
@@ -304,7 +315,10 @@ target_link_libraries(DSTfits
     PRIVATE curl
     PRIVATE z
     PRIVATE ${WCSLIB_LIBRARY}
+    PRIVATE GSL::gsl
+    PRIVATE GSL::gslcblas
 )
+
 
 #-------------------- Download sample FITS files for testing
 set(TESTDATA_DIR ${CMAKE_SOURCE_DIR}/build/testdata)
@@ -355,6 +369,8 @@ foreach( test_source_file ${TEST_SRC} )
     get_filename_component( tSRC ${test_source_file} NAME_WE)
     gtest_discover_tests(${tSRC})
 endforeach( test_source_file ${TEST_SRC} )
+
+add_dependencies(gTest_wcs tofits)
 
 #-------------------- CONFIGURATION OF DOXYGEN DOC GENERATION
 
