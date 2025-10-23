@@ -10,6 +10,8 @@
 
 #include <stdexcept>
 #include <thread>
+#include <iostream>
+#include <sstream>
 
 #include <fitsio.h>
 

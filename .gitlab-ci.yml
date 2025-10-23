@@ -34,11 +34,13 @@ deps:
 
 build:
   stage: build
+  dependencies:
+    - deps
   script:
     - mkdir -p build
     - cd build
     - export CFLAGS="-fPIC -O3" CXXFLAGS="-fPIC -O3"
-    - cmake -DWITH_DEBUG=YES -Wno-dev -DCMAKE_CXX_STANDARD=23 -DCMAKE_CXX_STANDARD_REQUIRED=ON -DCMAKE_CXX_EXTENSIONS=OFF ..
+    - cmake -Wno-dev -DCMAKE_CXX_STANDARD=23 -DCMAKE_CXX_STANDARD_REQUIRED=ON -DCMAKE_CXX_EXTENSIONS=OFF ..
     - make -j "$(nproc --all)"
   artifacts:
     expire_in: 2 hrs
@@ -49,6 +51,9 @@ test:
   stage: test
   dependencies:
     - build
+  needs:
+    - job: build
+      artifacts: true
   script:
   - cd build
   - ctest --output-on-failure
