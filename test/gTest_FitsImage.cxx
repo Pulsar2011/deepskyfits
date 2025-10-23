@@ -1804,3 +1804,53 @@ TYPED_TEST(FITSimgStatsTest, modifier)
         EXPECT_NEAR(imgptr->DoubleValueAtPixel({8,10}), d, 1e-5);
     }
 }
+
+TEST(FITSimg, WorldCoordinates)
+{
+    verbose = verboseLevel::VERBOSE_NONE;
+
+#ifdef Darwinx86_64
+    std::string src = "build/testdata/testkeys.fits";
+#else
+    std::string src = "testdata/testkeys.fits";
+#endif  
+
+    // Use the copied file for all operations
+
+    FITSmanager ff(src);
+    EXPECT_TRUE(ff.isOpen());
+
+    std::shared_ptr<FITScube> img = ff.GetPrimary();
+    EXPECT_NE(img, nullptr);
+    EXPECT_EQ(img->Size(1), 300);
+    EXPECT_EQ(img->Size(2), 300);
+
+    // test pixel to world and back
+    size_t k = 0;
+    for(size_t j=0; j< img->Size(2); j++)
+    {
+        for(size_t i=0; i< img->Size(1); i++)
+        {
+            EXPECT_EQ(k, img->PixelIndex({i,j}));
+            EXPECT_EQ(i, img->PixelCoordinates(k)[0]);
+            EXPECT_EQ(j, img->PixelCoordinates(k)[1]);
+            worldCoords world0 = img->WorldCoordinates(k);
+
+            worldCoords world1 = img->WorldCoordinates(std::vector<size_t>({i,j}));
+
+            worldCoords world2 = img->WorldCoordinates(pixelCoords({static_cast<double>(i),static_cast<double>(j)}));
+            EXPECT_NEAR(world0[0], world1[0], 5e-6);
+            EXPECT_NEAR(world0[1], world1[1], 5e-6);
+            EXPECT_NEAR(world0[0], world2[0], 5e-6);
+            EXPECT_NEAR(world0[1], world2[1], 5e-6);
+
+            pixelCoords pix = img->World2Pixel(world2);
+            EXPECT_EQ(static_cast<size_t>(pix[0]+0.5), i);
+            EXPECT_EQ(static_cast<size_t>(pix[1]+0.5), j);
+            k++;
+        }
+    }
+    
+    EXPECT_NO_THROW(ff.Close());
+    EXPECT_FALSE(ff.isOpen());
+}

@@ -504,7 +504,7 @@ namespace DSL
 
         }
 
-        worldVectors FITSwcs::pixel2world(const size_t& wcsIndex, const pixelVectors& px)
+        worldVectors FITSwcs::pixel2world(const size_t& wcsIndex, const pixelVectors& px) const
         {
             if(fwcs == nullptr)
             {
@@ -597,7 +597,7 @@ namespace DSL
             return wv;
         }
 
-        pixelVectors FITSwcs::world2pixel(const size_t& wcsIndex, const worldVectors& wc)
+        pixelVectors FITSwcs::world2pixel(const size_t& wcsIndex, const worldVectors& wc) const
         {
             if(fwcs == nullptr)
             {
