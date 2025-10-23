@@ -20,7 +20,7 @@ TEST(FITSmanager, verbose_operations)
     ASSERT_EQ(static_cast<uint8_t>(DSL::verbose), 0x01);
 
     DSL::verbose = DSL::verboseLevel::VERBOSE_DETAIL;
-    ASSERT_EQ(static_cast<uint8_t>(DSL::verbose), 0x0F);
+    ASSERT_EQ(static_cast<uint8_t>(DSL::verbose), 0xF0);
 
     DSL::verbose = DSL::verboseLevel::VERBOSE_HDU;
     ASSERT_EQ(static_cast<uint8_t>(DSL::verbose), 0x02);
@@ -38,8 +38,8 @@ TEST(FITSmanager, verbose_operations)
     DSL::verbose |= DSL::verboseLevel::VERBOSE_IMG;
     DSL::verbose |= DSL::verboseLevel::VERBOSE_TBL;
     DSL::verbose |= DSL::verboseLevel::VERBOSE_HDU;
-    ASSERT_EQ  (static_cast<uint8_t>(DSL::verbose), static_cast<uint8_t>(DSL::verboseLevel::VERBOSE_DETAIL));
-    ASSERT_EQ  (DSL::verbose|DSL::verboseLevel::VERBOSE_DETAIL, DSL::verboseLevel::VERBOSE_DETAIL);
+    ASSERT_EQ  (static_cast<uint8_t>(DSL::verbose), static_cast<uint8_t>(DSL::verboseLevel::VERBOSE_ALL));
+    ASSERT_EQ  (DSL::verbose|DSL::verboseLevel::VERBOSE_DETAIL, DSL::verboseLevel::VERBOSE_DEBUG);
     ASSERT_TRUE((DSL::verbose&DSL::verboseLevel::VERBOSE_IMG)==DSL::verboseLevel::VERBOSE_IMG);
     ASSERT_TRUE((DSL::verbose&DSL::verboseLevel::VERBOSE_TBL)==DSL::verboseLevel::VERBOSE_TBL);
     ASSERT_TRUE((DSL::verbose&DSL::verboseLevel::VERBOSE_HDU)==DSL::verboseLevel::VERBOSE_HDU);
@@ -54,7 +54,7 @@ TEST(FITSmanager, verbose_operations)
     ASSERT_FALSE(DSL::verbose==DSL::verboseLevel::VERBOSE_IMG);
     ASSERT_TRUE((DSL::verbose&DSL::verboseLevel::VERBOSE_TBL)==DSL::verboseLevel::VERBOSE_TBL);
     ASSERT_TRUE((DSL::verbose&DSL::verboseLevel::VERBOSE_HDU)==DSL::verboseLevel::VERBOSE_HDU);
-    ASSERT_TRUE(static_cast<uint8_t>(DSL::verbose&(~DSL::verboseLevel::VERBOSE_DETAIL))==0xF0);
+    ASSERT_TRUE(static_cast<uint8_t>(DSL::verbose&(~DSL::verboseLevel::VERBOSE_DETAIL))==0x0B);
 
     DSL::verbose = DSL::verboseLevel::VERBOSE_NONE;
     ASSERT_EQ(static_cast<uint8_t>(DSL::verbose), 0x00);
@@ -434,9 +434,9 @@ TEST(FITSmanager, create_fitsfile)
 TEST(FITSmanager, ReadingImage)
 {    
 #ifdef Darwinx86_64
-    std::string src = "build/testdata/rosat_pspc_rdf2_3_bk1.fits";
+    std::string src = "build/testdata/testkeys.fits";
 #else
-    std::string src = "testdata/rosat_pspc_rdf2_3_bk1.fits";
+    std::string src = "testdata/testkeys.fits";
 #endif
 
     // Use the copied file for all operations
@@ -445,8 +445,8 @@ TEST(FITSmanager, ReadingImage)
 
     std::shared_ptr<FITScube> img = ff.GetPrimary();
     EXPECT_NE(img, nullptr);
-    EXPECT_EQ(img->Size(1), 512);
-    EXPECT_EQ(img->Size(2), 512);
+    EXPECT_EQ(img->Size(1), 300);
+    EXPECT_EQ(img->Size(2), 300);
 
     img.reset();
     ff.Close();

@@ -7,3 +7,6 @@
 [submodule "Minuit2"]
 	path = Minuit2
 	url = https://github.com/GooFit/Minuit2.git
+[submodule "doxygen-awesome-css"]
+	path = doxygen-awesome-css
+	url = https://github.com/jothepro/doxygen-awesome-css.git

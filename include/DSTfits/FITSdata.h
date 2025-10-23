@@ -25,17 +25,18 @@ namespace DSL
     
 #ifdef Darwinx86_64
     enum class verboseLevel: uint8_t
-    {
 #else
     enum verboseLevel
-    {
 #endif
+    {
         VERBOSE_NONE    = 0x00,
         VERBOSE_BASIC   = 0x01,
-        VERBOSE_DETAIL  = 0x0F,
+        VERBOSE_DETAIL  = 0xF0,
+        VERBOSE_ALL     = 0x0F,
         VERBOSE_HDU     = 0x02,
         VERBOSE_IMG     = 0x04,
         VERBOSE_TBL     = 0x08,
+        VERBOSE_WCS     = 0x0A,
         VERBOSE_DEBUG   = 0xFF
     };
 

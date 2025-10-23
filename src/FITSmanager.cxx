@@ -795,12 +795,12 @@ namespace DSL
 #pragma endregion
 #pragma region * Modifying specific header keyword   
     
-    void FITSmanager::AppendKeyToPrimary(std::string key, const FITSkeyword &val)
+    void FITSmanager::AppendKeyToPrimary(const std::string& key, const FITSkeyword &val)
     {
         AppendKeyToHeader(1, key, val);
     }
     
-    void FITSmanager::AppendKeyToHeader(int HDU, std::string key, const FITSkeyword &val)
+    void FITSmanager::AppendKeyToHeader(int HDU, const std::string& key, const FITSkeyword &val)
     {
         char *comment = NULL;
         fits_status = 0;
@@ -868,7 +868,7 @@ namespace DSL
         }
     }
     
-    void FITSmanager::AppendKeyToHeader(int HDU, std::string key, int TYPE, std::string val, std::string cmt)
+    void FITSmanager::AppendKeyToHeader(int HDU, const std::string& key, const int& TYPE, const std::string& val, std::string cmt)
     {
         if(num_hdu == 0)
         {
@@ -876,27 +876,26 @@ namespace DSL
             throw FITSexception(fits_status,"FITSmanager","AppendKeyToHeader","FILE "+GetFileName()+" do not yet contains HDU blocks.");
         }
 
-        try
+        if(HDU > num_hdu)
         {
-            if(HDU > num_hdu)
-            {
-                throw FITSwarning("FITSmanager","AppendKeyToHeader","FILE "+
-                                  GetFileName()
-                                  +" do not yet contains HDU blocks.\n     Keyword string will be added to PRIMARY HDU block in memory.");
-            }
+            fits_status = BAD_HDU_NUM;
+            throw FITSexception(fits_status,"FITSmanager","AppendKeyToHeader","FILE "+
+                                GetFileName()
+                                +" Thei is not such an HDU #"+std::to_string(HDU)+".");
         }
-        catch(std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-            
-            AppendKey(key, TYPE, val, cmt);
-            return;
-        }
+
 
         MoveToHDU(HDU);
         
         if(fits_status)
+        {
+            if((verbose & verboseLevel::VERBOSE_BASIC)== verboseLevel::VERBOSE_BASIC)
+            {
+                FITSexception warn(fits_status,"FITSmanager","AppendKeyToHeader","something went wrong in accessing HDU #"+std::to_string(HDU));
+                std::cerr<<warn.what()<<std::endl<<std::flush;
+            }
             return;
+        }
         
         if(cmt.size() > 1)
             AppendKey(key, TYPE, val, cmt);
@@ -905,13 +904,13 @@ namespace DSL
             
     }
 
-    void FITSmanager::AppendKey(std::string key, int TYPE, std::string val, std::string cmt)
+    void FITSmanager::AppendKey(const std::string& key, const int& TYPE, const std::string& val, std::string cmt)
     {
         // writing metadata -> exclusive lock
         std::unique_lock<std::shared_mutex> lk(fptr_mtx);
         fits_status = 0;
         
-        if(!fptr)
+        if(!fptr or fptr.use_count() < 1)
         {
             fits_status = SHARED_NULPTR;
             throw FITSexception(fits_status,"FITSmanager","AppendKey","CAN'T GET HEADER FROM NULL POINTER");

@@ -24,7 +24,7 @@ namespace DSL
     
     class FITSexception:public std::exception
     {
-    private:
+    protected:
         const fitsError err;
         const std::string cname;
         const std::string cfun;
@@ -38,6 +38,18 @@ namespace DSL
         
         const char* what() const noexcept;
         
+    };
+
+    class WCSexception:public FITSexception
+    {
+    public:
+        WCSexception(const fitsError& err):FITSexception(err) {};
+        WCSexception(const fitsError& err, const std::string& who):FITSexception(err, who) {};
+        WCSexception(const fitsError& err, const std::string& who, const std::string& where):FITSexception(err, who, where) {};
+        WCSexception(const fitsError& err, const std::string& who, const std::string& where, const std::string& what):FITSexception(err, who, where, what) {};
+
+        const char* what() const noexcept;
+
     };
     
     class FITSwarning:public std::exception

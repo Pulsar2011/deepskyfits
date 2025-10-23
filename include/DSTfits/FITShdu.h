@@ -139,7 +139,9 @@ namespace DSL
 #pragma region  * ctor/dtor
         FITShdu();                                              //!< Default constructor
         FITShdu(const std::shared_ptr<fitsfile>& fptr);         //!< Construct from fitsfile
+        FITShdu(const std::string &);                           //!< Constructor from header string
         FITShdu(const FITShdu &);                               //!< Copy constructor
+        FITShdu(const FITSDictionary& keys): hdu(keys) {};      //!< Construct from FITSDictionary
         virtual ~FITShdu();                                     //!< Destructor
 
         void swap(FITShdu& other) noexcept;                        //!< Swap content of two FITShdu objects

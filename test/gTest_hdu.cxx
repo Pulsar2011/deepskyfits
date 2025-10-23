@@ -342,6 +342,49 @@ TEST(FITShdu_Constructor, DefaultAndCopy)
     EXPECT_TRUE(copy.GetBoolValueForKey("TEST_BOOL"));
 }
 
+TEST(FITShdu_Constructor, FromFITSDictionary)
+{
+    FITSDictionary fakeHdu;
+    fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("SIMPLE"),FITSkeyword("T","file does conform to FITS standard")));
+    fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("BITPIX"),FITSkeyword("16","number of bits per data pixel")));
+    fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("NAXIS"),FITSkeyword("2","number of data axes")));
+    fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("NAXIS1"),FITSkeyword("100","length of data axis 1")));
+    fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("NAXIS2"),FITSkeyword("100","length of data axis 2")));
+
+    FITShdu hdu(fakeHdu);
+    EXPECT_EQ(hdu.GetValueForKey("SIMPLE"), "T");
+    EXPECT_EQ(hdu.GetInt16ValueForKey("BITPIX"), 16);
+    EXPECT_EQ(hdu.GetUInt64ValueForKey("NAXIS"), 2);
+    EXPECT_EQ(hdu.GetUInt64ValueForKey("NAXIS1"), 100);
+    EXPECT_EQ(hdu.GetUInt64ValueForKey("NAXIS2"), 100);
+}
+
+TEST(FITShdu_Constructor, FromString)
+{
+    FITSDictionary fakeHdu;
+    fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("SIMPLE"),FITSkeyword("T","file does conform to FITS standard")));
+    fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("BITPIX"),FITSkeyword("16","number of bits per data pixel")));
+    fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("NAXIS"),FITSkeyword("2","number of data axes")));
+    fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("NAXIS1"),FITSkeyword("100","length of data axis 1")));
+    fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("NAXIS2"),FITSkeyword("100","length of data axis 2")));
+
+    FITShdu hdu_ref(fakeHdu);
+    EXPECT_EQ(hdu_ref.GetValueForKey("SIMPLE"), "T");
+    EXPECT_EQ(hdu_ref.GetInt16ValueForKey("BITPIX"), 16);
+    EXPECT_EQ(hdu_ref.GetUInt64ValueForKey("NAXIS"), 2);
+    EXPECT_EQ(hdu_ref.GetUInt64ValueForKey("NAXIS1"), 100);
+    EXPECT_EQ(hdu_ref.GetUInt64ValueForKey("NAXIS2"), 100);
+
+    std::string header_str = hdu_ref.asString();
+    FITShdu hdu(header_str);
+
+    EXPECT_EQ(hdu.GetValueForKey("SIMPLE"), "T");
+    EXPECT_EQ(hdu.GetInt16ValueForKey("BITPIX"), 16);
+    EXPECT_EQ(hdu.GetUInt64ValueForKey("NAXIS"), 2);
+    EXPECT_EQ(hdu.GetUInt64ValueForKey("NAXIS1"), 100);
+    EXPECT_EQ(hdu.GetUInt64ValueForKey("NAXIS2"), 100);
+}
+
 TEST(FITShdu_Constructor, FromFitsFile)
 {
 #ifdef Darwinx86_64
@@ -595,7 +638,6 @@ TEST(FITShdu_out, asString)
     {
         if(k < 3)
         {
-            size_t pos = (k+1) * 80;
             std::string thisStr = out.substr(k*80, 80);
             EXPECT_EQ(thisStr.find("AKEY"+std::to_string(k+1)), 0);
             EXPECT_EQ(thisStr.find("="), 9-1);
@@ -607,13 +649,15 @@ TEST(FITShdu_out, asString)
             out.erase(0, (k) * 80);
             std::string thisStr = out.substr(0, out.find("HISTORY")-1);
             EXPECT_EQ(thisStr.find("COMMENT"), 0);
-            EXPECT_EQ(thisStr.find("          "), 80);
+            thisStr.erase(0,80);
+            EXPECT_EQ(thisStr.find("COMMENT "), 0);
         }
         else if(k==4)
         {
             out.erase(0, out.find("HISTORY"));
-            EXPECT_EQ(out.find("HISTORY   "), 0);
-            EXPECT_EQ(out.find("          "), 80);
+            EXPECT_EQ(out.find("HISTORY "), 0);
+            out.erase(0,80);
+            EXPECT_EQ(out.find("HISTORY "), 0);
         }
     }
 

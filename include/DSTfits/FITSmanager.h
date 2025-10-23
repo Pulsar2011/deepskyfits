@@ -121,11 +121,11 @@ namespace DSL
 
 #pragma endregion
 #pragma region * Modifying specific header keyword        
-        void AppendKeyToPrimary(std::string, const FITSkeyword&);
-        void AppendKeyToHeader(int HDU, std::string, const FITSkeyword&);
-        void AppendKeyToHeader(int HDU, std::string, int, std::string, std::string cmt = "");
+        void AppendKeyToPrimary(const std::string&, const FITSkeyword&);
+        void AppendKeyToHeader(int HDU, const std::string&, const FITSkeyword&);
+        void AppendKeyToHeader(int HDU, const std::string&, const int&, const std::string&, std::string cmt = "");
         
-        void AppendKey(std::string, int, std::string, std::string cmt = "");
+        void AppendKey(const std::string&, const int&, const std::string&, std::string cmt = "");
 #pragma endregion
 
     };
