@@ -146,11 +146,11 @@ namespace DSL
 
         inline double at(const size_t& i) const { if(data == nullptr) throw FITSexception(SHARED_NOMEM,"FITScube","at","No data in memory"); return data->get(i); }
         
-        std::vector<double>                     WorldCoordinates(const size_t&) const; //!< Get world coordinates
-        virtual std::vector<double>             WorldCoordinates(const std::vector<size_t>&) const; //!< Get world coordinates
-        virtual std::vector<double>             WorldCoordinates(const std::vector<double>&) const; //!< Get world coordinates
+        virtual worldCoords             WorldCoordinates(const size_t&, const int& wcsIndex=0) const; //!< Get world coordinates
+        virtual worldCoords             WorldCoordinates(const std::vector<size_t>&, const int& wcsIndex=0) const; //!< Get world coordinates
+        virtual worldCoords             WorldCoordinates(const pixelCoords&, const int& wcsIndex=0) const; //!< Get world coordinates
         
-        virtual std::vector<double> World2Pixel( const std::vector<double>& ) const; //!< Get pixel coordinates based on WCS
+        virtual pixelCoords World2Pixel( const worldCoords&, const int& wcsIndex=0) const; //!< Get pixel coordinates based on WCS
         
         virtual std::vector<size_t> PixelCoordinates(const size_t&) const; //!< Get pixel coordinates
         
@@ -184,39 +184,6 @@ namespace DSL
                     static_assert(always_false_v<T>, "PixelIndex initializer_list must hold integral or floating types convertible to size_t");
 
                 return PixelIndex(pix_index);
-            }
-        }
-        
-        /**
-         *  Obtain the pixel index from the 1D FITS datacube based on the cartesian coordinate of the pixel
-         *  @param iPx: Cartésian coordinates of the pixel
-         *  @return Pixel index in the 1D FITS datacube
-         */
-        template<typename T>
-        std::vector<double> World2Pixel(const std::initializer_list<T>& arg) const           //!< Get pixel index
-        {
-
-            // fast path when caller already passes size_t coordinates
-            if constexpr (std::is_same_v<T, double>)
-            {
-                // direct construct vector from initializer_list (one allocation)
-                std::vector<double> pix_index(arg.begin(), arg.end());
-                return WorldCoordinates(pix_index);
-            }
-            else
-            {
-                // reserve to avoid repeated reallocations
-                std::vector<double> pix_coo;
-                pix_coo.reserve(arg.size());
-            
-                if constexpr (std::is_floating_point_v<T>)
-                    for (T v : arg) pix_coo.push_back(static_cast<double>(v));
-                else if constexpr (std::is_integral_v<T>)
-                    for (T v : arg) pix_coo.push_back(static_cast<double>(v));
-                else
-                    static_assert(always_false_v<T>, "World2Pixel initializer_list must hold integral or floating types convertible to double");
-
-                return World2Pixel(pix_coo);
             }
         }
         

@@ -42,7 +42,7 @@ namespace DSL
         protected:
 
             std::shared_ptr<struct wcsprm> fwcs;  //!< Pointer to the WCS structure from WCSLIB
-            int fwcs_status;                      //!< Status of the WCS structure
+            mutable int fwcs_status;                      //!< Status of the WCS structure
             int fnwcs;                             //!< Number of WCS in the WCSLIB structures
 #pragma region * protected member function
         
@@ -184,7 +184,7 @@ namespace DSL
              * @param pixcrd Array of pixel coordinates
              * @param world Array to store world coordinates
              */
-            worldVectors pixel2world(const size_t&, const pixelVectors&);
+            worldVectors pixel2world(const size_t&, const pixelVectors&) const;
 
             /**
              * @brief Convert world coordinates to pixel coordinates
@@ -194,7 +194,7 @@ namespace DSL
              * @param world Array of world coordinates
              * @param pixcrd Array to store pixel coordinates
              */
-            pixelVectors world2pixel(const size_t& wcsIndex, const worldVectors&);
+            pixelVectors world2pixel(const size_t& wcsIndex, const worldVectors&) const;
 
             /**
              * @brief Convert wcs to header string

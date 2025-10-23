@@ -397,40 +397,56 @@ class FITSmanager;
     }
     
     /**
-     *  Obtain the physical coordinate of a pixel
-     *  @param size_t pixel index position in the pixel array
-     *  @return pixel world coordinate
+     * @details Obtain the physical coordinate of a pixel in a specified coordinate system
+     * @param k pixel index position in the pixel array
+     * @param wcsIndex Index of the WCS to be used (default is 0)
+     * @return pixel world coordinate
      */
-    std::vector<double> FITScube::WorldCoordinates(const size_t& k) const
+    worldCoords FITScube::WorldCoordinates(const size_t& k, const int& wcsIndex) const
     {
         auto pixels_coo = std::bind( &FITScube::PixelCoordinates, this,std::placeholders::_1);
         return WorldCoordinates(pixels_coo(k));
     }
     
-    std::vector<double> FITScube::WorldCoordinates(const std::vector<size_t>& pixel) const
+    /**
+     * @brief Obtain the physical coordinate of a pixel in a specified coordinate system
+     * 
+     * @param pixel Pixel coordinates on each dimension of the FITS datacube
+     * @param wcsIndex Index of the WCS to be used (default is 0)
+     * @return pixel world coordinate
+     */
+    worldCoords FITScube::WorldCoordinates(const std::vector<size_t>& pixel, const int& wcsIndex) const
     {
-        std::vector<double> dbl_px = std::vector<double>(pixel.size());
-        for(size_t i = 0; i < pixel.size(); i++)
-            dbl_px[i] = static_cast<double>(pixel[i]);
+        pixelCoords dbl_px = pixelCoords(pixel.size());
+        size_t idx = 0;
+        for(std::vector<size_t>::const_iterator i = pixel.cbegin() ; i != pixel.cend(); i++)
+        {
+            dbl_px[idx] = static_cast<double>(*i);
+            idx++;
+        }
         
-        std::vector<double> wcs = WorldCoordinates(dbl_px);
+        worldCoords wcs = WorldCoordinates(dbl_px);
         dbl_px.clear();
         
         return wcs;
     }
     
-    std::vector<double> FITScube::WorldCoordinates(const std::vector<double>& pixel) const
+    worldCoords FITScube::WorldCoordinates(const pixelCoords& pixel, const int& wcsIndex) const
     {
-        std::vector<double> wcs = std::vector<double>(pixel.size());
-        for(size_t i = 0; i < pixel.size(); i++)
+        if(fwcs.getNumberOfWCS() == 0)
         {
-            double crval = (hdu.Exists("CRVAL"+std::to_string(i+1)))? hdu.GetDoubleValueForKey("CRVAL"+std::to_string(i+1)) : 0.;
-            double cdelt = (hdu.Exists("CDELT"+std::to_string(i+1)))? hdu.GetDoubleValueForKey("CDELT"+std::to_string(i+1)) : 1.;
-            double crpix = (hdu.Exists("CRPIX"+std::to_string(i+1)))? hdu.GetDoubleValueForKey("CRPIX"+std::to_string(i+1)) : 0.;
-
-            wcs[i] = (pixel[i] - crpix) * cdelt + crval;
+            return worldCoords(pixel);
         }
-        
+
+        if(wcsIndex < 0 || wcsIndex >= fwcs.getNumberOfWCS())
+        {
+            throw WCSexception(WCSERR_NULL_POINTER,"FITScube","WorldCoordinates","No WCS at index "+std::to_string(wcsIndex)+" defined in this FITS image");
+        }
+
+        pixelVectors pxVec;
+        pxVec.push_back(pixel);
+        worldCoords wcs = fwcs.pixel2world(wcsIndex,pxVec)[0];
+
         return wcs;
     }
     
@@ -464,25 +480,21 @@ class FITSmanager;
      *  @param coo: 1D pixel index
      *  @return Pixel coordinates on each dimension of the FITS datacube
      */
-    std::vector<double> FITScube::World2Pixel(const std::vector<double>& coo) const
+    pixelCoords FITScube::World2Pixel(const worldCoords& coo, const int& wcsIndex) const
     {
-        std::vector<double> xPixel = std::vector<double>(coo);
-        
-        for(size_t i = 0; i < xPixel.size(); i++)
+        if(fwcs.getNumberOfWCS() == 0)
         {
-            //std::cout<<xPixel[i]<<"  ->  ";
-            double crval = (hdu.Exists("CRVAL"+std::to_string(i+1)))? hdu.GetDoubleValueForKey("CRVAL"+std::to_string(i+1)) : 0.;
-            double cdelt = (hdu.Exists("CDELT"+std::to_string(i+1)))? hdu.GetDoubleValueForKey("CDELT"+std::to_string(i+1)) : 1.;
-            double crpix = (hdu.Exists("CRPIX"+std::to_string(i+1)))? hdu.GetDoubleValueForKey("CRPIX"+std::to_string(i+1)) : 0.;
-            
-            xPixel[i] -= crval;
-            xPixel[i] /= cdelt;
-            xPixel[i] += crpix;
-            
-            //std::cout<<xPixel[i]<<std::endl;
+            throw WCSexception(WCSERR_NULL_POINTER,"FITScube","World2Pixel","No WCS defined in this FITS image");
+        }
+
+        if(wcsIndex < 0 || wcsIndex >= fwcs.getNumberOfWCS())
+        {
+            throw  WCSexception(WCSERR_NULL_POINTER,"FITScube","World2Pixel","No WCS at index "+std::to_string(wcsIndex)+" defined in this FITS image");
         }
         
-        return xPixel;
+        worldVectors VWCoo;
+        VWCoo.push_back(coo);
+        return fwcs.world2pixel(wcsIndex, VWCoo)[0];
     }
     
     size_t FITScube::PixelIndex(const std::vector<size_t>& iPx) const
