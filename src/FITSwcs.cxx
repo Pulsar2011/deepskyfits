@@ -11,7 +11,7 @@
 #include <stdexcept>
 #include <thread>
 #include <iostream>
-#include <ssstream>
+#include <sstream>
 
 #include <fitsio.h>
 
