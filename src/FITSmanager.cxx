@@ -392,7 +392,8 @@ namespace DSL
     {
         fitsfile *fits = nullptr;
         
-        if(fits_open_file(&fits, fileName.c_str(), readOnly, &fits_status))
+        fits_status = 0;
+        if(fits_open_file(&fits, fileName.c_str(), !readOnly, &fits_status))
         {
             // don't change member fptr on failure
             throw FITSexception(fits_status,"FITSmanager","OpenFile","FILE : "+fileName);
@@ -519,100 +520,92 @@ namespace DSL
         if(fits_status)
             return NULL;
         
-        try
+        if(hdu_type != IMAGE_HDU)
         {
-            if(hdu_type != IMAGE_HDU)
-            {
-                fits_status = NOT_IMAGE;
+            fits_status = NOT_IMAGE;
 
-                throw FITSexception(fits_status,"FITSmanager","GetImageAtIndex","FILE "+GetFileName()+"\nCurrent HDU isn't an FITS image!");
-            }
+            throw FITSexception(fits_status,"FITSmanager","GetImageAtIndex","FILE "+GetFileName()+"\nCurrent HDU isn't an FITS image!");
+        }
+        
+        // copy shared_ptr under shared lock to keep pointer alive while we use it
+        std::shared_ptr<fitsfile> local;
+        {
+            std::shared_lock<std::shared_mutex> lk(fptr_mtx);
+            local = fptr;
+        }
+    
+        FITScube *img = NULL;
+    
+        int eqBITPIX = 0;
+    
+        if(fits_get_img_equivtype(local.get(), &eqBITPIX, &fits_status))
+        {
+            throw FITSexception(fits_status,"FITSmanager","GetImageAtIndex");
+        }
+
+        if(eqBITPIX == 64)
+        {
+            unsigned long long bz = 0;
+            if(ffgkyujj(local.get(), "BZERO", &bz, NULL, &fits_status))
+                bz=0ULL;
             
-            // copy shared_ptr under shared lock to keep pointer alive while we use it
-            std::shared_ptr<fitsfile> local;
-            {
-                std::shared_lock<std::shared_mutex> lk(fptr_mtx);
-                local = fptr;
-            }
-        
-            FITScube *img = NULL;
-        
-            int eqBITPIX = 0;
-        
-            if(fits_get_img_equivtype(local.get(), &eqBITPIX, &fits_status))
-            {
-                throw FITSexception(fits_status,"FITSmanager","GetImageAtIndex");
-            }
-
-            if(eqBITPIX == 64)
-            {
-                unsigned long long bz = 0;
-                if(ffgkyujj(local.get(), "BZERO", &bz, NULL, &fits_status))
-                    bz=0ULL;
-                
-                if (bz == 9223372036854775808ULL)
-                    eqBITPIX = 80;
-            }
-
-            if((verbose & verboseLevel::VERBOSE_IMG)== verboseLevel::VERBOSE_IMG)
-                std::cout<<"FITS image eqBITPIX = "<<eqBITPIX<<std::endl;
-        
-            switch (eqBITPIX)
-            {
-                case BYTE_IMG:
-                    img = new FITSimg<uint8_t>(local);
-                    break;
-                
-                case SBYTE_IMG:
-                    img = new FITSimg<int8_t>(local);
-                    break;
-
-                case SHORT_IMG:
-                    img = new FITSimg<int16_t>(local);
-                    break;
-                
-                case USHORT_IMG:
-                    img = new FITSimg<uint16_t>(local);
-                    break;
-                
-                case LONG_IMG:
-                    img = new FITSimg<int32_t>(local);
-                    break;
-                
-                case ULONG_IMG:
-                    img = new FITSimg<uint32_t>(local);
-                    break;
-                
-                case LONGLONG_IMG:
-                    img = new FITSimg<int64_t>(local);
-                    break;
-                
-                case ULONGLONG_IMG:
-                    img = new FITSimg<uint64_t>(local);
-                    break;
-                
-                case FLOAT_IMG:
-                    img = new FITSimg<float>(local);
-                    break;
-                
-                case DOUBLE_IMG:
-                    img = new FITSimg<double>(local);
-                    break;
-                
-                default:
-                    fits_status = BAD_BITPIX;
-                    throw FITSexception(fits_status,"FITSmanager","GetImageAtIndex","CAN'T GET IMAGES, DATA TYPE "+std::to_string(eqBITPIX)+" IS UNKNOWN");
-            }
-        
-            fits_status = img->Status();
-        
-            return std::shared_ptr<FITScube>(img);
+            if (bz == 9223372036854775808ULL)
+                eqBITPIX = 80;
         }
-        catch(std::exception& e)
+
+        if((verbose & verboseLevel::VERBOSE_IMG)== verboseLevel::VERBOSE_IMG)
+            std::cout<<"FITS image eqBITPIX = "<<eqBITPIX<<std::endl;
+    
+        switch (eqBITPIX)
         {
-            std::cerr<<e.what()<<std::endl;
-            return NULL;
+            case BYTE_IMG:
+                img = new FITSimg<uint8_t>(local);
+                break;
+            
+            case SBYTE_IMG:
+                img = new FITSimg<int8_t>(local);
+                break;
+
+            case SHORT_IMG:
+                img = new FITSimg<int16_t>(local);
+                break;
+            
+            case USHORT_IMG:
+                img = new FITSimg<uint16_t>(local);
+                break;
+            
+            case LONG_IMG:
+                img = new FITSimg<int32_t>(local);
+                break;
+            
+            case ULONG_IMG:
+                img = new FITSimg<uint32_t>(local);
+                break;
+            
+            case LONGLONG_IMG:
+                img = new FITSimg<int64_t>(local);
+                break;
+            
+            case ULONGLONG_IMG:
+                img = new FITSimg<uint64_t>(local);
+                break;
+            
+            case FLOAT_IMG:
+                img = new FITSimg<float>(local);
+                break;
+            
+            case DOUBLE_IMG:
+                img = new FITSimg<double>(local);
+                break;
+            
+            default:
+                fits_status = BAD_BITPIX;
+                throw FITSexception(fits_status,"FITSmanager","GetImageAtIndex","CAN'T GET IMAGES, DATA TYPE "+std::to_string(eqBITPIX)+" IS UNKNOWN");
         }
+    
+        fits_status = img->Status();
+    
+        return std::shared_ptr<FITScube>(img);
     }
     
 #pragma endregion
@@ -802,12 +795,12 @@ namespace DSL
 #pragma endregion
 #pragma region * Modifying specific header keyword   
     
-    void FITSmanager::AppendKeyToPrimary(std::string key, const FITSkeyword &val)
+    void FITSmanager::AppendKeyToPrimary(const std::string& key, const FITSkeyword &val)
     {
         AppendKeyToHeader(1, key, val);
     }
     
-    void FITSmanager::AppendKeyToHeader(int HDU, std::string key, const FITSkeyword &val)
+    void FITSmanager::AppendKeyToHeader(int HDU, const std::string& key, const FITSkeyword &val)
     {
         char *comment = NULL;
         fits_status = 0;
@@ -875,7 +868,7 @@ namespace DSL
         }
     }
     
-    void FITSmanager::AppendKeyToHeader(int HDU, std::string key, int TYPE, std::string val, std::string cmt)
+    void FITSmanager::AppendKeyToHeader(int HDU, const std::string& key, const int& TYPE, const std::string& val, std::string cmt)
     {
         if(num_hdu == 0)
         {
@@ -883,27 +876,26 @@ namespace DSL
             throw FITSexception(fits_status,"FITSmanager","AppendKeyToHeader","FILE "+GetFileName()+" do not yet contains HDU blocks.");
         }
 
-        try
+        if(HDU > num_hdu)
         {
-            if(HDU > num_hdu)
-            {
-                throw FITSwarning("FITSmanager","AppendKeyToHeader","FILE "+
-                                  GetFileName()
-                                  +" do not yet contains HDU blocks.\n     Keyword string will be added to PRIMARY HDU block in memory.");
-            }
+            fits_status = BAD_HDU_NUM;
+            throw FITSexception(fits_status,"FITSmanager","AppendKeyToHeader","FILE "+
+                                GetFileName()
+                                +" Thei is not such an HDU #"+std::to_string(HDU)+".");
         }
-        catch(std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-            
-            AppendKey(key, TYPE, val, cmt);
-            return;
-        }
+
 
         MoveToHDU(HDU);
         
         if(fits_status)
+        {
+            if((verbose & verboseLevel::VERBOSE_BASIC)== verboseLevel::VERBOSE_BASIC)
+            {
+                FITSexception warn(fits_status,"FITSmanager","AppendKeyToHeader","something went wrong in accessing HDU #"+std::to_string(HDU));
+                std::cerr<<warn.what()<<std::endl<<std::flush;
+            }
             return;
+        }
         
         if(cmt.size() > 1)
             AppendKey(key, TYPE, val, cmt);
@@ -912,13 +904,13 @@ namespace DSL
             
     }
 
-    void FITSmanager::AppendKey(std::string key, int TYPE, std::string val, std::string cmt)
+    void FITSmanager::AppendKey(const std::string& key, const int& TYPE, const std::string& val, std::string cmt)
     {
         // writing metadata -> exclusive lock
         std::unique_lock<std::shared_mutex> lk(fptr_mtx);
         fits_status = 0;
         
-        if(!fptr)
+        if(!fptr or fptr.use_count() < 1)
         {
             fits_status = SHARED_NULPTR;
             throw FITSexception(fits_status,"FITSmanager","AppendKey","CAN'T GET HEADER FROM NULL POINTER");

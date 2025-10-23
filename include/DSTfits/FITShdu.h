@@ -72,6 +72,7 @@ namespace DSL
 #pragma endregion
 #pragma region  * Dump
             void Dump( std::ostream& ) const;                   //!< Print out FITS KEYWORD value and descritpion
+            std::string asString() const;                       //!< Return FITS KEY CARDS as a string
     
         private:
             std::string fvalue;                                 //!< FITS KEEYWORD value
@@ -138,7 +139,9 @@ namespace DSL
 #pragma region  * ctor/dtor
         FITShdu();                                              //!< Default constructor
         FITShdu(const std::shared_ptr<fitsfile>& fptr);         //!< Construct from fitsfile
+        FITShdu(const std::string &);                           //!< Constructor from header string
         FITShdu(const FITShdu &);                               //!< Copy constructor
+        FITShdu(const FITSDictionary& keys): hdu(keys) {};      //!< Construct from FITSDictionary
         virtual ~FITShdu();                                     //!< Destructor
 
         void swap(FITShdu& other) noexcept;                        //!< Swap content of two FITShdu objects
@@ -214,6 +217,7 @@ namespace DSL
 #pragma endregion
 #pragma region  * Dump
         void Dump( std::ostream& ) const;               //!< Print out KEYWORD and their associated value and description.
+        std::string asString() const;               //!< Return FITS KEY CARDS as a string
         
 #pragma endregion
     };
