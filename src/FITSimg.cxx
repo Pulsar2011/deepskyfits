@@ -449,6 +449,84 @@ class FITSmanager;
 
         return wcs;
     }
+
+    /** 
+     * @brief Obtain the physical coordinates of multiple pixels in a specified coordinate system
+     * @param pixels List of pixel index of the FITS datacube
+     * @param wcsIndex Index of the WCS to be used (default is 0)
+     * @return a vector of pixel world coordinates
+     */
+    worldVectors FITScube::WorldCoordinatesVector(const std::initializer_list<size_t>& pixels, const int& wcsIndex) const
+    {
+        return WorldCoordinatesVector(std::vector<size_t>(pixels), wcsIndex);
+    }
+
+    /** 
+     * @brief Obtain the physical coordinates of multiple pixels in a specified coordinate system
+     * @param pixels List of pixel index of the FITS datacube
+     * @param wcsIndex Index of the WCS to be used (default is 0)
+     * @return a vector of pixel world coordinates
+     */
+    worldVectors FITScube::WorldCoordinatesVector(const std::valarray<size_t>& pixels, const int& wcsIndex) const
+    {
+        std::vector<size_t> px_vec;
+        for(size_t i = 0; i < pixels.size(); i++)
+        {
+            px_vec.push_back(pixels[i]);
+        }
+        return WorldCoordinatesVector(px_vec, wcsIndex);
+    }
+
+    /** 
+     * @brief Obtain the physical coordinates of multiple pixels in a specified coordinate system
+     * @param pixels vector of pixel index of the FITS datacube
+     * @param wcsIndex Index of the WCS to be used (default is 0)
+     * @return a vector of pixel world coordinates
+     */
+    worldVectors FITScube::WorldCoordinatesVector(const std::vector<size_t>& pixels, const int& wcsIndex) const
+    {
+        pixelVectors pxs;
+        for(std::vector<size_t>::const_iterator it = pixels.cbegin(); it != pixels.cend(); it++)
+        {
+            pixelCoords k;
+            std::vector<size_t> px_coord = PixelCoordinates(*it);
+            
+            for(std::vector<size_t>::const_iterator ix = px_coord.cbegin(); ix != px_coord.cend(); ix++)
+            {
+                k.push_back(static_cast<double>(*ix));
+            }
+            pxs.push_back(k);    
+        }
+
+        return WorldCoordinatesVector(pxs, wcsIndex);
+    }
+
+    /**
+     * @brief Obtain the physical coordinates of multiple pixels in a specified coordinate system
+     * 
+     * @param pixels vector of pixel coordinates with floating point value on each axis
+     * @param wcsIndex Index of the WCS to be used (default is 0)
+     * @return vector of pixel world coordinates
+     */
+    worldVectors FITScube::WorldCoordinatesVector(const pixelVectors& pixels, const int& wcsIndex) const
+    {
+        if(fwcs.getNumberOfWCS() == 0)
+        {
+            worldVectors wc_vec;
+            for(const auto& px : pixels)
+            {
+                wc_vec.push_back(worldCoords(px));
+            }
+            return wc_vec;
+        }
+
+        if(wcsIndex < 0 || wcsIndex >= fwcs.getNumberOfWCS())
+        {
+            throw WCSexception(WCSERR_NULL_POINTER,"FITScube","WorldCoordinatesMatrix","No WCS at index "+std::to_string(wcsIndex)+" defined in this FITS image");
+        }
+
+        return fwcs.pixel2world(wcsIndex, pixels);
+    }
     
     /**
      *  Get the pixel coordinates given the pixel index from the 1D pixel array of the FITS datacube
@@ -496,7 +574,57 @@ class FITSmanager;
         VWCoo.push_back(coo);
         return fwcs.world2pixel(wcsIndex, VWCoo)[0];
     }
-    
+
+    /**
+     * @brief Get the pixel coordinates of multiple pixels given their world coordinates
+     * 
+     * @param coo World coordinates of the pixels array
+     * @param wcsIndex index of the WCS to be used
+     * @return vector of pixel coordinates in floating point representation
+     */
+    pixelVectors FITScube::World2PixelVector(const worldVectors& coo, const int& wcsIndex) const
+    {
+        if(fwcs.getNumberOfWCS() == 0)
+        {
+            throw WCSexception(WCSERR_NULL_POINTER,"FITScube","World2PixelMatrix","No WCS defined in this FITS image");
+        }
+
+        if(wcsIndex < 0 || wcsIndex >= fwcs.getNumberOfWCS())
+        {
+            throw  WCSexception(WCSERR_NULL_POINTER,"FITScube","World2PixelMatrix","No WCS at index "+std::to_string(wcsIndex)+" defined in this FITS image");
+        }
+        
+        return fwcs.world2pixel(wcsIndex, coo);
+    }
+
+    /**
+     * @brief Get the pixel indices in the 1D pixel array given the world coordinates of multiple pixels
+     * 
+     * @param coo World coordinates of the pixels array
+     * @param wcsIndex Index of the WCS to be used
+     * @return array of 1D pixel indices
+     */
+    std::valarray<size_t> FITScube::World2PixelArray(const worldVectors& coo, const int& wcsIndex) const
+    {
+        pixelVectors pxs = World2PixelVector(coo,wcsIndex);
+        std::valarray<size_t> result(pxs.size());
+
+        size_t ij = 0;
+        for(pixelVectors::const_iterator it = pxs.cbegin(); it != pxs.cend(); it++)
+        {
+            size_t idx = PixelIndex(*it);
+            result[ij] = idx;
+            ij++;
+        }
+
+        return result;
+    }
+
+    /**
+     *  Get the pixel index in the 1D pixel array given the pixel coordinates on each dimension of the FITS datacube
+     *  @param iPx: Pixel coordinates on each dimension of the FITS datacube
+     *  @return 1D pixel index
+     */
     size_t FITScube::PixelIndex(const std::vector<size_t>& iPx) const
     {
         size_t index = 0;
