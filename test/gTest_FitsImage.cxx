@@ -1854,3 +1854,38 @@ TEST(FITSimg, WorldCoordinates)
     EXPECT_NO_THROW(ff.Close());
     EXPECT_FALSE(ff.isOpen());
 }
+
+TEST(FITSimg, WorldCoordinatesMatrix)
+{
+    verbose = verboseLevel::VERBOSE_NONE;
+
+#ifdef Darwinx86_64
+    std::string src = "build/testdata/testkeys.fits";
+#else
+    std::string src = "testdata/testkeys.fits";
+#endif  
+
+    // Use the copied file for all operations
+
+    FITSmanager ff(src);
+    EXPECT_TRUE(ff.isOpen());
+
+    std::shared_ptr<FITScube> img = ff.GetPrimary();
+    EXPECT_NE(img, nullptr);
+    EXPECT_EQ(img->Size(1), 300);
+    EXPECT_EQ(img->Size(2), 300);
+
+    std::valarray<size_t> piX(img->Nelements());
+    for(size_t k=0; k< img->Nelements(); k++)
+        piX[k] = k;
+
+    worldVectors world = img->WorldCoordinatesVector(piX);
+    std::valarray<size_t> piY = img->World2PixelArray(world);
+
+    for(size_t k=0; k< img->Nelements(); k++)
+        EXPECT_EQ(piX[k], piY[k]);
+    
+    
+    EXPECT_NO_THROW(ff.Close());
+    EXPECT_FALSE(ff.isOpen());
+}

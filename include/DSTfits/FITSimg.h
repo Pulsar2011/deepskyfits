@@ -149,8 +149,15 @@ namespace DSL
         virtual worldCoords             WorldCoordinates(const size_t&, const int& wcsIndex=0) const; //!< Get world coordinates
         virtual worldCoords             WorldCoordinates(const std::vector<size_t>&, const int& wcsIndex=0) const; //!< Get world coordinates
         virtual worldCoords             WorldCoordinates(const pixelCoords&, const int& wcsIndex=0) const; //!< Get world coordinates
+
+        virtual worldVectors            WorldCoordinatesVector(const std::valarray<size_t>&, const int& wcsIndex=0) const; //!< Get world 
+        virtual worldVectors            WorldCoordinatesVector(const std::initializer_list<size_t>&, const int& wcsIndex=0) const; //!< Get world coordinates
+        virtual worldVectors            WorldCoordinatesVector(const std::vector<size_t>&, const int& wcsIndex=0) const; //!< Get world coordinates
+        virtual worldVectors            WorldCoordinatesVector(const pixelVectors&, const int& wcsIndex=0) const; //!< Get world coordinates
         
         virtual pixelCoords World2Pixel( const worldCoords&, const int& wcsIndex=0) const; //!< Get pixel coordinates based on WCS
+        virtual std::valarray<size_t> World2PixelArray( const worldVectors&, const int& wcsIndex=0) const; //!< Get pixel coordinates based on WCS
+        virtual pixelVectors World2PixelVector( const worldVectors&, const int& wcsIndex=0) const; //!< Get pixel coordinates based on WCS
         
         virtual std::vector<size_t> PixelCoordinates(const size_t&) const; //!< Get pixel coordinates
         
