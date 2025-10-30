@@ -116,10 +116,37 @@ namespace DSL
              */
             FITSwcs(const std::shared_ptr<fitsfile>& fptr, int relax = WCSHDR_all, int ctrl = 0);
 
+
+            FITSwcs(const FITSwcs& other); //!< Copy constructor
+            FITSwcs(const FITSwcs& other, const size_t& idx); //!< Copy constructor
+
+            /**
+             * @brief Construct a new FITSwcs object for a subimage defined by pixel ranges
+             * 
+             * @param other Input FITSwcs object
+             * @param idx Index of the WCS to extract
+             * @param crpix Index of the pixel to be used as new reference in the subfrme WCS
+             */
+            FITSwcs(const FITSwcs& other, const size_t& idx, const std::vector<size_t>& crpix); //!< Copy constructor
+            FITSwcs(const FITSwcs& other, const size_t& idx, const std::initializer_list<size_t>& crpix): FITSwcs(other, idx, std::vector<size_t>(crpix)) {} //!< Copy constructor
+
+            FITSwcs(const FITSwcs& other, const size_t& idx, const std::vector<double>& crpix); //!< Copy constructor
+            FITSwcs(const FITSwcs& other, const size_t& idx, const std::initializer_list<double>& crpix): FITSwcs(other, idx, std::vector<double>(crpix)) {} //!< Copy constructor
+            
+
             /**
              *  @details Destructor
              */
             ~FITSwcs();
+
+            /**
+             * @brief Swap content of two FITSwcs objects
+             * 
+             * @param first wsc object to swap with \c second
+             * @param second wsc object to swap with \c first
+             */
+            static void swap(FITSwcs& first, FITSwcs& second) noexcept; //!< Swap content of two FITSwcs objects
+
 #pragma endregion
 #pragma region * Accessor
 
@@ -202,7 +229,7 @@ namespace DSL
              * @param wcsIndex Index of the WCS to convert. Default value is -1, all WCS present in the structure will be converted to aa header string.
              * @return std::string 
              */
-            std::string asString(const int& wcsIndex=-1); //!< Get WCS header as a string for a given WCS index
+            std::string asString(const int& wcsIndex=-1) const; //!< Get WCS header as a string for a given WCS index
 
             /**
              * @brief Convert wcs to header 
@@ -210,7 +237,7 @@ namespace DSL
              * @param wcsIndex Index of the WCS to convert. Default value is -1, all WCS present in the structure will be converted to a FITS header.
              * @return FITShdu dictionary with WCS keycards 
              */
-            FITShdu asFITShdu(const int& wcsIndex=-1); //!< Get WCS header as a string for a given WCS index
+            FITShdu asFITShdu(const int& wcsIndex=-1) const; //!< Get WCS header as a string for a given WCS index
 #pragma endregion 
 #pragma region * I/O
             void Dump(const int& wcsIndex=-1) const; //!< Dump WCS information to an output stream

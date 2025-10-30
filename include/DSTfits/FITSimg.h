@@ -199,6 +199,8 @@ namespace DSL
         
         inline const FITShdu& HDU() const {return hdu;}
         inline       FITShdu& HDU() {return hdu;}
+
+        inline size_t getNumberOfWCS() const {return fwcs.getNumberOfWCS(); }
         
         virtual double GetSum ()                   const =0;
         virtual double GetMean()                   const =0;
@@ -3208,17 +3210,51 @@ namespace DSL
         hdu.ValueForKey("NAXIS1",Naxis[0]);
         hdu.ValueForKey("NAXIS2",Naxis[1]);
         
-        size_t n = 0;
+        if(getNumberOfWCS() < 1)
+            return;
 
-        // use lightweight lambdas to avoid incorrect function-pointer casts and overload issues
-        auto pixels_pos = [this](size_t idx) -> std::vector<size_t> { return this->PixelCoordinates(idx); };
-        auto pixels_coo = [this](const std::vector<size_t>& v) -> std::vector<double> { return this->WorldCoordinates(v); };
-        
-        hdu.ValueForKey("CRPIX1",static_cast<double>( 0 ));
-        hdu.ValueForKey("CRPIX2",static_cast<double>( 0 ));
-        
-        hdu.ValueForKey("CRVAL1",static_cast<double>( pixels_coo(pixels_pos(n))[0] ));
-        hdu.ValueForKey("CRVAL2",static_cast<double>( pixels_coo(pixels_pos(n))[1] ));
+        // update WCS info
+        for(size_t idx = 0; idx < getNumberOfWCS(); idx++)
+        {
+            try
+            {
+                std::vector<double> crpx;
+                for(size_t iAxes = 0; iAxes < Naxis.size(); iAxes++)
+                {
+                    if(iAxes == 0)
+                        crpx.push_back( static_cast<double>(xMin) ); // FITS pixel start at 1
+                    else if(iAxes == 1)
+                        crpx.push_back( static_cast<double>(yMin) );
+                    else
+                    {
+                        crpx.push_back(fwcs.CRPIX(idx,iAxes+1));
+                    }
+                }
+
+                FITSwcs tmp(fwcs,idx,crpx);
+                FITShdu tmp_hdu = tmp.asFITShdu();
+
+                for(FITSDictionary::const_iterator it = tmp_hdu.begin(); it != tmp_hdu.end(); it++)
+                {
+                    hdu.ValueForKey(it->first,it->second.value(),it->second.type(),it->second.comment());
+                }
+
+                FITSwcs::swap(fwcs,tmp);
+            }
+            catch(WCSexception& e)
+            {
+                std::cerr<<e.what()<<std::flush;
+
+                FITSwcs tmp(fwcs,idx);
+                FITShdu tmp_hdu = tmp.asFITShdu();
+
+                for(FITSDictionary::const_iterator it = tmp_hdu.begin(); it != tmp_hdu.end(); it++)
+                {
+                    hdu.DeleteKey(it->first);
+                }
+            }
+
+        }
     }
     
     /**

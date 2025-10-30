@@ -186,7 +186,7 @@ class FITSmanager;
      * @details Copie constructor
      * @param cube: FITS data cube to be copied.
      */
-    FITScube::FITScube(const FITScube& cube):fwcs()
+    FITScube::FITScube(const FITScube& cube):fwcs(cube.fwcs)
     {
         if(mask.size() > 1)
             mask.~valarray<bool>();

@@ -732,6 +732,26 @@ namespace DSL
                         pos++;
                     }
                 }
+                else
+                {
+                    while ((tmp_string.size()%80))
+                        tmp_string+=" ";
+                }
+            }
+            else
+            {
+                // For regular keywords, ensure exactly 80 characters
+                if (tmp_string.size() > 80)
+                {
+                    // Truncate if too long
+                    tmp_string = tmp_string.substr(0, 80);
+                }
+                else
+                {
+                    // Pad with spaces to exactly 80 characters
+                    while ((tmp_string.size() % 80))
+                        tmp_string += " ";
+                }
             }
 
             out += tmp_string;
