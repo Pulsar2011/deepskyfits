@@ -966,7 +966,18 @@ TEST(FITSimg, Test_Crop)
 
     for(size_t j=0; j<cimg->Size(2); j++)
         for(size_t i=0; i<cimg->Size(1); i++)
+        {
             EXPECT_EQ(cimg->Int16ValueAtPixel({i,j}), img->Int16ValueAtPixel({i+50,j+25}));
+            EXPECT_EQ(cimg->getNumberOfWCS(), img->getNumberOfWCS());
+            EXPECT_EQ(cimg->getNumberOfWCS(), 1);
+
+            worldCoords wcsrc = img->WorldCoordinates(img->PixelIndex({i+50,j+25}), 0);
+            worldCoords wcscr = cimg->WorldCoordinates(cimg->PixelIndex({i,j}), 0);
+
+
+            EXPECT_NEAR(wcsrc[0], wcscr[0], 1e-6);
+            EXPECT_NEAR(wcsrc[1], wcscr[1], 1e-6);
+        }
     
 
     img.reset();
@@ -1065,6 +1076,23 @@ TYPED_TEST(FITSimgStatsTest, Layer)
             k++ ;
         }
 
+    img.HDU().ValueForKey("CRPIX1", (double) 20.0);
+    img.HDU().ValueForKey("CRPIX2", (double) 30.0);
+    img.HDU().ValueForKey("CRVAL1", (double) 0.0);
+    img.HDU().ValueForKey("CRVAL2", (double) 0.0);
+    img.HDU().ValueForKey("CDELT1", (double) 0.5);
+    img.HDU().ValueForKey("CDELT2", (double) 0.5);
+    img.HDU().ValueForKey("CRPIX1A", (double) 0.0);
+    img.HDU().ValueForKey("CRPIX2A", (double) 0.0);
+    img.HDU().ValueForKey("CRVAL1A", (double) 10.0);
+    img.HDU().ValueForKey("CRVAL2A", (double) 10.0);
+    img.HDU().ValueForKey("CDELT1A", (double) 1);
+    img.HDU().ValueForKey("CDELT2A", (double) 1);
+
+    EXPECT_NO_THROW(img.reLoadWCS());
+    EXPECT_EQ(img.getNumberOfWCS(), 2);
+    
+    
     for(size_t k = 2; k < 5; k++)
     {
         FITSimg<T> layer(2, {N,N});
@@ -1079,6 +1107,13 @@ TYPED_TEST(FITSimgStatsTest, Layer)
         EXPECT_EQ(img.Size(), (k)*N*N);
         EXPECT_EQ(img.Size(3), (k));
 
+        EXPECT_EQ(img.getNumberOfWCS(), 2);
+        EXPECT_EQ(img.getWCS().getNumberOfAxis(0), 3);
+        EXPECT_EQ(img.getWCS().getNumberOfAxis(1), 3);
+        EXPECT_NEAR(img.getWCS().CRPIX(0,3),0,1e-7);
+        EXPECT_NEAR(img.getWCS().CRVAL(0,3),1,1e-7);
+        EXPECT_NEAR(img.getWCS().CDELT(0,3),1,1e-7);
+        
         for(size_t iz=0; iz<img.Size(3); iz++)
             for(size_t iy=0; iy<img.Size(2); iy++)
                 for(size_t ix=0; ix<img.Size(1); ix++)
@@ -1092,7 +1127,23 @@ TYPED_TEST(FITSimgStatsTest, Layer)
         EXPECT_EQ(layer->Size(1), N);
         EXPECT_EQ(layer->Size(2), N);
 
+        EXPECT_EQ(img.getNumberOfWCS(), 2);
+        EXPECT_EQ(img.getWCS().getNumberOfAxis(0), 3);
+        EXPECT_EQ(img.getWCS().getNumberOfAxis(1), 3);
+
         auto ldata = layer->GetData<T>();
+        EXPECT_NEAR(layer->getWCS().CRPIX(0,3),-1*static_cast<double>(k),1e-7);
+        EXPECT_NEAR(layer->getWCS().CRVAL(0,3),1,1e-7);
+        EXPECT_NEAR(layer->getWCS().CDELT(0,3),1,1e-7);
+
+        EXPECT_ANY_THROW(layer->WorldCoordinates(std::vector<size_t>({0,0}),0));
+        EXPECT_ANY_THROW(layer->WorldCoordinates(std::vector<size_t>({0,0}),1));
+
+        EXPECT_NO_THROW(layer->WorldCoordinates(std::vector<size_t>({0,0,0}),0));
+        EXPECT_NO_THROW(layer->WorldCoordinates(std::vector<size_t>({0,0,0}),1));
+
+        EXPECT_NEAR(layer->WorldCoordinates(std::vector<size_t>({0,0,0}),0)[2], 1.0 + static_cast<double>(k), 1e-7);
+        EXPECT_NEAR(layer->WorldCoordinates(std::vector<size_t>({0,0,0}),1)[2], 1.0 + static_cast<double>(k), 1e-7);
 
         for(size_t j=0; j<layer->Size(2); j++)
             for(size_t i=0; i<layer->Size(1); i++)

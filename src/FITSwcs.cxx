@@ -297,29 +297,9 @@ namespace DSL
             }
 
             FITShdu _origin = other.asFITShdu(idx);
-
+            
             //GET WCS SUFFIX
-            std::string suff=std::string();
-            for(FITSDictionary::const_iterator it = _origin.begin(); it != _origin.end(); ++it)
-            {
-                std::string key = it->first;
-                if(key.find("WCSAXES") != std::string::npos ||
-                   key.find("CTYPE")   != std::string::npos ||
-                   key.find("CRVAL")   != std::string::npos ||
-                   key.find("CRPIX")   != std::string::npos ||
-                   key.find("CDELT")   != std::string::npos )
-                {
-                    //EXTRACT THE SUFFIX
-                    size_t pos = key.find_first_of("0123456789");
-                    if(pos != std::string::npos)
-                    {
-                        suff += key.substr(pos+1);
-                    }
-                }
-
-                if(!suff.empty())
-                    break;
-            }
+            const std::string suff = other.getSuffix(idx);
 
             if((verbose&verboseLevel::VERBOSE_WCS)==verboseLevel::VERBOSE_WCS)
             {
@@ -397,29 +377,7 @@ namespace DSL
             }
 
             FITShdu _origin = other.asFITShdu(idx);
-
-            //GET WCS SUFFIX
-            std::string suff=std::string();
-            for(FITSDictionary::const_iterator it = _origin.begin(); it != _origin.end(); ++it)
-            {
-                std::string key = it->first;
-                if(key.find("WCSAXES") != std::string::npos ||
-                   key.find("CTYPE")   != std::string::npos ||
-                   key.find("CRVAL")   != std::string::npos ||
-                   key.find("CRPIX")   != std::string::npos ||
-                   key.find("CDELT")   != std::string::npos )
-                {
-                    //EXTRACT THE SUFFIX
-                    size_t pos = key.find_first_of("0123456789");
-                    if(pos != std::string::npos)
-                    {
-                        suff += key.substr(pos+1);
-                    }
-                }
-
-                if(!suff.empty())
-                    break;
-            }
+            const std::string suff = other.getSuffix(idx);
 
             if((verbose&verboseLevel::VERBOSE_WCS)==verboseLevel::VERBOSE_WCS)
             {
@@ -518,6 +476,47 @@ namespace DSL
             }
 
             return static_cast<size_t>(fwcs.get()[wcsIndex].naxis);
+        }
+
+        const std::string FITSwcs::getSuffix(const size_t& wcsIndex) const
+        {
+            if(fwcs == nullptr)
+            {
+                std::string errmsg = wcs_errmsg[WCSERR_UNSET];
+                throw WCSexception(WCSERR_UNSET,"FITSwcs","getNumberOfAxis",errmsg);
+            }
+
+            if(wcsIndex >= static_cast<size_t>(fnwcs))
+            {
+                std::string errmsg = wcs_errmsg[WCSERR_UNSET];
+                throw WCSexception(WCSERR_BAD_PARAM,"FITSwcs","getNumberOfAxis",errmsg);
+            }
+
+            std::string suff=std::string();
+            FITShdu _origin = asFITShdu(wcsIndex);
+            
+            for(FITSDictionary::const_iterator it = _origin.begin(); it != _origin.end(); ++it)
+            {
+                std::string key = it->first;
+                if(key.find("WCSAXES") != std::string::npos ||
+                   key.find("CTYPE")   != std::string::npos ||
+                   key.find("CRVAL")   != std::string::npos ||
+                   key.find("CRPIX")   != std::string::npos ||
+                   key.find("CDELT")   != std::string::npos )
+                {
+                    //EXTRACT THE SUFFIX
+                    size_t pos = key.find_last_of("0123456789");
+                    if(pos != std::string::npos)
+                    {
+                        suff += key.substr(pos+1);
+                    }
+                }
+
+                if(!suff.empty())
+                    break;
+            }
+
+            return std::string(suff);
         }
 
         /**
@@ -802,11 +801,11 @@ namespace DSL
                 throw WCSexception(WCSERR_BAD_PIX,"FITSwcs","pixel2world","Empty pixel vector");
             }
             // require nelem >= naxis when multiple points
-            const int naxis = static_cast<int>(fwcs.get()[wcsIndex].naxis);
-            if (ncoord > 1 && nelem < naxis)
+            const int naxis = static_cast<int>(std::max(fwcs.get()[wcsIndex].naxis,nelem));
+            if (ncoord > 0 && nelem != naxis)
             {
                 std::ostringstream os;
-                os << "pixel2world: nelem (" << nelem << ") < naxis (" << naxis << ")";
+                os << "pixel2world: nelem (" << nelem << ") != naxis (" << naxis << ")";
                 throw WCSexception(WCSERR_BAD_PIX,"FITSwcs","pixel2world",os.str());
             }
 

@@ -153,6 +153,7 @@ namespace DSL
             inline int getStatus() const { return fwcs_status; }   //!< Get the WCS status
             inline int getNumberOfWCS() const { return fnwcs; }    //!< Get the number of WCS structures
             size_t getNumberOfAxis(const size_t&) const;              //!< Get the number of WCS structures
+            const std::string getSuffix(const size_t&) const;        //!< Get the WCS suffix for a given WCS index
             
             double CRPIX(const size_t&) const; //!< Get the CRPIX value for a given WCS index and axis
             double CRPIX(const size_t&, const size_t&) const; //!< Get the CRPIX value for a given WCS index and axis
