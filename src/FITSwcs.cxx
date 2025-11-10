@@ -43,6 +43,13 @@ namespace DSL
                 throw FITSexception(fwcs_status,"FITSwcs","initFromString","Empty header string");
             }
 
+            if((verbose&verboseLevel::VERBOSE_DEBUG)==verboseLevel::VERBOSE_DEBUG)
+            {
+                std::cout<<std::endl<<std::endl<<"\033[31m--- FITSwcs::initFromString() ---\033[0m]"<<std::endl<<std::endl;
+                std::cout<<"Header size (bytes) : "<<header.size()<<std::endl
+                    <<header<<std::endl<<std::endl;
+            }
+
             int nkeyrec = static_cast<int>(header.size()/80);
             int nreject=0;
             struct wcsprm* _wcs = nullptr;
@@ -86,12 +93,6 @@ namespace DSL
                         }
                     }
                 }
-
-                if((verbose&verboseLevel::VERBOSE_DEBUG)==verboseLevel::VERBOSE_DEBUG)
-                {
-                    std::cout<<std::endl<<"\033[31m*****\033[34m WCS HEADER PARSED \033[0m\n";
-                    wcsprt(_wcs);
-                }
             }
 
             if(fnwcs > 0)
@@ -133,13 +134,19 @@ namespace DSL
                     std::cerr<<"\033[31m[WCSFIX]\033[0m WCSFIX failed with status code "<<fix_status<<std::endl;
                 }
 
-                 wcserr_enable(0);
+                wcserr_enable(0);
 
                 if(wcsset(_wcs))
                 {
                     fwcs.reset();
                     fwcs_status = WCSERR_UNSET;
                     throw WCSexception(fwcs_status,"FITSwcs","initFromString","wcsset failed after wcsfixi");
+                }
+
+                if((verbose&verboseLevel::VERBOSE_DEBUG)==verboseLevel::VERBOSE_DEBUG)
+                {
+                    std::cout<<std::endl<<"\033[31m*****\033[34m WCS HEADER PARSED \033[0m\n";
+                    wcsprt(_wcs);
                 }
 
                 int nw = fnwcs;
@@ -226,12 +233,224 @@ namespace DSL
             initFromImg(fptr, relax, ctrl);
         }
 
+        FITSwcs::FITSwcs(const FITSwcs& other):fwcs(other.fwcs), fwcs_status(other.fwcs_status), fnwcs(other.fnwcs)
+        { }
+
+        FITSwcs::FITSwcs(const FITSwcs& other, const size_t& idx):fwcs(), fwcs_status(WCSERR_UNSET), fnwcs(0)
+        {
+            if(other.fwcs == nullptr)
+            {
+                fwcs_status = WCSERR_UNSET;
+                throw WCSexception(fwcs_status,"FITSwcs","Copy Constructor","Input FITSwcs object has no WCS defined");
+            }
+
+            if(idx >= static_cast<size_t>(other.fnwcs))
+            {
+                fwcs_status = WCSERR_BAD_PARAM;
+                throw WCSexception(fwcs_status,"FITSwcs","Copy Constructor","Input FITSwcs object index is out of range");
+            }
+
+            
+            struct wcsprm* _wcs = new wcsprm;
+            _wcs->flag=-1;
+            if ( wcssub(1, &(other.fwcs.get()[idx]),0x0,0x0, _wcs) )
+            {
+                fwcs_status = WCSERR_UNSET;
+                throw WCSexception(fwcs_status,"FITSwcs","Copy Constructor","wcsdup failed");
+            }
+
+            fwcs_status = wcsset(_wcs);
+
+            if(fwcs_status)
+            {
+                    fwcs.reset();
+                    fwcs_status = WCSERR_UNSET;
+                    throw WCSexception(fwcs_status,"FITSwcs","initFromString","wcsset failed after wcsfixi");
+            }
+
+            fwcs = std::shared_ptr<struct wcsprm>( _wcs, [](struct wcsprm* p){if(!p) return; struct wcsprm* tmp = p;wcsfree(tmp);} );
+            fnwcs       = 1;
+        }
+
+        FITSwcs::FITSwcs(const FITSwcs& other, const size_t& idx, const std::vector<size_t>& crpix):fwcs(), fwcs_status(WCSERR_UNSET), fnwcs(0)
+        {
+            if(crpix.size() != other.getNumberOfAxis(idx))
+            {
+                fwcs_status = WCSERR_BAD_PARAM;
+                throw WCSexception(fwcs_status,"FITSwcs","Copy Constructor","CRPIX vector size doesn't match number of axis in WCS");
+            }
+
+            if(other.fwcs == nullptr)
+            {
+                fwcs_status = WCSERR_UNSET;
+                throw WCSexception(fwcs_status,"FITSwcs","Copy Constructor","Input FITSwcs object has no WCS defined");
+            }
+
+            if(other.getNumberOfWCS() == 0)
+            {
+                return;
+            }
+            else if(other.getNumberOfWCS() <= idx)
+            {
+                fwcs_status = WCSERR_BAD_PARAM;
+                throw WCSexception(fwcs_status,"FITSwcs","Copy Constructor","Input FITSwcs object index is out of range");
+            }
+
+            FITShdu _origin = other.asFITShdu(idx);
+            
+            //GET WCS SUFFIX
+            const std::string suff = other.getSuffix(idx);
+
+            if((verbose&verboseLevel::VERBOSE_WCS)==verboseLevel::VERBOSE_WCS)
+            {
+                std::cout<<std::endl<<"\033[32m[FITSwcs Copy Constructor]\033[0m OLD sub-WCS HDU:"<<std::endl;
+                _origin.Dump(std::cerr);
+            }
+
+            // ESTIMATE THE VALUE THAT WOULD HAVE 'OLD' CRPIX IN THE NEW SUBIMAGE
+            std::vector<size_t> new_crpix;
+            for(size_t i = 0; i < crpix.size(); i++)
+            {
+                double delta = other.CRPIX(idx, i+1) - static_cast<double>(crpix[i]);
+                _origin.ValueForKey("CRPIX"+std::to_string(i+1)+suff, delta, "Pixel coordinate of reference point");
+            }
+
+            if((verbose&verboseLevel::VERBOSE_WCS)==verboseLevel::VERBOSE_WCS)
+            {
+                std::cout<<std::endl<<"\033[32m[FITSwcs Copy Constructor]\033[0m NNEWw sub-WCS HDU:"<<std::endl;
+                _origin.Dump(std::cerr);
+            }
+
+            // Fallback sequence without nested try/catch
+            const std::vector<int> relax_order = { WCSHDR_all, WCSHDR_reject, WCSHDR_strict, WCSHDR_none };
+
+            bool initialized = false;
+            std::ostringstream errs;
+            for (int relax : relax_order)
+            {
+                try
+                {
+                    initFromImg(_origin, relax, 0);
+                    initialized = true;
+                    break;
+                }
+                catch(const WCSexception& e)
+                {
+                    if((verbose&verboseLevel::VERBOSE_WCS)==verboseLevel::VERBOSE_WCS)
+                    {
+                        std::cerr<<"\033[31m[ERROR]\033[0m FITSwcs Copy Constructor failed with relax="<<relax<<":\n";
+                        std::cerr<<e.what()<<std::endl;
+                    }
+                    errs << " relax=" << relax << " failed: " << e.what() << "\n";
+                }
+            }
+        
+            if (!initialized)
+            {
+                throw WCSexception(WCSERR_UNSET, "FITSwcs", "Copy Constructor",
+                        std::string("Failed to init from subimage HDU after trying relax sequence:\n") + errs.str());
+            }
+        }
+
+        FITSwcs::FITSwcs(const FITSwcs& other, const size_t& idx, const std::vector<double>& crpix):fwcs(), fwcs_status(WCSERR_UNSET), fnwcs(0)
+        {
+            if(crpix.size() != other.getNumberOfAxis(idx))
+            {
+                fwcs_status = WCSERR_BAD_PARAM;
+                throw WCSexception(fwcs_status,"FITSwcs","Copy Constructor","CRPIX vector size doesn't match number of axis in WCS");
+            }
+
+            if(other.fwcs == nullptr)
+            {
+                fwcs_status = WCSERR_UNSET;
+                throw WCSexception(fwcs_status,"FITSwcs","Copy Constructor","Input FITSwcs object has no WCS defined");
+            }
+
+            if(other.getNumberOfWCS() == 0)
+            {
+                return;
+            }
+            else if(other.getNumberOfWCS() <= idx)
+            {
+                fwcs_status = WCSERR_BAD_PARAM;
+                throw WCSexception(fwcs_status,"FITSwcs","Copy Constructor","Input FITSwcs object index is out of range");
+            }
+
+            FITShdu _origin = other.asFITShdu(idx);
+            const std::string suff = other.getSuffix(idx);
+
+            if((verbose&verboseLevel::VERBOSE_WCS)==verboseLevel::VERBOSE_WCS)
+            {
+                std::cout<<std::endl<<"\033[32m[FITSwcs Copy Constructor]\033[0m OLD sub-WCS HDU:"<<std::endl;
+                _origin.Dump(std::cerr);
+            }
+
+            // ESTIMATE THE VALUE THAT WOULD HAVE 'OLD' CRPIX IN THE NEW SUBIMAGE
+            std::vector<double> new_crpix;
+            for(size_t i = 0; i < crpix.size(); i++)
+            {
+                double delta = other.CRPIX(idx, i+1) - crpix[i];
+                _origin.ValueForKey("CRPIX"+std::to_string(i+1)+suff, delta, "Pixel coordinate of reference point");
+            }
+
+            if((verbose&verboseLevel::VERBOSE_WCS)==verboseLevel::VERBOSE_WCS)
+            {
+                std::cout<<std::endl<<"\033[32m[FITSwcs Copy Constructor]\033[0m NNEWw sub-WCS HDU:"<<std::endl;
+                _origin.Dump(std::cerr);
+            }
+
+            // Fallback sequence without nested try/catch
+            const std::vector<int> relax_order = { WCSHDR_all, WCSHDR_reject, WCSHDR_strict, WCSHDR_none };
+
+            bool initialized = false;
+            std::ostringstream errs;
+            for (int relax : relax_order)
+            {
+                try
+                {
+                    initFromImg(_origin, relax, 0);
+                    initialized = true;
+                    break;
+                }
+                catch(const WCSexception& e)
+                {
+                    if((verbose&verboseLevel::VERBOSE_WCS)==verboseLevel::VERBOSE_WCS)
+                    {
+                        std::cerr<<"\033[31m[ERROR]\033[0m FITSwcs Copy Constructor failed with relax="<<relax<<":\n";
+                        std::cerr<<e.what()<<std::endl;
+                    }
+                    errs << " relax=" << relax << " failed: " << e.what() << "\n";
+                }
+            }
+        
+            if (!initialized)
+            {
+                throw WCSexception(WCSERR_UNSET, "FITSwcs", "Copy Constructor",
+                        std::string("Failed to init from subimage HDU after trying relax sequence:\n") + errs.str());
+            }
+        }
+
         FITSwcs::~FITSwcs()
         {
             fwcs.reset();
             fwcs_status = WCSERR_UNSET;
             fnwcs       = 0;
         }
+
+        void FITSwcs::swap(FITSwcs& first, FITSwcs& second) noexcept
+        {
+            using std::swap;
+            swap(first.fwcs, second.fwcs);
+            swap(first.fwcs_status, second.fwcs_status);
+            swap(first.fnwcs, second.fnwcs);
+
+            for(int k =0; k < first.fnwcs; k++)
+                first.fwcs_status = wcsset(&(first.fwcs.get()[k]));
+
+            for(size_t k =0; k < static_cast<size_t>(second.fnwcs); k++)
+                second.fwcs_status = wcsset(&(second.fwcs.get()[k]));
+        }
+
 
 #pragma endregion
 #pragma region * Accessor
@@ -257,6 +476,47 @@ namespace DSL
             }
 
             return static_cast<size_t>(fwcs.get()[wcsIndex].naxis);
+        }
+
+        const std::string FITSwcs::getSuffix(const size_t& wcsIndex) const
+        {
+            if(fwcs == nullptr)
+            {
+                std::string errmsg = wcs_errmsg[WCSERR_UNSET];
+                throw WCSexception(WCSERR_UNSET,"FITSwcs","getNumberOfAxis",errmsg);
+            }
+
+            if(wcsIndex >= static_cast<size_t>(fnwcs))
+            {
+                std::string errmsg = wcs_errmsg[WCSERR_UNSET];
+                throw WCSexception(WCSERR_BAD_PARAM,"FITSwcs","getNumberOfAxis",errmsg);
+            }
+
+            std::string suff=std::string();
+            FITShdu _origin = asFITShdu(wcsIndex);
+            
+            for(FITSDictionary::const_iterator it = _origin.begin(); it != _origin.end(); ++it)
+            {
+                std::string key = it->first;
+                if(key.find("WCSAXES") != std::string::npos ||
+                   key.find("CTYPE")   != std::string::npos ||
+                   key.find("CRVAL")   != std::string::npos ||
+                   key.find("CRPIX")   != std::string::npos ||
+                   key.find("CDELT")   != std::string::npos )
+                {
+                    //EXTRACT THE SUFFIX
+                    size_t pos = key.find_last_of("0123456789");
+                    if(pos != std::string::npos)
+                    {
+                        suff += key.substr(pos+1);
+                    }
+                }
+
+                if(!suff.empty())
+                    break;
+            }
+
+            return std::string(suff);
         }
 
         /**
@@ -541,11 +801,11 @@ namespace DSL
                 throw WCSexception(WCSERR_BAD_PIX,"FITSwcs","pixel2world","Empty pixel vector");
             }
             // require nelem >= naxis when multiple points
-            const int naxis = static_cast<int>(fwcs.get()[wcsIndex].naxis);
-            if (ncoord > 1 && nelem < naxis)
+            const int naxis = static_cast<int>(std::max(fwcs.get()[wcsIndex].naxis,nelem));
+            if (ncoord > 0 && nelem != naxis)
             {
                 std::ostringstream os;
-                os << "pixel2world: nelem (" << nelem << ") < naxis (" << naxis << ")";
+                os << "pixel2world: nelem (" << nelem << ") != naxis (" << naxis << ")";
                 throw WCSexception(WCSERR_BAD_PIX,"FITSwcs","pixel2world",os.str());
             }
 
@@ -691,7 +951,7 @@ namespace DSL
             return pv;
         }
 
-        std::string FITSwcs::asString(const int& wcsIndex)
+        std::string FITSwcs::asString(const int& wcsIndex) const
         {
             if(fwcs == nullptr)
             {
@@ -733,7 +993,7 @@ namespace DSL
             return shdr;
         }
 
-        FITShdu FITSwcs::asFITShdu(const int& wcsIndex)
+        FITShdu FITSwcs::asFITShdu(const int& wcsIndex) const
         {
             std::string header = asString(wcsIndex);
             FITShdu shdr(header);

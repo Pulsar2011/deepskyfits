@@ -327,11 +327,8 @@ TEST(FITS_wcs, NoWcsFound)
     }
 }
 
-TEST(FITS_wcs, changeReferencial)
+FITShdu buildFakeHDU()
 {
-    verbose &= verboseLevel::VERBOSE_WCS;
-    verbose |= verboseLevel::VERBOSE_BASIC;
-
     FITSDictionary fakeHdu;
     fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("SIMPLE"),FITSkeyword("T","file does conform to FITS standard")));
     fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("BITPIX"),FITSkeyword("16","number of bits per data pixel")));
@@ -395,7 +392,16 @@ TEST(FITS_wcs, changeReferencial)
     fakeHdu.insert(std::pair<key_code,FITSkeyword>(std::string("SPECSYS"),FITSkeyword("BARYCENT","")));
 
     FITShdu hdu(fakeHdu);
-    FITSwcs wcs(hdu);
+
+    return hdu;
+}
+
+TEST(FITS_wcs, changeReferencial)
+{
+    verbose &= verboseLevel::VERBOSE_WCS;
+    verbose |= verboseLevel::VERBOSE_BASIC;
+
+    FITSwcs wcs(buildFakeHDU());
     
     EXPECT_EQ(wcs.getStatus(), WCSERR_SUCCESS);
     EXPECT_EQ(wcs.getNumberOfWCS(), 1);
@@ -447,4 +453,258 @@ TEST(FITS_wcs, changeReferencial)
     }
 
     EXPECT_NO_THROW(wcs.~FITSwcs());
+}
+
+TEST(FITS_wcs, COPY_CONSTRUCTOR)
+{
+    verbose = verboseLevel::VERBOSE_NONE;
+
+    // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
+#ifdef Darwinx86_64
+    FITSmanager fm("build/testdata/DSS.fits", true);
+#else
+    FITSmanager fm("testdata/DSS.fits", true);
+#endif
+
+    std::shared_ptr<FITShdu> hdu = fm.GetPrimaryHeader();
+    FITSwcs wcs1(hdu);
+    EXPECT_EQ(wcs1.getStatus(), WCSERR_SUCCESS);
+
+    FITSwcs wcs2(wcs1); // Copy constructor
+    EXPECT_EQ(wcs2.getStatus(), WCSERR_SUCCESS);
+    EXPECT_EQ(wcs2.getNumberOfWCS(), wcs1.getNumberOfWCS());
+
+    for(size_t k = 0; k < wcs1.getNumberOfWCS(); k++)
+    {
+        EXPECT_EQ(wcs2.getNumberOfAxis(k), wcs1.getNumberOfAxis(k));
+        for(size_t i=1; i<=wcs1.getNumberOfAxis(k); i++)
+        {
+            EXPECT_NEAR(wcs2.CRPIX(k,i), wcs1.CRPIX(k,i), 1e-10);
+            EXPECT_NEAR(wcs2.CRVAL(k,i), wcs1.CRVAL(k,i), 1e-10);
+            EXPECT_NEAR(wcs2.CDELT(k,i), wcs1.CDELT(k,i), 1e-10);
+        }
+
+        for(size_t ix = 0 ; ix < 100; ix+=5)
+            for(size_t iy = 0 ; iy < 100; iy+=5)
+            {
+                pixelVectors pix({{static_cast<double>(ix), static_cast<double>(iy)}});
+                worldVectors world1 = wcs1.pixel2world(k, pix);
+                worldVectors world2 = wcs2.pixel2world(k, pix);
+
+                EXPECT_NEAR(world2[0][0], world1[0][0], 1e-8);
+                EXPECT_NEAR(world2[0][1], world1[0][1], 1e-8);
+
+                pixelVectors pix2_back = wcs2.world2pixel(k, world2);
+
+                EXPECT_NEAR(pix2_back[0][0], pix[0][0], 1e-8);
+                EXPECT_NEAR(pix2_back[0][1], pix[0][1], 1e-8);
+            }
+    }
+}
+
+TEST(FITS_wcs, SUBCOPY_CONSTRUCTOR)
+{
+    verbose = verboseLevel::VERBOSE_NONE;
+
+    // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
+#ifdef Darwinx86_64
+    FITSmanager fm("build/testdata/DSS.fits", true);
+#else
+    FITSmanager fm("testdata/DSS.fits", true);
+#endif
+
+    
+    std::shared_ptr<FITShdu> hdu = fm.GetPrimaryHeader();
+    FITSwcs wcs1(hdu);
+    EXPECT_EQ(wcs1.getStatus(), WCSERR_SUCCESS);
+
+    for(size_t k=0; k < wcs1.getNumberOfWCS(); k++)
+    {
+    
+        FITSwcs wcs2(wcs1,k); // Copy constructor
+        EXPECT_EQ(wcs2.getStatus(), WCSERR_SUCCESS);
+        EXPECT_EQ(wcs2.getNumberOfWCS(), 1);
+
+        EXPECT_EQ(wcs2.getNumberOfAxis(0), wcs1.getNumberOfAxis(k));
+        for(size_t i=1; i<=wcs1.getNumberOfAxis(k); i++)
+        {
+            EXPECT_NEAR(wcs2.CRPIX(i), wcs1.CRPIX(k,i), 1e-10);
+            EXPECT_NEAR(wcs2.CRVAL(i), wcs1.CRVAL(k,i), 1e-10);
+            EXPECT_NEAR(wcs2.CDELT(i), wcs1.CDELT(k,i), 1e-10);
+        }
+        
+        for(size_t ix = 0 ; ix < 100; ix+=5)
+            for(size_t iy = 0 ; iy < 100; iy+=5)
+            {
+                pixelVectors pix({{static_cast<double>(ix), static_cast<double>(iy)}});
+                worldVectors world1 = wcs1.pixel2world(k, pix);
+                worldVectors world2 = wcs2.pixel2world(0, pix);
+
+                EXPECT_NEAR(world2[0][0], world1[0][0], 1e-8);
+                EXPECT_NEAR(world2[0][1], world1[0][1], 1e-8);
+
+                pixelVectors pix2_back = wcs2.world2pixel(0, world2);
+
+                EXPECT_NEAR(pix2_back[0][0], pix[0][0], 1e-8);
+                EXPECT_NEAR(pix2_back[0][1], pix[0][1], 1e-8);
+            }
+        
+    }
+}
+
+TEST(FITS_wcs, SUBFRAMECOPY_CONSTRUCTOR_INT)
+{
+    verbose = verboseLevel::VERBOSE_NONE;
+    //verbose |= verboseLevel::VERBOSE_DEBUG;
+
+    // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
+#ifdef Darwinx86_64
+    FITSmanager fm("build/testdata/DSS.fits", true);
+#else
+    FITSmanager fm("testdata/DSS.fits", true);
+#endif
+
+    
+    std::shared_ptr<FITShdu> hdu = fm.GetPrimaryHeader();
+    FITSwcs wcs1(hdu);
+    EXPECT_EQ(wcs1.getStatus(), WCSERR_SUCCESS);
+
+    for(size_t k=0; k < wcs1.getNumberOfWCS(); k++)
+    {
+    
+        if(k==0)
+        {
+            EXPECT_ANY_THROW( FITSwcs wcs2(wcs1,k,std::vector<size_t>({10,50})); ); // Copy constructor with invalid offset size
+            continue;
+        }
+
+        FITSwcs wcs2(wcs1,k,std::vector<size_t>({10,50})); // Copy constructor
+        EXPECT_EQ(wcs2.getStatus(), WCSERR_SUCCESS);
+        EXPECT_EQ(wcs2.getNumberOfWCS(), 1);
+
+        EXPECT_EQ(wcs2.getNumberOfAxis(0), wcs1.getNumberOfAxis(k));
+        for(size_t i=1; i<=wcs1.getNumberOfAxis(k); i++)
+        {
+            EXPECT_NEAR(wcs2.CRPIX(0,i), wcs1.CRPIX(k,i)-((i==1)?10:50), 1e-6);
+            EXPECT_NEAR(wcs2.CRVAL(0,i), wcs1.CRVAL(k,i), 1e-6);
+            EXPECT_NEAR(wcs2.CDELT(0,i), wcs1.CDELT(k,i), 1e-6);
+        }
+        
+        for(size_t ix = 0 ; ix < 100; ix+=5)
+            for(size_t iy = 0 ; iy < 100; iy+=5)
+            {
+                pixelVectors newpix({{static_cast<double>(ix), static_cast<double>(iy)}});
+                pixelVectors oldpix({{static_cast<double>(ix+10), static_cast<double>(iy+50)}});
+                worldVectors world1 = wcs1.pixel2world(k, oldpix);
+                worldVectors world2 = wcs2.pixel2world(0, newpix);
+
+                EXPECT_NEAR(world2[0][0], world1[0][0], 1e-8);
+                EXPECT_NEAR(world2[0][1], world1[0][1], 1e-8);
+
+                pixelVectors pix2_back = wcs2.world2pixel(0, world2);
+
+                EXPECT_NEAR(pix2_back[0][0], newpix[0][0], 1e-8);
+                EXPECT_NEAR(pix2_back[0][1], newpix[0][1], 1e-8);
+            }
+        
+    }
+}
+
+TEST(FITS_wcs, SUBFRAMECOPY_CONSTRUCTOR_DBL)
+{
+    verbose = verboseLevel::VERBOSE_NONE;
+    //verbose |= verboseLevel::VERBOSE_DEBUG;
+
+    // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
+#ifdef Darwinx86_64
+    FITSmanager fm("build/testdata/DSS.fits", true);
+#else
+    FITSmanager fm("testdata/DSS.fits", true);
+#endif
+
+    
+    std::shared_ptr<FITShdu> hdu = fm.GetPrimaryHeader();
+    FITSwcs wcs1(hdu);
+    EXPECT_EQ(wcs1.getStatus(), WCSERR_SUCCESS);
+
+    for(size_t k=0; k < wcs1.getNumberOfWCS(); k++)
+    {
+    
+        if(k==0)
+        {
+            EXPECT_ANY_THROW( FITSwcs wcs2(wcs1,k,{10.,50.}); ); // Copy constructor with invalid offset size
+            continue;
+        }
+
+        FITSwcs wcs2(wcs1,k,{10.,50.}); // Copy constructor
+        EXPECT_EQ(wcs2.getStatus(), WCSERR_SUCCESS);
+        EXPECT_EQ(wcs2.getNumberOfWCS(), 1);
+
+        EXPECT_EQ(wcs2.getNumberOfAxis(0), wcs1.getNumberOfAxis(k));
+        for(size_t i=1; i<=wcs1.getNumberOfAxis(k); i++)
+        {
+            EXPECT_NEAR(wcs2.CRPIX(0,i), wcs1.CRPIX(k,i)-((i==1)?10:50), 1e-6);
+            EXPECT_NEAR(wcs2.CRVAL(0,i), wcs1.CRVAL(k,i), 1e-6);
+            EXPECT_NEAR(wcs2.CDELT(0,i), wcs1.CDELT(k,i), 1e-6);
+        }
+        
+        for(size_t ix = 0 ; ix < 100; ix+=5)
+            for(size_t iy = 0 ; iy < 100; iy+=5)
+            {
+                pixelVectors newpix({{static_cast<double>(ix), static_cast<double>(iy)}});
+                pixelVectors oldpix({{static_cast<double>(ix+10), static_cast<double>(iy+50)}});
+                worldVectors world1 = wcs1.pixel2world(k, oldpix);
+                worldVectors world2 = wcs2.pixel2world(0, newpix);
+
+                EXPECT_NEAR(world2[0][0], world1[0][0], 1e-8);
+                EXPECT_NEAR(world2[0][1], world1[0][1], 1e-8);
+
+                pixelVectors pix2_back = wcs2.world2pixel(0, world2);
+
+                EXPECT_NEAR(pix2_back[0][0], newpix[0][0], 1e-8);
+                EXPECT_NEAR(pix2_back[0][1], newpix[0][1], 1e-8);
+            }
+        
+    }
+}
+
+TEST(FITS_wcs, swapWCS)
+{
+    verbose = verboseLevel::VERBOSE_NONE;
+
+    // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
+#ifdef Darwinx86_64
+    FITSmanager fm("build/testdata/DSS.fits", true);
+#else
+    FITSmanager fm("testdata/DSS.fits", true);
+#endif
+
+    std::shared_ptr<FITShdu> hdu = fm.GetPrimaryHeader();
+    FITSwcs wcs1(hdu);
+    EXPECT_EQ(wcs1.getStatus(), WCSERR_SUCCESS);
+
+    FITSwcs wcs2(buildFakeHDU());
+    EXPECT_EQ(wcs2.getStatus(), WCSERR_SUCCESS);
+
+    FITSwcs::swap(wcs1, wcs2);
+
+    EXPECT_EQ(wcs1.getNumberOfWCS(), 1);
+    EXPECT_EQ(wcs1.getNumberOfAxis(0), 3);
+
+    EXPECT_EQ(wcs2.getNumberOfWCS(), 3);
+    EXPECT_EQ(wcs2.getNumberOfAxis(0), 2);
+
+    EXPECT_NEAR(wcs1.CRPIX(0,1), 90.0, 1e-7);
+    EXPECT_NEAR(wcs1.CRPIX(0,2), 90.0, 1e-7);
+    EXPECT_NEAR(wcs1.CRPIX(0,3), 1., 1e-7);
+
+    EXPECT_NEAR(wcs2.CRPIX(1,1), 5009.62946648,1e-7);
+    EXPECT_NEAR(wcs2.CRPIX(1,2), -7580.52942578,1e-7);
+
+    EXPECT_NEAR(wcs1.CRVAL(0,1), 192.2500, 1e-7);
+    EXPECT_NEAR(wcs1.CRVAL(0,2), 27.4000, 1e-7);
+    EXPECT_NEAR(wcs1.CRVAL(0,3), 5569271.04, 1e-7);
+
+    EXPECT_NEAR(wcs2.CRVAL(1,1), 80.5671666667,1e-7);
+    EXPECT_NEAR(wcs2.CRVAL(1,2), -14.953,1e-7);
 }

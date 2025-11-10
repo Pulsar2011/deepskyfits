@@ -144,7 +144,11 @@ namespace DSL
         inline const size_t GetDimension() const {return Naxis.size();}
         inline const std::string GetName() const {if(hdu.Exists("EXTNAME")) return hdu.GetValueForKey("EXTNAME"); else return std::string("NO NAME");}       //!< Get the name of the image
 
+#pragma endregion
+#pragma region * WCS
         inline double at(const size_t& i) const { if(data == nullptr) throw FITSexception(SHARED_NOMEM,"FITScube","at","No data in memory"); return data->get(i); }
+        inline const FITSwcs& getWCS() const { return fwcs; }
+        inline size_t getNumberOfWCS() const {return fwcs.getNumberOfWCS(); }
         
         virtual worldCoords             WorldCoordinates(const size_t&, const int& wcsIndex=0) const; //!< Get world coordinates
         virtual worldCoords             WorldCoordinates(const std::vector<size_t>&, const int& wcsIndex=0) const; //!< Get world coordinates
@@ -158,7 +162,11 @@ namespace DSL
         virtual pixelCoords World2Pixel( const worldCoords&, const int& wcsIndex=0) const; //!< Get pixel coordinates based on WCS
         virtual std::valarray<size_t> World2PixelArray( const worldVectors&, const int& wcsIndex=0) const; //!< Get pixel coordinates based on WCS
         virtual pixelVectors World2PixelVector( const worldVectors&, const int& wcsIndex=0) const; //!< Get pixel coordinates based on WCS
-        
+#pragma endregion
+#pragma region * Pixel index/coordinates
+
+        inline void reLoadWCS() { FITSwcs tmp(hdu); FITSwcs::swap(fwcs,tmp);} //!< Reload WCS from HDU
+
         virtual std::vector<size_t> PixelCoordinates(const size_t&) const; //!< Get pixel coordinates
         
         /**
@@ -196,7 +204,8 @@ namespace DSL
         
         virtual size_t PixelIndex(const std::vector<size_t>&) const;           //!< Get pixel index
         virtual size_t PixelIndex(const std::vector<double>&) const;
-        
+
+#pragma endregion
         inline const FITShdu& HDU() const {return hdu;}
         inline       FITShdu& HDU() {return hdu;}
         
@@ -1840,8 +1849,38 @@ namespace DSL
         
         cpy_mask.resize(0);
         cpy_data.resize(0);
-        
-        
+
+        if( getNumberOfWCS() > 0 )
+        {
+            bool wcs_needs_update = false;
+            for( size_t wcsIdx = 0; wcsIdx < getNumberOfWCS(); ++wcsIdx )
+            {
+
+                const std::string suff = fwcs.getSuffix(wcsIdx);
+                
+                //UPDATE THE WCSAXES KEYWORD
+                if(!hdu.Exists("CRPIX3"+suff))
+                {
+                    hdu.ValueForKey("CRPIX3"+suff,"0.0",fFloat,"Reference pixel for axis 3");
+                    wcs_needs_update |= true;
+                }
+                
+                if(!hdu.Exists("CDELT3"+suff))
+                {
+                    hdu.ValueForKey("CDELT3"+suff,"1.0",fFloat,"Coordinate increment at reference pixel for axis 3");
+                    wcs_needs_update |= true;
+                }
+
+                if(!hdu.Exists("CRVAL3"+suff))
+                {
+                    hdu.ValueForKey("CRVAL3"+suff,"1.0",fFloat,"Coordinate value at reference pixel for axis 3");
+                    wcs_needs_update |= true;
+                }
+            }
+
+            if(wcs_needs_update)
+                reLoadWCS();
+        }
     }
     
 #pragma endregion
@@ -3136,6 +3175,51 @@ namespace DSL
         if(copy->GetData<T>()->size() != copy->hdu.GetDimension() )
             throw FITSwarning("FITScube","Layer","DIMENSION MISSMATCH : "+std::to_string(copy->GetData<T>()->size())+" != "+std::to_string(copy->hdu.GetDimension()));
 
+        if(getNumberOfWCS() < 1)
+            return std::shared_ptr<FITScube>(copy);
+
+        for(size_t k = 0; k < getNumberOfWCS(); k++)
+        {
+            try
+            {
+                std::vector<double> crpx;
+                for(size_t iAxes = 0; iAxes < Naxis.size(); iAxes++)
+                {
+                    if(iAxes == 2)
+                        crpx.push_back( static_cast<double>(iLayer) ); // FITS pixel start at 1
+                    else
+                    {
+                        crpx.push_back(fwcs.CRPIX(k,iAxes+1));
+                    }
+                }
+
+                FITSwcs tmp(fwcs,k,crpx);
+                FITShdu tmp_hdu = tmp.asFITShdu();
+
+                for(FITSDictionary::const_iterator it = tmp_hdu.begin(); it != tmp_hdu.end(); it++)
+                {
+                    copy->hdu.ValueForKey(it->first,it->second.value(),it->second.type(),it->second.comment());
+                }
+            }
+            catch(WCSexception& e)
+            {
+                std::cerr<<"\033[33m[WARNING]\033[0m WCS #"<<k<<" couldn't be updated after layer extraction. Deleting WCS info from header."<<std::endl;
+                std::cerr<<"          WCS calibration for extracted layer is invalid and new calibration is required."<<std::endl;
+                std::cerr<<"          Original exception message: "<<e.what()<<std::endl;
+                std::cerr<<"\033[0m"<<std::endl;
+
+                FITSwcs tmp(fwcs,k);
+                FITShdu tmp_hdu = tmp.asFITShdu();
+
+                for(FITSDictionary::const_iterator it = tmp_hdu.begin(); it != tmp_hdu.end(); it++)
+                {
+                    copy->hdu.DeleteKey(it->first);
+                }
+            }
+        }
+
+        copy->reLoadWCS();
+
         return std::shared_ptr<FITScube>(copy);
     }
     
@@ -3208,17 +3292,54 @@ namespace DSL
         hdu.ValueForKey("NAXIS1",Naxis[0]);
         hdu.ValueForKey("NAXIS2",Naxis[1]);
         
-        size_t n = 0;
+        if(getNumberOfWCS() < 1)
+            return;
 
-        // use lightweight lambdas to avoid incorrect function-pointer casts and overload issues
-        auto pixels_pos = [this](size_t idx) -> std::vector<size_t> { return this->PixelCoordinates(idx); };
-        auto pixels_coo = [this](const std::vector<size_t>& v) -> std::vector<double> { return this->WorldCoordinates(v); };
-        
-        hdu.ValueForKey("CRPIX1",static_cast<double>( 0 ));
-        hdu.ValueForKey("CRPIX2",static_cast<double>( 0 ));
-        
-        hdu.ValueForKey("CRVAL1",static_cast<double>( pixels_coo(pixels_pos(n))[0] ));
-        hdu.ValueForKey("CRVAL2",static_cast<double>( pixels_coo(pixels_pos(n))[1] ));
+        // update WCS info
+        for(size_t idx = 0; idx < getNumberOfWCS(); idx++)
+        {
+            try
+            {
+                std::vector<double> crpx;
+                for(size_t iAxes = 0; iAxes < Naxis.size(); iAxes++)
+                {
+                    if(iAxes == 0)
+                        crpx.push_back( static_cast<double>(xMin) ); // FITS pixel start at 1
+                    else if(iAxes == 1)
+                        crpx.push_back( static_cast<double>(yMin) );
+                    else
+                    {
+                        crpx.push_back(fwcs.CRPIX(idx,iAxes+1));
+                    }
+                }
+
+                FITSwcs tmp(fwcs,idx,crpx);
+                FITShdu tmp_hdu = tmp.asFITShdu();
+
+                for(FITSDictionary::const_iterator it = tmp_hdu.begin(); it != tmp_hdu.end(); it++)
+                {
+                    hdu.ValueForKey(it->first,it->second.value(),it->second.type(),it->second.comment());
+                }
+            }
+            catch(WCSexception& e)
+            {
+                std::cerr<<"\033[33m[WARNING]\033[0m WCS #"<<idx<<" couldn't be updated after image resize. Deleting WCS info from header."<<std::endl;
+                std::cerr<<"          WCS calibration with this new image size might be invalid and new calibration is required."<<std::endl;
+                std::cerr<<"          Original exception message: "<<e.what()<<std::endl;
+                std::cerr<<"\033[0m"<<std::endl;
+
+                FITSwcs tmp(fwcs,idx);
+                FITShdu tmp_hdu = tmp.asFITShdu();
+
+                for(FITSDictionary::const_iterator it = tmp_hdu.begin(); it != tmp_hdu.end(); it++)
+                {
+                    hdu.DeleteKey(it->first);
+                }
+            }
+        }
+
+        FITSwcs new_wcs(hdu);
+        FITSwcs::swap(fwcs, new_wcs);
     }
     
     /**
@@ -3307,25 +3428,6 @@ namespace DSL
         copy->Bscale(BSCALE);
         copy->Bzero (BZERO);
         copy->Blank (BLANK);
-        
-        for(size_t k = 1; k <= this->GetDimension(); k++)
-        {
-            if(hdu.Exists("CDELT"+std::to_string(k)))
-                copy->HDU().ValueForKey("CDELT"+std::to_string(k),
-                                         this->HDU().GetDoubleValueForKey("CDELT"+std::to_string(k))
-                                         * static_cast<double>(Size(k))/static_cast<double>(copy->Size(k)));
-            else
-                copy->HDU().ValueForKey("CDELT"+std::to_string(k),
-                                         static_cast<double>(Size(k))/static_cast<double>(copy->Size(k)),"");
-
-            if(hdu.Exists("CRVAL"+std::to_string(k)))
-                copy->HDU().ValueForKey("CRVAL"+std::to_string(k),
-                                         this->HDU().GetDoubleValueForKey("CRVAL"+std::to_string(k))
-                                         + static_cast<double>(Size(k))/static_cast<double>(copy->Size(k))/2.);
-            else
-                copy->HDU().ValueForKey("CRVAL"+std::to_string(k),
-                                         static_cast<double>(Size(k))/static_cast<double>(copy->Size(k))/2.);
-        }
 
         if((verbose & verboseLevel::VERBOSE_DETAIL) == verboseLevel::VERBOSE_DETAIL)
             std::cout<<" Rebining :";
@@ -3361,6 +3463,27 @@ namespace DSL
         });
         if(!handle)
             throw FITSexception(SHARED_NULPTR,"FITSimg<T>::Rebin","missing data");
+
+        // Attempt to propagate rebinning to WCS
+
+        for(size_t k = 1; k <= this->GetDimension(); k++)
+        {
+            if(hdu.Exists("CDELT"+std::to_string(k)))
+                copy->HDU().ValueForKey("CDELT"+std::to_string(k),
+                                         this->HDU().GetDoubleValueForKey("CDELT"+std::to_string(k))
+                                         * static_cast<double>(Size(k))/static_cast<double>(copy->Size(k)));
+            else
+                copy->HDU().ValueForKey("CDELT"+std::to_string(k),
+                                         static_cast<double>(Size(k))/static_cast<double>(copy->Size(k)),"");
+
+            if(hdu.Exists("CRVAL"+std::to_string(k)))
+                copy->HDU().ValueForKey("CRVAL"+std::to_string(k),
+                                         this->HDU().GetDoubleValueForKey("CRVAL"+std::to_string(k))
+                                         + static_cast<double>(Size(k))/static_cast<double>(copy->Size(k))/2.);
+            else
+                copy->HDU().ValueForKey("CRVAL"+std::to_string(k),
+                                         static_cast<double>(Size(k))/static_cast<double>(copy->Size(k))/2.);
+        }
 
         if((verbose & verboseLevel::VERBOSE_DETAIL) == verboseLevel::VERBOSE_DETAIL)
             std::cout<<" \033[33m DONE\033[0m"<<std::endl;
