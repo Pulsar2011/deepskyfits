@@ -656,7 +656,7 @@ namespace DSL
             if(wcsIndex >= static_cast<size_t>(fnwcs))
             {
                 std::string errmsg = wcs_errmsg[WCSERR_UNSET];
-                throw WCSexception(WCSERR_BAD_PARAM,"FITSwcs","CDELT",errmsg);
+                throw WCSexception(WCSERR_BAD_PARAM,"FITSwcs","CTYPE",errmsg);
             }
 
             std::vector<std::string> ctype_list;
@@ -670,7 +670,34 @@ namespace DSL
             }
 
             return ctype_list;
-        } 
+        }
+        
+        std::vector< std::string> FITSwcs::CUNIT(const size_t& wcsIndex) const
+        {
+            if(fwcs == nullptr)
+            {
+                std::string errmsg = wcs_errmsg[WCSERR_UNSET];
+                throw WCSexception(WCSERR_UNSET,"FITSwcs","getCUNITs",errmsg);
+            }
+
+            if(wcsIndex >= static_cast<size_t>(fnwcs))
+            {
+                std::string errmsg = wcs_errmsg[WCSERR_UNSET];
+                throw WCSexception(WCSERR_BAD_PARAM,"FITSwcs","CUNIT",errmsg);
+            }
+
+            std::vector<std::string> cunit_list;
+            size_t axis_cnt = static_cast<size_t>(fwcs.get()[wcsIndex].naxis);
+            cunit_list.reserve(axis_cnt);
+
+            for(size_t i = 0; i < axis_cnt; i++)
+            {
+                std::string cunit_axis(fwcs.get()[wcsIndex].cunit[i]);
+                cunit_list.push_back(cunit_axis);
+            }
+
+            return cunit_list;
+        }
 
 #pragma endregion
 #pragma region * Conversion
