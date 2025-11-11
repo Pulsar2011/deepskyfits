@@ -165,6 +165,7 @@ namespace DSL
             double CDELT(const size_t&, const size_t&) const; //!< Get the CRPIX value for a given WCS index and axis
 
             std::vector< std::string > CTYPE(const size_t&) const; //!< Get the CTYPE values for a given WCS index
+            std::vector< std::string > CUNIT(const size_t&) const; //!< Get the CTYPE values for a given WCS index
             
 #pragma endregion
 
