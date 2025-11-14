@@ -20,17 +20,12 @@
 
 // DeepSkyTools dependency
 #include "FITShdu.h"
+#include "FITSdata.h"
 
 
 
 namespace DSL
 {
-    typedef std::vector<double> pixelCoords;
-    typedef std::vector<double> worldCoords;
-
-    typedef std::vector<pixelCoords> pixelVectors;
-    typedef std::vector<worldCoords> worldVectors;
-
 #pragma region - FITSwcs class definition
     /**
      *  @class FITSwcs

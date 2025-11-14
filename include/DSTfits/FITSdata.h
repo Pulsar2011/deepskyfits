@@ -23,6 +23,12 @@
 namespace DSL
 {
     
+    typedef std::vector<double> pixelCoords;
+    typedef std::vector<double> worldCoords;
+
+    typedef std::vector<pixelCoords> pixelVectors;
+    typedef std::vector<worldCoords> worldVectors;
+    
 #ifdef Darwinx86_64
     enum class verboseLevel: uint8_t
 #else
