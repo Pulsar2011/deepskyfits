@@ -212,7 +212,11 @@ ExternalProject_Add(
 #-------------------- Configuration de la bibliothèque WCSFIT
 
 set(WCSLIB_VERSION 8.4)
-set(WCSLIB_URL "https://www.atnf.csiro.au/computing/software/wcs/WCS/wcslib-${WCSLIB_VERSION}.tar.bz2")
+set(WCSLIB_URLS
+    "https://www.atnf.csiro.au/people/mcalabre/WCS/wcslib-${WCSLIB_VERSION}.tar.bz2"
+    "https://www.atnf.csiro.au/computing/software/wcs/WCS/wcslib-${WCSLIB_VERSION}.tar.bz2"
+)
+string(REPLACE ";" " " WCSLIB_URLS_SP "${WCSLIB_URLS}")
 set(WCSLIB_INSTALL_DIR ${CMAKE_SOURCE_DIR}/build/wcslib)
 set(WCSLIB_SRC_DIR ${CMAKE_SOURCE_DIR}/wcslib/wcslib-${WCSLIB_VERSION})
 
@@ -223,7 +227,7 @@ set(WCSLIB_TARBALL "${CMAKE_SOURCE_DIR}/wcslib-${WCSLIB_VERSION}.tar.bz2")
 
 # Custom target to download wcslib tarball (only download if missing)
 add_custom_target(download_wcslib
-    COMMAND /usr/bin/env bash -c "if [ ! -f \"${WCSLIB_TARBALL}\" ]; then echo 'Downloading wcslib to ${WCSLIB_TARBALL}...' && wget -O \"${WCSLIB_TARBALL}\" \"${WCSLIB_URL}\"; else echo 'wcslib tarball already exists: ${WCSLIB_TARBALL}'; fi"
+    COMMAND /usr/bin/env bash -c "set -e; if [ ! -f \"${WCSLIB_TARBALL}\" ]; then echo 'Downloading wcslib to ${WCSLIB_TARBALL}...'; for u in ${WCSLIB_URLS_SP}; do echo \"Trying: $u\"; if command -v wget >/dev/null 2>&1; then wget -t 3 --retry-connrefused -O \"${WCSLIB_TARBALL}\" \"$u\" && exit 0 || true; elif command -v curl >/dev/null 2>&1; then curl -fsSL --retry 3 \"$u\" -o \"${WCSLIB_TARBALL}\" && exit 0 || true; fi; done; echo 'All wcslib download URLs failed' >&2; exit 1; else echo 'wcslib tarball already exists: ${WCSLIB_TARBALL}'; fi"
     WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/wcslib"
     COMMENT "Download wcslib tarball if missing"
     VERBATIM
