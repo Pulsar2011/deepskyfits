@@ -1054,7 +1054,148 @@ TYPED_TEST(FITSimgStatsTest, arrayRebinning)
 }
 
 
-TYPED_TEST(FITSimgStatsTest, Layer)
+TYPED_TEST(FITSimgStatsTest, LayerParent)
+{
+    verbose = verboseLevel::VERBOSE_NONE;
+    using T = typename TestFixture::value_type;
+
+    this->EnsureOutDir();
+
+    const size_t N = TestFixture::N();
+    FITSimg<T> img(2, {N, N});
+    
+    auto data = img.template GetData<T>();
+    ASSERT_NE(data, nullptr);
+
+    // fill predictable pattern: value = (i % 256) + (j)
+    size_t k = 0;
+    for (size_t j = 0; j < img.Size(2); ++j)
+        for (size_t i = 0; i < img.Size(1); ++i)
+        {
+            (*data)[i + j * img.Size(1)] = static_cast<T>(1);
+            k++ ;
+        }
+
+    img.HDU().ValueForKey("CRPIX1", (double) 20.0);
+    img.HDU().ValueForKey("CRPIX2", (double) 30.0);
+    img.HDU().ValueForKey("CRVAL1", (double) 0.0);
+    img.HDU().ValueForKey("CRVAL2", (double) 0.0);
+    img.HDU().ValueForKey("CDELT1", (double) 0.5);
+    img.HDU().ValueForKey("CDELT2", (double) 0.5);
+    img.HDU().ValueForKey("CRPIX1A", (double) 0.0);
+    img.HDU().ValueForKey("CRPIX2A", (double) 0.0);
+    img.HDU().ValueForKey("CRVAL1A", (double) 10.0);
+    img.HDU().ValueForKey("CRVAL2A", (double) 10.0);
+    img.HDU().ValueForKey("CDELT1A", (double) 1);
+    img.HDU().ValueForKey("CDELT2A", (double) 1);
+
+    EXPECT_NO_THROW(img.reLoadWCS());
+    EXPECT_EQ(img.getNumberOfWCS(), 2);
+    
+    
+    for(size_t k = 2; k < 5; k++)
+    {
+        std::shared_ptr<FITScube> layer(new FITSimg<T>(2, {N,N}));
+        auto ldata = layer->GetData<T>();
+        ASSERT_NE(ldata, nullptr);
+        
+        for(size_t j=0; j<layer->Size(2); j++)
+            for(size_t i=0; i<layer->Size(1); i++)
+                (*ldata)[i + j * layer->Size(1)] = static_cast<T>(k);
+
+        img.AddLayer((*layer.get()));
+        EXPECT_EQ(img.Size(), (k)*N*N);
+        EXPECT_EQ(img.Size(3), (k));
+
+        EXPECT_EQ(img.getNumberOfWCS(), 2);
+        EXPECT_EQ(img.getWCS().getNumberOfAxis(0), 3);
+        EXPECT_EQ(img.getWCS().getNumberOfAxis(1), 3);
+        EXPECT_NEAR(img.getWCS().CRPIX(0,3),0,1e-7);
+        EXPECT_NEAR(img.getWCS().CRVAL(0,3),1,1e-7);
+        EXPECT_NEAR(img.getWCS().CDELT(0,3),1,1e-7);
+        
+        for(size_t iz=0; iz<img.Size(3); iz++)
+            for(size_t iy=0; iy<img.Size(2); iy++)
+                for(size_t ix=0; ix<img.Size(1); ix++)
+                        EXPECT_EQ(img[img.PixelIndex({ix,iy,iz})], static_cast<T>(iz+1));
+    }
+
+    for(size_t k=0; k < img.Size(3); k++)
+    {
+        std::shared_ptr<FITScube> layer = img.Layer(k);
+        EXPECT_NE(layer, nullptr);
+        EXPECT_EQ(layer->Size(1), N);
+        EXPECT_EQ(layer->Size(2), N);
+
+        EXPECT_EQ(img.getNumberOfWCS(), 2);
+        EXPECT_EQ(img.getWCS().getNumberOfAxis(0), 3);
+        EXPECT_EQ(img.getWCS().getNumberOfAxis(1), 3);
+
+        auto ldata = layer->GetData<T>();
+        EXPECT_NEAR(layer->getWCS().CRPIX(0,3),-1*static_cast<double>(k),1e-7);
+        EXPECT_NEAR(layer->getWCS().CRVAL(0,3),1,1e-7);
+        EXPECT_NEAR(layer->getWCS().CDELT(0,3),1,1e-7);
+
+        EXPECT_ANY_THROW(layer->WorldCoordinates(std::vector<size_t>({0,0}),0));
+        EXPECT_ANY_THROW(layer->WorldCoordinates(std::vector<size_t>({0,0}),1));
+
+        EXPECT_NO_THROW(layer->WorldCoordinates(std::vector<size_t>({0,0,0}),0));
+        EXPECT_NO_THROW(layer->WorldCoordinates(std::vector<size_t>({0,0,0}),1));
+
+        EXPECT_NEAR(layer->WorldCoordinates(std::vector<size_t>({0,0,0}),0)[2], 1.0 + static_cast<double>(k), 1e-7);
+        EXPECT_NEAR(layer->WorldCoordinates(std::vector<size_t>({0,0,0}),1)[2], 1.0 + static_cast<double>(k), 1e-7);
+
+        for(size_t j=0; j<layer->Size(2); j++)
+            for(size_t i=0; i<layer->Size(1); i++)
+                EXPECT_EQ((*ldata)[layer->PixelIndex({i,j})], static_cast<T>(k+1));
+    }
+
+    EXPECT_ANY_THROW(img.Layer(img.Size(3)));
+
+    FITSimg<T> img2(2, {N+5,N+5});
+    auto idata = img2.template GetData<T>();
+    ASSERT_NE(idata, nullptr);
+
+    for(size_t k = 0; k < idata->size(); k++)
+        (*idata)[k] = static_cast<T>(5);
+
+    EXPECT_ANY_THROW(img.AddLayer(img2));
+
+    FITSimg<T> img3(2, {N,N+5});
+    EXPECT_ANY_THROW(img.AddLayer(img3));
+
+    FITSimg<T> img4(2, {N+5,N});
+    EXPECT_ANY_THROW(img.AddLayer(img4));
+
+    FITSimg<T> cube(3, {N+5,N+5,2});
+    auto cdata = cube.template GetData<T>();
+    ASSERT_NE(cdata, nullptr);
+
+    for(size_t k = 0; k < cdata->size(); k++)
+        (*cdata)[k] = static_cast<T>(10);
+
+    img2.AddLayer(cube);
+    EXPECT_EQ(img2.Size(), (3)*(N+5)*(N+5));
+    EXPECT_EQ(img2.Size(3), (3));
+
+    for(k = 0; k < img2.Size(3); k++)
+    {
+        std::shared_ptr<FITScube> layer = img2.Layer(k);
+        EXPECT_NE(layer, nullptr);
+        EXPECT_EQ(layer->Size(1), N+5);
+        EXPECT_EQ(layer->Size(2), N+5);
+
+        auto ldata = layer->GetData<T>();
+
+        for(size_t j=0; j<ldata->size(); j++)
+            if(k < 1)
+                EXPECT_EQ((*ldata)[j], static_cast<T>(5));
+            else
+                EXPECT_EQ((*ldata)[j], static_cast<T>(10));
+    }
+}
+
+TYPED_TEST(FITSimgStatsTest, LayerChild)
 {
     verbose = verboseLevel::VERBOSE_NONE;
     using T = typename TestFixture::value_type;

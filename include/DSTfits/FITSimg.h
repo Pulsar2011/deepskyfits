@@ -526,6 +526,8 @@ namespace DSL
         virtual std::shared_ptr<FITScube> Rebin  (const std::initializer_list<size_t>& l, bool doMean=false) const {return Rebin(std::vector<size_t>(l),doMean);};
         virtual std::shared_ptr<FITScube> Rebin  (const std::vector<size_t>& , bool doMean=false) const =0;
         
+        virtual void AddLayer(const FITScube&) =0;
+        
         virtual void Print() const {};
         
     };
@@ -550,12 +552,12 @@ namespace DSL
         T BLANK;    //!< Transparent pixel reference value
 
 #pragma region * Initialization
-        virtual void img_init();
+        virtual void img_init()  override ;
         void template_init();
         
 #pragma endregion
 #pragma region * I/O
-        void WriteDataCube(const std::shared_ptr<fitsfile>& );  //!< Write data to Fits HDU
+        void WriteDataCube(const std::shared_ptr<fitsfile>& )  override ;  //!< Write data to Fits HDU
         template<typename S> void WriteData(const std::shared_ptr<fitsfile>& , int);
     
     public:
@@ -570,70 +572,71 @@ namespace DSL
         
 #pragma endregion
 #pragma region * Modifier
-        void Bscale(const  uint8_t& );
-        void Bscale(const   int8_t& );
-        void Bscale(const uint16_t& );
-        void Bscale(const  int16_t& );
-        void Bscale(const uint32_t& );
-        void Bscale(const  int32_t& );
-        void Bscale(const uint64_t& );
-        void Bscale(const  int64_t& );
+        void Bscale(const  uint8_t& ) override ;
+        void Bscale(const   int8_t& ) override ;
+        void Bscale(const uint16_t& ) override ;
+        void Bscale(const  int16_t& ) override ;
+        void Bscale(const uint32_t& ) override ;
+        void Bscale(const  int32_t& ) override ;
+        void Bscale(const uint64_t& ) override ;
+        void Bscale(const  int64_t& ) override ;
 #ifdef Darwinx86_64
-        void Bscale(const size_t&   );
+        void Bscale(const size_t&   ) override ;
 #endif
-        void Bscale(const float&    );
-        void Bscale(const double&   );
+        void Bscale(const float&    ) override ;
+        void Bscale(const double&   ) override ;
         
-        void Bzero(const  uint8_t& );
-        void Bzero(const   int8_t& );
-        void Bzero(const uint16_t& );
-        void Bzero(const  int16_t& );
-        void Bzero(const uint32_t& );
-        void Bzero(const  int32_t& );
-        void Bzero(const uint64_t& );
-        void Bzero(const  int64_t& );
+        void Bzero(const  uint8_t& ) override ;
+        void Bzero(const   int8_t& ) override ;
+        void Bzero(const uint16_t& ) override ;
+        void Bzero(const  int16_t& ) override ;
+        void Bzero(const uint32_t& ) override ;
+        void Bzero(const  int32_t& ) override ;
+        void Bzero(const uint64_t& ) override ;
+        void Bzero(const  int64_t& ) override ;
 #ifdef Darwinx86_64
-        void Bzero(const size_t&   );
+        void Bzero(const size_t&   ) override ;
 #endif
-        void Bzero(const float&    );
-        void Bzero(const double&   );
+        void Bzero(const float&    ) override ;
+        void Bzero(const double&   ) override ;
 
-        void Blank(const  uint8_t& );
-        void Blank(const   int8_t& );
-        void Blank(const uint16_t& );
-        void Blank(const  int16_t& );
-        void Blank(const uint32_t& );
-        void Blank(const  int32_t& );
-        void Blank(const uint64_t& );
-        void Blank(const  int64_t& );
+        void Blank(const  uint8_t& ) override ;
+        void Blank(const   int8_t& ) override ;
+        void Blank(const uint16_t& ) override ;
+        void Blank(const  int16_t& ) override ;
+        void Blank(const uint32_t& ) override ;
+        void Blank(const  int32_t& ) override ;
+        void Blank(const uint64_t& ) override ;
+        void Blank(const  int64_t& ) override ;
 #ifdef Darwinx86_64
-        void Blank(const size_t&   );
+        void Blank(const size_t&   ) override ;
 #endif
-        void Blank(const float&    );
-        void Blank(const double&   );
+        void Blank(const float&    ) override ;
+        void Blank(const double&   ) override ;
         
+        void AddLayer(const FITScube&) override;
         void AddLayer(const FITSimg<T>&);
 
 #pragma endregion
 
 #pragma region * Statistical property
-        double GetSum ()                   const;
-        double GetMean()                   const;
-        double GetQuadraticMean()          const;
-        double GetVariance()               const;
-        double GetStdDev()                 const;
-        double GetRMS()                    const;
-        double GetRMSE()                   const;
-        double GetMedian()                 const;
-        double GetMinimum()                const;
-        double GetMaximum()                const;
-        double Getpercentil(const double&) const;
-        double Get5thpercentil()           const;
-        double Get25thpercentil()          const;
-        double Get75thpercentil()          const;
-        double Get95thpercentil()          const;
-        double GetKurtosis()               const;
-        double GetSkewness()               const;
+        double GetSum ()                   const override;
+        double GetMean()                   const override;
+        double GetQuadraticMean()          const override;
+        double GetVariance()               const override;
+        double GetStdDev()                 const override;
+        double GetRMS()                    const override;
+        double GetRMSE()                   const override;
+        double GetMedian()                 const override;
+        double GetMinimum()                const override;
+        double GetMaximum()                const override;
+        double Getpercentil(const double&) const override;
+        double Get5thpercentil()           const override;
+        double Get25thpercentil()          const override;
+        double Get75thpercentil()          const override;
+        double Get95thpercentil()          const override;
+        double GetKurtosis()               const override;
+        double GetSkewness()               const override;
 
 #pragma endregion
 #pragma region * data operation
@@ -649,252 +652,252 @@ namespace DSL
         const T operator [](const size_t&) const;  ///< Get pixel content
               T operator [](const size_t&);	      ///< Get pixel content
         
-        uint8_t      UInt8ValueAtPixel   (const size_t& k) const {return UByteValueAtPixel   (k);}
-        uint8_t      UByteValueAtPixel   (const size_t&) const;
+        uint8_t      UInt8ValueAtPixel   (const size_t& k) const override {return UByteValueAtPixel   (k);}
+        uint8_t      UByteValueAtPixel   (const size_t&) const override ;
 
-        int8_t       Int8ValueAtPixel    (const size_t& k) const {return ByteValueAtPixel    (k);}
-        int8_t       ByteValueAtPixel    (const size_t&) const;
+        int8_t       Int8ValueAtPixel    (const size_t& k) const override {return ByteValueAtPixel    (k);}
+        int8_t       ByteValueAtPixel    (const size_t&) const override ;
 
-        uint16_t     UInt16ValueAtPixel  (const size_t& k) const {return UShortValueAtPixel  (k);}
-        uint16_t     UShortValueAtPixel  (const size_t&) const;
+        uint16_t     UInt16ValueAtPixel  (const size_t& k) const override {return UShortValueAtPixel  (k);}
+        uint16_t     UShortValueAtPixel  (const size_t&) const override ;
 
-        int16_t      Int16ValueAtPixel   (const size_t& k) const {return ShortValueAtPixel   (k);}
-        int16_t      ShortValueAtPixel   (const size_t&) const;
+        int16_t      Int16ValueAtPixel   (const size_t& k) const override {return ShortValueAtPixel   (k);}
+        int16_t      ShortValueAtPixel   (const size_t&) const override ;
 
-        uint32_t     UInt32ValueAtPixel  (const size_t& k) const {return ULongValueAtPixel   (k);}
-        uint32_t     ULongValueAtPixel   (const size_t&) const;
+        uint32_t     UInt32ValueAtPixel  (const size_t& k) const override {return ULongValueAtPixel   (k);}
+        uint32_t     ULongValueAtPixel   (const size_t&) const override ;
 
-        int32_t      Int32ValueAtPixel   (const size_t& k) const {return LongValueAtPixel    (k);}
-        int32_t      LongValueAtPixel    (const size_t&) const;
+        int32_t      Int32ValueAtPixel   (const size_t& k) const override {return LongValueAtPixel    (k);}
+        int32_t      LongValueAtPixel    (const size_t&) const override ;
 
-        int64_t      Int64ValueAtPixel  (const size_t& k) const {return LongLongValueAtPixel(k);}
-        int64_t      LongLongValueAtPixel(const size_t&) const;
+        int64_t      Int64ValueAtPixel  (const size_t& k) const override {return LongLongValueAtPixel(k);}
+        int64_t      LongLongValueAtPixel(const size_t&) const override ;
 
-        uint64_t     UInt64ValueAtPixel   (const size_t& k) const {return ULongLongValueAtPixel(k);}
-        uint64_t     ULongLongValueAtPixel(const size_t&) const;
+        uint64_t     UInt64ValueAtPixel   (const size_t& k) const override {return ULongLongValueAtPixel(k);}
+        uint64_t     ULongLongValueAtPixel(const size_t&) const override ;
 
-        float        FloatValueAtPixel   (const size_t&) const;
-        double       DoubleValueAtPixel  (const size_t&) const;
+        float        FloatValueAtPixel   (const size_t&) const override ;
+        double       DoubleValueAtPixel  (const size_t&) const override ;
 
-        uint8_t      UInt8ValueAtPixel   (const std::initializer_list<size_t>& k) const {return UByteValueAtPixel(k);}
-        uint8_t      UByteValueAtPixel   (const std::initializer_list<size_t>&) const ;
+        uint8_t      UInt8ValueAtPixel   (const std::initializer_list<size_t>& k) const  override {return UByteValueAtPixel(k);}
+        uint8_t      UByteValueAtPixel   (const std::initializer_list<size_t>&) const override ;
 
-        int8_t       Int8ValueAtPixel    (const std::initializer_list<size_t>& k) const {return ByteValueAtPixel(k);}
-        int8_t       ByteValueAtPixel    (const std::initializer_list<size_t>&) const ;
+        int8_t       Int8ValueAtPixel    (const std::initializer_list<size_t>& k) const override {return ByteValueAtPixel(k);}
+        int8_t       ByteValueAtPixel    (const std::initializer_list<size_t>&) const override ;
 
-        uint16_t     UInt16ValueAtPixel  (const std::initializer_list<size_t>& k) const {return UShortValueAtPixel(k);}
-        uint16_t     UShortValueAtPixel  (const std::initializer_list<size_t>&) const ;
+        uint16_t     UInt16ValueAtPixel  (const std::initializer_list<size_t>& k) const override {return UShortValueAtPixel(k);}
+        uint16_t     UShortValueAtPixel  (const std::initializer_list<size_t>&) const override ;
 
-        int16_t      Int16ValueAtPixel   (const std::initializer_list<size_t>& k) const {return ShortValueAtPixel(k);}
-        int16_t      ShortValueAtPixel   (const std::initializer_list<size_t>&) const ;
+        int16_t      Int16ValueAtPixel   (const std::initializer_list<size_t>& k) const override {return ShortValueAtPixel(k);}
+        int16_t      ShortValueAtPixel   (const std::initializer_list<size_t>&) const override ;
 
-        uint32_t     UInt32ValueAtPixel  (const std::initializer_list<size_t>& k) const {return ULongValueAtPixel(k);}
-        uint32_t     ULongValueAtPixel   (const std::initializer_list<size_t>&) const ;
+        uint32_t     UInt32ValueAtPixel  (const std::initializer_list<size_t>& k) const override {return ULongValueAtPixel(k);}
+        uint32_t     ULongValueAtPixel   (const std::initializer_list<size_t>&) const override ;
 
-        int32_t      Int32ValueAtPixel   (const std::initializer_list<size_t>& k) const {return LongValueAtPixel(k);}
-        int32_t      LongValueAtPixel    (const std::initializer_list<size_t>&) const ;
+        int32_t      Int32ValueAtPixel   (const std::initializer_list<size_t>& k) const override {return LongValueAtPixel(k);}
+        int32_t      LongValueAtPixel    (const std::initializer_list<size_t>&) const override ;
 
-        int64_t      Int64ValueAtPixel   (const std::initializer_list<size_t>& k) const {return LongLongValueAtPixel(k);}
-        int64_t      LongLongValueAtPixel(const std::initializer_list<size_t>&) const ;
+        int64_t      Int64ValueAtPixel   (const std::initializer_list<size_t>& k) const override {return LongLongValueAtPixel(k);}
+        int64_t      LongLongValueAtPixel(const std::initializer_list<size_t>&) const override ;
 
-        uint64_t      UInt64ValueAtPixel   (const std::initializer_list<size_t>& k) const {return ULongLongValueAtPixel(k);}
-        uint64_t      ULongLongValueAtPixel(const std::initializer_list<size_t>&) const ;
+        uint64_t      UInt64ValueAtPixel   (const std::initializer_list<size_t>& k) const override {return ULongLongValueAtPixel(k);}
+        uint64_t      ULongLongValueAtPixel(const std::initializer_list<size_t>&) const override ;
 
 
-        float        FloatValueAtPixel   (const std::initializer_list<size_t>&) const ;
-        double       DoubleValueAtPixel  (const std::initializer_list<size_t>&) const ;
+        float        FloatValueAtPixel   (const std::initializer_list<size_t>&) const  override ;
+        double       DoubleValueAtPixel  (const std::initializer_list<size_t>&) const  override ;
 
 #pragma region -- Operator +=
         template<typename S>
         void operator+= (const S&);///< Apply positive offset to data
 
-        void operator+=(const  uint8_t& val){return operator+=< uint8_t>(val);}
-        void operator+=(const   int8_t& val){return operator+=<  int8_t>(val);}
-        void operator+=(const uint16_t& val){return operator+=<uint16_t>(val);}
-        void operator+=(const  int16_t& val){return operator+=< int16_t>(val);}
-        void operator+=(const uint32_t& val){return operator+=<uint32_t>(val);}
-        void operator+=(const  int32_t& val){return operator+=< int32_t>(val);}
-        void operator+=(const uint64_t& val){return operator+=<uint64_t>(val);}
-        void operator+=(const  int64_t& val){return operator+=< int64_t>(val);}
+        void operator+=(const  uint8_t& val) override {return operator+=< uint8_t>(val);}
+        void operator+=(const   int8_t& val) override {return operator+=<  int8_t>(val);}
+        void operator+=(const uint16_t& val) override {return operator+=<uint16_t>(val);}
+        void operator+=(const  int16_t& val) override {return operator+=< int16_t>(val);}
+        void operator+=(const uint32_t& val) override {return operator+=<uint32_t>(val);}
+        void operator+=(const  int32_t& val) override {return operator+=< int32_t>(val);}
+        void operator+=(const uint64_t& val) override {return operator+=<uint64_t>(val);}
+        void operator+=(const  int64_t& val) override {return operator+=< int64_t>(val);}
 #ifdef Darwinx86_64
-        void operator+=(const   size_t& val){return operator+=<  size_t>(val);}
+        void operator+=(const   size_t& val) override {return operator+=<  size_t>(val);}
 #endif
-        void operator+=(const    float& val){return operator+=<   float>(val);}
-        void operator+=(const   double& val){return operator+=<  double>(val);}
+        void operator+=(const    float& val) override {return operator+=<   float>(val);}
+        void operator+=(const   double& val) override {return operator+=<  double>(val);}
 
         template<typename S>
         void operator+= (const std::valarray<S>&);///< Scale up data
 
-        void operator+=(const std::valarray< uint8_t>& val){return operator+=< uint8_t>(val);}
-        void operator+=(const std::valarray<  int8_t>& val){return operator+=<  int8_t>(val);}
-        void operator+=(const std::valarray<uint16_t>& val){return operator+=<uint16_t>(val);}
-        void operator+=(const std::valarray< int16_t>& val){return operator+=< int16_t>(val);}
-        void operator+=(const std::valarray<uint32_t>& val){return operator+=<uint32_t>(val);}
-        void operator+=(const std::valarray< int32_t>& val){return operator+=< int32_t>(val);}
-        void operator+=(const std::valarray<uint64_t>& val){return operator+=<uint64_t>(val);}
-        void operator+=(const std::valarray< int64_t>& val){return operator+=< int64_t>(val);}
+        void operator+=(const std::valarray< uint8_t>& val) override {return operator+=< uint8_t>(val);}
+        void operator+=(const std::valarray<  int8_t>& val) override {return operator+=<  int8_t>(val);}
+        void operator+=(const std::valarray<uint16_t>& val) override {return operator+=<uint16_t>(val);}
+        void operator+=(const std::valarray< int16_t>& val) override {return operator+=< int16_t>(val);}
+        void operator+=(const std::valarray<uint32_t>& val) override {return operator+=<uint32_t>(val);}
+        void operator+=(const std::valarray< int32_t>& val) override {return operator+=< int32_t>(val);}
+        void operator+=(const std::valarray<uint64_t>& val) override {return operator+=<uint64_t>(val);}
+        void operator+=(const std::valarray< int64_t>& val) override {return operator+=< int64_t>(val);}
 #ifdef Darwinx86_64
-        void operator+=(const std::valarray<  size_t>& val){return operator+=<  size_t>(val);}
+        void operator+=(const std::valarray<  size_t>& val) override {return operator+=<  size_t>(val);}
 #endif
-        void operator+=(const std::valarray<   float>& val){return operator+=<   float>(val);}
-        void operator+=(const std::valarray<  double>& val){return operator+=<  double>(val);}
+        void operator+=(const std::valarray<   float>& val) override {return operator+=<   float>(val);}
+        void operator+=(const std::valarray<  double>& val) override {return operator+=<  double>(val);}
 
         template<typename S>
         void operator+= (const FITSimg<S>&);///< Multiply images
 
-        void operator+=(const FITScube&);
+        void operator+=(const FITScube&) override ;
 
 #pragma endregion
 #pragma region -- Operator -=
         template<typename S>
         void operator-= (const S&);///< Apply negative offset to data
 
-        void operator-=(const  uint8_t& val){return operator-=< uint8_t>(val);}
-        void operator-=(const   int8_t& val){return operator-=<  int8_t>(val);}
-        void operator-=(const uint16_t& val){return operator-=<uint16_t>(val);}
-        void operator-=(const  int16_t& val){return operator-=< int16_t>(val);}
-        void operator-=(const uint32_t& val){return operator-=<uint32_t>(val);}
-        void operator-=(const  int32_t& val){return operator-=< int32_t>(val);}
-        void operator-=(const uint64_t& val){return operator-=<uint64_t>(val);}
-        void operator-=(const  int64_t& val){return operator-=< int64_t>(val);}
+        void operator-=(const  uint8_t& val) override {return operator-=< uint8_t>(val);}
+        void operator-=(const   int8_t& val) override {return operator-=<  int8_t>(val);}
+        void operator-=(const uint16_t& val) override {return operator-=<uint16_t>(val);}
+        void operator-=(const  int16_t& val) override {return operator-=< int16_t>(val);}
+        void operator-=(const uint32_t& val) override {return operator-=<uint32_t>(val);}
+        void operator-=(const  int32_t& val) override {return operator-=< int32_t>(val);}
+        void operator-=(const uint64_t& val) override {return operator-=<uint64_t>(val);}
+        void operator-=(const  int64_t& val) override {return operator-=< int64_t>(val);}
 #ifdef Darwinx86_64
-        void operator-=(const   size_t& val){return operator-=<  size_t>(val);}
+        void operator-=(const   size_t& val) override {return operator-=<  size_t>(val);}
 #endif
-        void operator-=(const    float& val){return operator-=<   float>(val);}
-        void operator-=(const   double& val){return operator-=<  double>(val);}
+        void operator-=(const    float& val) override {return operator-=<   float>(val);}
+        void operator-=(const   double& val) override {return operator-=<  double>(val);}
 
         template<typename S>
         void operator-= (const std::valarray<S>&);///< Scale up data
 
-        void operator-=(const std::valarray< uint8_t>& val){return operator-=< uint8_t>(val);}
-        void operator-=(const std::valarray<  int8_t>& val){return operator-=<  int8_t>(val);}
-        void operator-=(const std::valarray<uint16_t>& val){return operator-=<uint16_t>(val);}
-        void operator-=(const std::valarray< int16_t>& val){return operator-=< int16_t>(val);}
-        void operator-=(const std::valarray<uint32_t>& val){return operator-=<uint32_t>(val);}
-        void operator-=(const std::valarray< int32_t>& val){return operator-=< int32_t>(val);}
-        void operator-=(const std::valarray<uint64_t>& val){return operator-=<uint64_t>(val);}
-        void operator-=(const std::valarray< int64_t>& val){return operator-=< int64_t>(val);}
+        void operator-=(const std::valarray< uint8_t>& val) override {return operator-=< uint8_t>(val);}
+        void operator-=(const std::valarray<  int8_t>& val) override {return operator-=<  int8_t>(val);}
+        void operator-=(const std::valarray<uint16_t>& val) override {return operator-=<uint16_t>(val);}
+        void operator-=(const std::valarray< int16_t>& val) override {return operator-=< int16_t>(val);}
+        void operator-=(const std::valarray<uint32_t>& val) override {return operator-=<uint32_t>(val);}
+        void operator-=(const std::valarray< int32_t>& val) override {return operator-=< int32_t>(val);}
+        void operator-=(const std::valarray<uint64_t>& val) override {return operator-=<uint64_t>(val);}
+        void operator-=(const std::valarray< int64_t>& val) override {return operator-=< int64_t>(val);}
 #ifdef Darwinx86_64
-        void operator-=(const std::valarray<  size_t>& val){return operator-=<  size_t>(val);}
+        void operator-=(const std::valarray<  size_t>& val) override {return operator-=<  size_t>(val);}
 #endif
-        void operator-=(const std::valarray<   float>& val){return operator-=<   float>(val);}
-        void operator-=(const std::valarray<  double>& val){return operator-=<  double>(val);}
+        void operator-=(const std::valarray<   float>& val) override {return operator-=<   float>(val);}
+        void operator-=(const std::valarray<  double>& val) override {return operator-=<  double>(val);}
 
         template<typename S>
         void operator-= (const FITSimg<S>&);///< Multiply images
 
-        void operator-=(const FITScube&);
+        void operator-=(const FITScube&) override ;
 
 #pragma endregion
 #pragma region -- Operator *=
         template<typename S>
         void operator*= (const S&);///< Scale up data
 
-        void operator*=(const  uint8_t& val){return operator*=< uint8_t>(val);}
-        void operator*=(const   int8_t& val){return operator*=<  int8_t>(val);}
-        void operator*=(const uint16_t& val){return operator*=<uint16_t>(val);}
-        void operator*=(const  int16_t& val){return operator*=< int16_t>(val);}
-        void operator*=(const uint32_t& val){return operator*=<uint32_t>(val);}
-        void operator*=(const  int32_t& val){return operator*=< int32_t>(val);}
-        void operator*=(const uint64_t& val){return operator*=<uint64_t>(val);}
-        void operator*=(const  int64_t& val){return operator*=< int64_t>(val);}
+        void operator*=(const  uint8_t& val) override {return operator*=< uint8_t>(val);}
+        void operator*=(const   int8_t& val) override {return operator*=<  int8_t>(val);}
+        void operator*=(const uint16_t& val) override {return operator*=<uint16_t>(val);}
+        void operator*=(const  int16_t& val) override {return operator*=< int16_t>(val);}
+        void operator*=(const uint32_t& val) override {return operator*=<uint32_t>(val);}
+        void operator*=(const  int32_t& val) override {return operator*=< int32_t>(val);}
+        void operator*=(const uint64_t& val) override {return operator*=<uint64_t>(val);}
+        void operator*=(const  int64_t& val) override {return operator*=< int64_t>(val);}
 #ifdef Darwinx86_64
-        void operator*=(const   size_t& val){return operator*=<  size_t>(val);}
+        void operator*=(const   size_t& val) override {return operator*=<  size_t>(val);}
 #endif
-        void operator*=(const    float& val){return operator*=<   float>(val);}
-        void operator*=(const   double& val){return operator*=<  double>(val);}
+        void operator*=(const    float& val) override {return operator*=<   float>(val);}
+        void operator*=(const   double& val) override {return operator*=<  double>(val);}
 
         template<typename S>
         void operator*= (const std::valarray<S>&);///< Scale up data
 
-        void operator*=(const std::valarray< uint8_t>& val){return operator*=< uint8_t>(val);}
-        void operator*=(const std::valarray<  int8_t>& val){return operator*=<  int8_t>(val);}
-        void operator*=(const std::valarray<uint16_t>& val){return operator*=<uint16_t>(val);}
-        void operator*=(const std::valarray< int16_t>& val){return operator*=< int16_t>(val);}
-        void operator*=(const std::valarray<uint32_t>& val){return operator*=<uint32_t>(val);}
-        void operator*=(const std::valarray< int32_t>& val){return operator*=< int32_t>(val);}
-        void operator*=(const std::valarray<uint64_t>& val){return operator*=<uint64_t>(val);}
-        void operator*=(const std::valarray< int64_t>& val){return operator*=< int64_t>(val);}
+        void operator*=(const std::valarray< uint8_t>& val) override {return operator*=< uint8_t>(val);}
+        void operator*=(const std::valarray<  int8_t>& val) override {return operator*=<  int8_t>(val);}
+        void operator*=(const std::valarray<uint16_t>& val) override {return operator*=<uint16_t>(val);}
+        void operator*=(const std::valarray< int16_t>& val) override {return operator*=< int16_t>(val);}
+        void operator*=(const std::valarray<uint32_t>& val) override {return operator*=<uint32_t>(val);}
+        void operator*=(const std::valarray< int32_t>& val) override {return operator*=< int32_t>(val);}
+        void operator*=(const std::valarray<uint64_t>& val) override {return operator*=<uint64_t>(val);}
+        void operator*=(const std::valarray< int64_t>& val) override {return operator*=< int64_t>(val);}
 #ifdef Darwinx86_64
-        void operator*=(const std::valarray<  size_t>& val){return operator*=<  size_t>(val);}
+        void operator*=(const std::valarray<  size_t>& val) override {return operator*=<  size_t>(val);}
 #endif
-        void operator*=(const std::valarray<   float>& val){return operator*=<   float>(val);}
-        void operator*=(const std::valarray<  double>& val){return operator*=<  double>(val);}
+        void operator*=(const std::valarray<   float>& val) override {return operator*=<   float>(val);}
+        void operator*=(const std::valarray<  double>& val) override {return operator*=<  double>(val);}
 
         template<typename S>
         void operator*= (const FITSimg<S>&);///< Multiply images
 
-        void operator*=(const FITScube&);
+        void operator*=(const FITScube&)  override ;
 
 #pragma endregion
 #pragma region -- Operator /=
         template<typename S>
         void operator/= (const S&);///< Scale down data
 
-        void operator/=(const  uint8_t& val){return operator/=< uint8_t>(val);};
-        void operator/=(const   int8_t& val){return operator/=<  int8_t>(val);};
-        void operator/=(const uint16_t& val){return operator/=<uint16_t>(val);};
-        void operator/=(const  int16_t& val){return operator/=< int16_t>(val);};
-        void operator/=(const uint32_t& val){return operator/=<uint32_t>(val);};
-        void operator/=(const  int32_t& val){return operator/=< int32_t>(val);};
-        void operator/=(const uint64_t& val){return operator/=<uint64_t>(val);};
-        void operator/=(const  int64_t& val){return operator/=< int64_t>(val);};
+        void operator/=(const  uint8_t& val) override {return operator/=< uint8_t>(val);};
+        void operator/=(const   int8_t& val) override {return operator/=<  int8_t>(val);};
+        void operator/=(const uint16_t& val) override {return operator/=<uint16_t>(val);};
+        void operator/=(const  int16_t& val) override {return operator/=< int16_t>(val);};
+        void operator/=(const uint32_t& val) override {return operator/=<uint32_t>(val);};
+        void operator/=(const  int32_t& val) override {return operator/=< int32_t>(val);};
+        void operator/=(const uint64_t& val) override {return operator/=<uint64_t>(val);};
+        void operator/=(const  int64_t& val) override {return operator/=< int64_t>(val);};
 #ifdef Darwinx86_64
-        void operator/=(const   size_t& val){return operator/=<  size_t>(val);};
+        void operator/=(const   size_t& val) override {return operator/=<  size_t>(val);};
 #endif
-        void operator/=(const    float& val){return operator/=<   float>(val);};
-        void operator/=(const   double& val){return operator/=<  double>(val);};
+        void operator/=(const    float& val) override {return operator/=<   float>(val);};
+        void operator/=(const   double& val) override {return operator/=<  double>(val);};
 
         template<typename S>
         void operator/= (const std::valarray<S>&);///< Scale up data
 
-        void operator/=(const std::valarray< uint8_t>& val){return operator/=< uint8_t>(val);}
-        void operator/=(const std::valarray<  int8_t>& val){return operator/=<  int8_t>(val);}
-        void operator/=(const std::valarray<uint16_t>& val){return operator/=<uint16_t>(val);}
-        void operator/=(const std::valarray< int16_t>& val){return operator/=< int16_t>(val);}
-        void operator/=(const std::valarray<uint32_t>& val){return operator/=<uint32_t>(val);}
-        void operator/=(const std::valarray< int32_t>& val){return operator/=< int32_t>(val);}
-        void operator/=(const std::valarray<uint64_t>& val){return operator/=<uint64_t>(val);}
-        void operator/=(const std::valarray< int64_t>& val){return operator/=< int64_t>(val);}
+        void operator/=(const std::valarray< uint8_t>& val) override {return operator/=< uint8_t>(val);}
+        void operator/=(const std::valarray<  int8_t>& val) override {return operator/=<  int8_t>(val);}
+        void operator/=(const std::valarray<uint16_t>& val) override {return operator/=<uint16_t>(val);}
+        void operator/=(const std::valarray< int16_t>& val) override {return operator/=< int16_t>(val);}
+        void operator/=(const std::valarray<uint32_t>& val) override {return operator/=<uint32_t>(val);}
+        void operator/=(const std::valarray< int32_t>& val) override {return operator/=< int32_t>(val);}
+        void operator/=(const std::valarray<uint64_t>& val) override {return operator/=<uint64_t>(val);}
+        void operator/=(const std::valarray< int64_t>& val) override {return operator/=< int64_t>(val);}
 #ifdef Darwinx86_64
-        void operator/=(const std::valarray<  size_t>& val){return operator/=<  size_t>(val);}
+        void operator/=(const std::valarray<  size_t>& val) override {return operator/=<  size_t>(val);}
 #endif
-        void operator/=(const std::valarray<   float>& val){return operator/=<   float>(val);}
-        void operator/=(const std::valarray<  double>& val){return operator/=<  double>(val);}
+        void operator/=(const std::valarray<   float>& val) override {return operator/=<   float>(val);}
+        void operator/=(const std::valarray<  double>& val) override {return operator/=<  double>(val);}
 
         template<typename S>
         void operator/=(const FITSimg<S>&);///< Multiply images
 
-        void operator/=(const FITScube&);
+        void operator/=(const FITScube&)  override ;
 
 #pragma endregion
 
-        void SetPixelValue(const  uint8_t& val, const std::vector<size_t>& vPx) {this->template SetPixelValue< uint8_t>(val,vPx);}
-        void SetPixelValue(const   int8_t& val, const std::vector<size_t>& vPx) {this->template SetPixelValue<  int8_t>(val,vPx);}
-        void SetPixelValue(const uint16_t& val, const std::vector<size_t>& vPx) {this->template SetPixelValue<uint16_t>(val,vPx);}
-        void SetPixelValue(const  int16_t& val, const std::vector<size_t>& vPx) {this->template SetPixelValue< int16_t>(val,vPx);}
-        void SetPixelValue(const uint32_t& val, const std::vector<size_t>& vPx) {this->template SetPixelValue<uint32_t>(val,vPx);}
-        void SetPixelValue(const  int32_t& val, const std::vector<size_t>& vPx) {this->template SetPixelValue< int32_t>(val,vPx);}
-        void SetPixelValue(const uint64_t& val, const std::vector<size_t>& vPx) {this->template SetPixelValue<uint64_t>(val,vPx);}
-        void SetPixelValue(const  int64_t& val, const std::vector<size_t>& vPx) {this->template SetPixelValue< int64_t>(val,vPx);}
+        void SetPixelValue(const  uint8_t& val, const std::vector<size_t>& vPx) override {this->template SetPixelValue< uint8_t>(val,vPx);}
+        void SetPixelValue(const   int8_t& val, const std::vector<size_t>& vPx) override {this->template SetPixelValue<  int8_t>(val,vPx);}
+        void SetPixelValue(const uint16_t& val, const std::vector<size_t>& vPx) override {this->template SetPixelValue<uint16_t>(val,vPx);}
+        void SetPixelValue(const  int16_t& val, const std::vector<size_t>& vPx) override {this->template SetPixelValue< int16_t>(val,vPx);}
+        void SetPixelValue(const uint32_t& val, const std::vector<size_t>& vPx) override {this->template SetPixelValue<uint32_t>(val,vPx);}
+        void SetPixelValue(const  int32_t& val, const std::vector<size_t>& vPx) override {this->template SetPixelValue< int32_t>(val,vPx);}
+        void SetPixelValue(const uint64_t& val, const std::vector<size_t>& vPx) override {this->template SetPixelValue<uint64_t>(val,vPx);}
+        void SetPixelValue(const  int64_t& val, const std::vector<size_t>& vPx) override {this->template SetPixelValue< int64_t>(val,vPx);}
 #ifdef Darwinx86_64
-        void SetPixelValue(const   size_t& val, const std::vector<size_t>& vPx) {this->template SetPixelValue<  size_t>(val,vPx);}
+        void SetPixelValue(const   size_t& val, const std::vector<size_t>& vPx) override {this->template SetPixelValue<  size_t>(val,vPx);}
 #endif
-        void SetPixelValue(const    float& val, const std::vector<size_t>& vPx) {this->template SetPixelValue<   float>(val,vPx);}
-        void SetPixelValue(const   double& val, const std::vector<size_t>& vPx) {this->template SetPixelValue<  double>(val,vPx);}
-        void SetPixelValue(const  uint8_t& val, const size_t& iPx)              {this->template SetPixelValue< uint8_t>(val,iPx);}
-        void SetPixelValue(const   int8_t& val, const size_t& iPx)              {this->template SetPixelValue<  int8_t>(val,iPx);}
-        void SetPixelValue(const uint16_t& val, const size_t& iPx)              {this->template SetPixelValue<uint16_t>(val,iPx);}
-        void SetPixelValue(const  int16_t& val, const size_t& iPx)              {this->template SetPixelValue< int16_t>(val,iPx);}
-        void SetPixelValue(const uint32_t& val, const size_t& iPx)              {this->template SetPixelValue<uint32_t>(val,iPx);}
-        void SetPixelValue(const  int32_t& val, const size_t& iPx)              {this->template SetPixelValue< int32_t>(val,iPx);}
-        void SetPixelValue(const uint64_t& val, const size_t& iPx)              {this->template SetPixelValue<uint64_t>(val,iPx);}
-        void SetPixelValue(const  int64_t& val, const size_t& iPx)              {this->template SetPixelValue< int64_t>(val,iPx);}
+        void SetPixelValue(const    float& val, const std::vector<size_t>& vPx) override {this->template SetPixelValue<   float>(val,vPx);}
+        void SetPixelValue(const   double& val, const std::vector<size_t>& vPx) override {this->template SetPixelValue<  double>(val,vPx);}
+        void SetPixelValue(const  uint8_t& val, const size_t& iPx)              override {this->template SetPixelValue< uint8_t>(val,iPx);}
+        void SetPixelValue(const   int8_t& val, const size_t& iPx)              override {this->template SetPixelValue<  int8_t>(val,iPx);}
+        void SetPixelValue(const uint16_t& val, const size_t& iPx)              override {this->template SetPixelValue<uint16_t>(val,iPx);}
+        void SetPixelValue(const  int16_t& val, const size_t& iPx)              override {this->template SetPixelValue< int16_t>(val,iPx);}
+        void SetPixelValue(const uint32_t& val, const size_t& iPx)              override {this->template SetPixelValue<uint32_t>(val,iPx);}
+        void SetPixelValue(const  int32_t& val, const size_t& iPx)              override {this->template SetPixelValue< int32_t>(val,iPx);}
+        void SetPixelValue(const uint64_t& val, const size_t& iPx)              override {this->template SetPixelValue<uint64_t>(val,iPx);}
+        void SetPixelValue(const  int64_t& val, const size_t& iPx)              override {this->template SetPixelValue< int64_t>(val,iPx);}
 #ifdef Darwinx86_64
-        void SetPixelValue(const   size_t& val, const size_t& iPx)              {this->template SetPixelValue<  size_t>(val,iPx);}
+        void SetPixelValue(const   size_t& val, const size_t& iPx)              override {this->template SetPixelValue<  size_t>(val,iPx);}
 #endif
-        void SetPixelValue(const    float& val, const size_t& iPx)              {this->template SetPixelValue<   float>(val,iPx);}
-        void SetPixelValue(const   double& val, const size_t& iPx)              {this->template SetPixelValue<  double>(val,iPx);}
+        void SetPixelValue(const    float& val, const size_t& iPx)              override {this->template SetPixelValue<   float>(val,iPx);}
+        void SetPixelValue(const   double& val, const size_t& iPx)              override {this->template SetPixelValue<  double>(val,iPx);}
         
         template<typename S>
         void SetPixelValue(const S&, const std::vector<size_t>&);
@@ -917,13 +920,13 @@ namespace DSL
         
 #pragma endregion
 #pragma region * Extraction method
-        std::shared_ptr<FITScube> Layer(const size_t&) const;
-        std::shared_ptr<FITScube> Window (size_t, size_t, size_t, size_t) const;
-        std::shared_ptr<FITScube> Rebin  (const std::vector<size_t>&, bool doMean=false ) const;
+        std::shared_ptr<FITScube> Layer(const size_t&) const override;
+        std::shared_ptr<FITScube> Window (size_t, size_t, size_t, size_t) const override;
+        std::shared_ptr<FITScube> Rebin  (const std::vector<size_t>&, bool doMean=false ) const override;
         
-        void Resize(const size_t&, const size_t&, const size_t&, const size_t&);
+        void Resize(const size_t&, const size_t&, const size_t&, const size_t&) override;
         
-        void Print() const;
+        void Print() const override;
 #pragma endregion
     };
     
@@ -1773,6 +1776,22 @@ namespace DSL
 
 #pragma endregion
 #pragma endregion
+
+    template< typename T >
+    void FITSimg<T>::AddLayer(const FITScube& iLayer)
+    {
+        // Dynamic cast to determine the actual type
+        const FITSimg<T>* typedLayer = dynamic_cast<const FITSimg<T>*>(&iLayer);
+        
+        if (!typedLayer)
+        {
+            throw FITSexception(BAD_DIMEN, "FITSimg", "AddLayer", 
+                               "Layer type mismatch - cannot add layer of different type");
+        }
+
+        // Call the typed version
+        AddLayer(*typedLayer);
+    }
     
     template< typename T >
     void FITSimg<T>::AddLayer(const FITSimg<T>& iLayer)
