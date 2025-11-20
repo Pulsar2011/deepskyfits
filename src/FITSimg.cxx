@@ -29,6 +29,28 @@ class FITSmanager;
 #pragma region - FITScube class implementation
 
 #pragma region * protected member function
+
+    std::vector<std::string> FITScube::makeAlphaSequence(std::size_t n) const
+    {
+        std::vector<std::string> out;
+        out.reserve(n);
+        for(std::size_t i = 0; i < n; ++i)
+        {
+            std::size_t v = i;
+            std::string s;
+            do
+            {
+                char c = static_cast<char>('A' + (v % 26));
+                s.insert(s.begin(), c);
+                v = v / 26;
+                if(v == 0) break;
+                v -= 1; // Excel-style decrement
+            }
+            while(true);
+            out.push_back(std::move(s));
+        }
+        return out;
+    }
     
     /**
      *  @brief construct NAXIS size std::vector for n dimension

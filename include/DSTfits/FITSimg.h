@@ -95,6 +95,8 @@ namespace DSL
 #pragma region * Purely virtual & protected methos
     protected:
         virtual void img_init() =0;      //!< Child class initialization
+
+        std::vector<std::string> makeAlphaSequence(std::size_t n) const;
         
 #pragma endregion
 #pragma region * ctor/dtor
@@ -105,8 +107,14 @@ namespace DSL
     public:
         FITScube(const FITScube&);                              //!< Copy constructor
         virtual ~FITScube();                                    //!< Destructor
-        
-        
+
+        /**
+         * @brief Resize or crop the FITS image
+         * 
+         * @param xpixels x pixel coordinate of the bottom left corner of the cropping widonws with the size of the cropping windows along the x axis
+         * @param ypixels y pixel coordinate of the bottom left corner of the cropping widonws with the size of the cropping windows along the y axis
+         */
+        inline void Resize(const std::pair<size_t,size_t>& xpixels, const std::pair<size_t,size_t>& ypixels) { Resize(xpixels.first, ypixels.first, xpixels.second, ypixels.second); }
         virtual void Resize(const size_t&, const size_t&, const size_t&, const size_t&) = 0;
         
         static FITScube* UByteFITSimg      (const size_t&, const std::initializer_list<size_t>& );
@@ -3484,24 +3492,102 @@ namespace DSL
             throw FITSexception(SHARED_NULPTR,"FITSimg<T>::Rebin","missing data");
 
         // Attempt to propagate rebinning to WCS
+        size_t nWCS = getNumberOfWCS();
+        std::vector<std::string> wcsType;
+        if(nWCS > 1)
+        {
+            wcsType = makeAlphaSequence(nWCS);
+            wcsType.insert(wcsType.begin(), "");
+        }
+        else
+            wcsType.push_back("");
 
         for(size_t k = 1; k <= this->GetDimension(); k++)
         {
-            if(hdu.Exists("CDELT"+std::to_string(k)))
-                copy->HDU().ValueForKey("CDELT"+std::to_string(k),
-                                         this->HDU().GetDoubleValueForKey("CDELT"+std::to_string(k))
-                                         * static_cast<double>(Size(k))/static_cast<double>(copy->Size(k)));
-            else
-                copy->HDU().ValueForKey("CDELT"+std::to_string(k),
-                                         static_cast<double>(Size(k))/static_cast<double>(copy->Size(k)),"");
 
-            if(hdu.Exists("CRVAL"+std::to_string(k)))
-                copy->HDU().ValueForKey("CRVAL"+std::to_string(k),
-                                         this->HDU().GetDoubleValueForKey("CRVAL"+std::to_string(k))
-                                         + static_cast<double>(Size(k))/static_cast<double>(copy->Size(k))/2.);
-            else
-                copy->HDU().ValueForKey("CRVAL"+std::to_string(k),
-                                         static_cast<double>(Size(k))/static_cast<double>(copy->Size(k))/2.);
+            for(size_t wcsIdx = 0; wcsIdx < nWCS; wcsIdx++)
+            {
+                if(hdu.Exists("CDELT"+std::to_string(k)+wcsType[wcsIdx]))
+                    copy->HDU().ValueForKey("CDELT"+std::to_string(k)+wcsType[wcsIdx],
+                                             this->HDU().GetDoubleValueForKey("CDELT"+std::to_string(k)+wcsType[wcsIdx])
+                                             * static_cast<double>(Size(k))/static_cast<double>(copy->Size(k)));
+                else
+                    copy->HDU().ValueForKey("CDELT"+std::to_string(k)+wcsType[wcsIdx],
+                                             static_cast<double>(Size(k))/static_cast<double>(copy->Size(k)),"");
+
+                if(hdu.Exists("CRPIX"+std::to_string(k)+wcsType[wcsIdx]))
+                    copy->HDU().ValueForKey("CRPIX"+std::to_string(k)+wcsType[wcsIdx],
+                                            (this->HDU().GetDoubleValueForKey("CRPIX"+std::to_string(k)+wcsType[wcsIdx])
+                                                + ((std::abs(this->HDU().GetDoubleValueForKey("CRPIX"+std::to_string(k)+wcsType[wcsIdx]))<std::numeric_limits<double>::min())?-0.5:0))
+                                            * (static_cast<double>(copy->Size(k))/static_cast<double>(Size(k))));
+                else
+                    copy->HDU().ValueForKey("CRPIX"+std::to_string(k)+wcsType[wcsIdx],
+                                            static_cast<double>(copy->Size(k))/static_cast<double>(Size(k)),"");
+
+                if(hdu.Exists("CRVAL"+std::to_string(k)+wcsType[wcsIdx]))
+                    copy->HDU().ValueForKey("CRVAL"+std::to_string(k)+wcsType[wcsIdx],
+                                            this->HDU().GetDoubleValueForKey("CRVAL"+std::to_string(k)+wcsType[wcsIdx]));
+                else
+                    copy->HDU().ValueForKey("CRVAL"+std::to_string(k)+wcsType[wcsIdx],0.0,"");
+
+                for (size_t iL = 1; iL <= this->GetDimension(); iL++)
+                {
+                    std::string pcKey = "PC"+std::to_string(k)+"_"+std::to_string(iL)+wcsType[wcsIdx];
+                    std::string cdKey = "CD"+std::to_string(k)+"_"+std::to_string(iL)+wcsType[wcsIdx];
+
+                    if(hdu.Exists(pcKey))
+                        copy->HDU().ValueForKey(pcKey,
+                                                this->HDU().GetDoubleValueForKey(pcKey)*static_cast<double>(Size(k))/static_cast<double>(copy->Size(k)));
+                    else if(hdu.Exists(cdKey))
+                        copy->HDU().ValueForKey(cdKey,
+                                                this->HDU().GetDoubleValueForKey(cdKey)*static_cast<double>(Size(k))/static_cast<double>(copy->Size(k)));}
+            }
+        }
+
+        try
+        {
+            std::cerr<<FITSwarning("FITScube","Rebin","Attempting to update WCS after rebinning. Result might be less accurate. It is recommanded to recalibrate WCS after rebinning.").what()<<std::endl;
+            copy->reLoadWCS();
+        }
+        catch(WCSexception& e)
+        {
+            std::cerr<<"\033[33m[WARNING]\033[0m WCS couldn't be updated after rebinning. Image require new WCS calibration. Deleting WCS info from header."<<std::endl;
+            std::cerr<<"          Original exception message: "<<e.what()<<std::endl;
+            std::cerr<<"\033[0m"<<std::endl;
+
+            for(size_t k = 1; k <= this->GetDimension(); k++)
+            {
+                for(size_t wcsIdx = 0; wcsIdx < nWCS; wcsIdx++)
+                {
+                    if(hdu.Exists("CDELT"+std::to_string(k)+wcsType[wcsIdx]))
+                        copy->HDU().DeleteKey("CDELT"+std::to_string(k)+wcsType[wcsIdx]);
+                    if(hdu.Exists("CRVAL"+std::to_string(k)+wcsType[wcsIdx]))
+                        copy->HDU().DeleteKey("CRVAL"+std::to_string(k)+wcsType[wcsIdx]);
+                    if(hdu.Exists("CTYPE"+std::to_string(k)+wcsType[wcsIdx]))
+                        copy->HDU().DeleteKey("CTYPE"+std::to_string(k)+wcsType[wcsIdx]);
+                    if(hdu.Exists("CRPIX"+std::to_string(k)+wcsType[wcsIdx]))
+                        copy->HDU().DeleteKey("CRPIX"+std::to_string(k)+wcsType[wcsIdx]);
+                    if(hdu.Exists("CUNIT"+std::to_string(k)+wcsType[wcsIdx]))
+                        copy->HDU().DeleteKey("CUNIT"+std::to_string(k)+wcsType[wcsIdx]);
+                    if(hdu.Exists("WCSAXES"+wcsType[wcsIdx]))
+                        copy->HDU().DeleteKey("WCSAXES"+wcsType[wcsIdx]);
+                    if(hdu.Exists("CROTA"+std::to_string(k)+wcsType[wcsIdx]))
+                        copy->HDU().DeleteKey("CROTA"+std::to_string(k)+wcsType[wcsIdx]);
+
+                    for(size_t ix = 1; ix <= 2; ix++)
+                    for(size_t jx = 1; jx <= 2; jx++)
+                    {
+                        if(hdu.Exists("PC"+std::to_string(ix)+"_"+std::to_string(jx)+wcsType[wcsIdx]))
+                            copy->HDU().DeleteKey("PC"+std::to_string(ix)+"_"+std::to_string(jx)+wcsType[wcsIdx]);
+                        if(hdu.Exists("CD"+std::to_string(ix)+"_"+std::to_string(jx)+wcsType[wcsIdx]))
+                            copy->HDU().DeleteKey("CD"+std::to_string(ix)+"_"+std::to_string(jx)+wcsType[wcsIdx]);
+                    }
+                    
+                }
+
+            }
+            if(hdu.Exists("RADECSYS"))
+                copy->HDU().DeleteKey("RADECSYS");
         }
 
         if((verbose & verboseLevel::VERBOSE_DETAIL) == verboseLevel::VERBOSE_DETAIL)
