@@ -978,9 +978,72 @@ TEST(FITSimg, Test_Crop)
             EXPECT_NEAR(wcsrc[0], wcscr[0], 1e-6);
             EXPECT_NEAR(wcsrc[1], wcscr[1], 1e-6);
         }
+
+    std::shared_ptr<FITScube> cpy_img = ff.GetPrimary();
+    
+    cpy_img->Resize(std::pair<size_t,size_t>(50,60), std::pair<size_t,size_t>(25,75));
+    EXPECT_EQ(cpy_img->Size(1), 60);
+    EXPECT_EQ(cpy_img->Size(2), 75);
+
+    for(size_t j=0; j<cpy_img->Size(2); j++)
+        for(size_t i=0; i<cpy_img->Size(1); i++)
+        {
+            EXPECT_EQ(cpy_img->Int16ValueAtPixel({i,j}), img->Int16ValueAtPixel({i+50,j+25}));
+            EXPECT_EQ(cpy_img->getNumberOfWCS(), img->getNumberOfWCS());
+            EXPECT_EQ(cpy_img->getNumberOfWCS(), 1);
+
+            worldCoords wcsrc = img->WorldCoordinates(img->PixelIndex({i+50,j+25}), 0);
+            worldCoords wcscr = cpy_img->WorldCoordinates(cpy_img->PixelIndex({i,j}), 0);
+
+
+            EXPECT_NEAR(wcsrc[0], wcscr[0], 1e-6);
+            EXPECT_NEAR(wcsrc[1], wcscr[1], 1e-6);
+        }
+
+    img.reset();
+    cpy_img.reset();
+    ff.Close();
+    EXPECT_FALSE(ff.isOpen());
+}
+
+TEST(FITSimg, Test_RebinningWCS)
+{
+    verbose = verboseLevel::VERBOSE_NONE;
+
+#ifdef Darwinx86_64
+    std::string src = "build/testdata/testkeys.fits";
+#else
+    std::string src = "testdata/testkeys.fits";
+#endif
+
+    // Use the copied file for all operations
+
+    FITSmanager ff(src);
+    EXPECT_TRUE(ff.isOpen());
+
+    std::shared_ptr<FITScube> img = ff.GetPrimary();
+    EXPECT_NE(img, nullptr);
+    //EXPECT_EQ(img->Size(1), 300);
+    //EXPECT_EQ(img->Size(2), 300);
+
+    std::shared_ptr<FITScube> cimg = img->Rebin({4,4}, false);
+    EXPECT_NE(cimg, nullptr);
+    EXPECT_EQ(cimg->Size(1), img->Size(1)/4);
+    EXPECT_EQ(cimg->Size(2), img->Size(2)/4);
+
+    for(size_t j=0; j<cimg->Size(2); j++)
+        for(size_t i=0; i<cimg->Size(1); i++)
+        {
+            worldCoords wcsrc =  img->WorldCoordinates( img->PixelIndex({i*4+2,j*4+2}), 0);
+            worldCoords wcscr = cimg->WorldCoordinates(cimg->PixelIndex({i    ,    j}), 0);
+            EXPECT_NEAR(wcsrc[0], wcscr[0], 1e-1);
+            EXPECT_NEAR(wcsrc[1], wcscr[1], 1e-1);
+        }
+
     
 
     img.reset();
+    cimg.reset();
     ff.Close();
     EXPECT_FALSE(ff.isOpen());
 }
@@ -1052,7 +1115,6 @@ TYPED_TEST(FITSimgStatsTest, arrayRebinning)
     for(size_t j=0; j<mdata->size(); j++)
         EXPECT_NEAR((*mdata)[j], (T)1, 1e-6);
 }
-
 
 TYPED_TEST(FITSimgStatsTest, LayerParent)
 {
