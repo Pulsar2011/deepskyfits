@@ -16,7 +16,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
-#include <map>
+#include <any>
 #include <memory>
 #include <vector>
 #include <valarray>
@@ -35,22 +35,19 @@ namespace DSL
     class FITStable;
     class FITSform;
     
-    typedef std::map<size_t,FITSform> clist;
-    
-#pragma mark - cdescriptor class definition
+#pragma region - FITSform class definition
     class FITSform
     {
         /**
          * @class FITSform  FITStable.h "fitsExtractor/FITStable.h"
          * @author GILLARD William
-         * @version 1.0.0
          * @date 08/08/2017
          * @brief FITS table's column descriptor
          * @details Helper class that allow easy access to the name, type, unit of FITS ASCII and BINARY columns.
          **/
         
     private:
-#pragma mark * private member
+#pragma region -- private member
         const std::string fname;
         const dtype ftype;
         std::string funit;
@@ -60,39 +57,60 @@ namespace DSL
         
         int64_t frepeat;
         int64_t fwidth;
-        
+
         size_t fpos;
 
     protected:
-#pragma mark * protected member function
+#pragma endregion
+#pragma region -- protected member function
         inline FITSform():fname(),ftype(dtype::tnone),funit(),fscale(1),fzero(0),frepeat(1),fwidth(0),fpos(0) {};
         
         inline void setNelem(const int64_t& n) {frepeat = n;}
         inline void setWidth(const int64_t& w) {fwidth  = w;}
         
     public:
-#pragma mark * definition
+#pragma endregion
+#pragma region -- definition
         typedef std::pair<float,float>   complex;
         typedef std::pair<double,double> dblcomplex;
+
+        typedef std::vector< int8_t >                   int8Vector;
+        typedef std::vector< uint8_t >                  uint8Vector;
+        typedef std::vector< int16_t >                  int16Vector;
+        typedef std::vector< uint16_t >                 uint16Vector;
+        typedef std::vector< int32_t >                  int32Vector;
+        typedef std::vector< uint32_t >                 uint32Vector;
+        typedef std::vector< int64_t >                  int64Vector;
+        typedef std::vector< uint64_t >                 uint64Vector;
+        typedef std::vector< float >                    floatVector;
+        typedef std::vector< double >                   doubleVector;
+        typedef std::vector< char* >                    charVector;
+        typedef std::vector< std::string >              stringVector;
+        typedef std::vector< std::pair<float,float> >   complexVector;
+        typedef std::vector< std::pair<double,double> > dblcomplexVector;
         
-#pragma mark * static member function
+        
+#pragma endregion
+#pragma region -- static member function
         static const std::string getDataType(const dtype &);
         static const dtype getDataTypeID(const std::string &);
         
         const std::string getTTYPE() const;
         
-#pragma mark * ctor/dtor
-        FITSform(const size_t, const std::string, const dtype, const std::string unit="");
-        FITSform(const size_t, const std::string, const dtype, const double, const double, const std::string unit="");
+#pragma endregion
+#pragma region -- ctor/dtor
+        FITSform(const size_t&, const std::string&, const dtype&, const std::string unit="");
+        FITSform(const size_t&, const std::string&, const dtype&, const double&, const double&, const std::string unit="");
         
-        FITSform(const size_t, const std::string, const dtype, const int64_t, const int64_t, const std::string unit="");
-        FITSform(const size_t, const std::string, const dtype, const int64_t, const int64_t, const double, const double, const std::string unit="");
+        FITSform(const size_t&, const std::string&, const dtype&, const int64_t&, const int64_t&, const std::string unit="");
+        FITSform(const size_t&, const std::string&, const dtype&, const int64_t&, const int64_t&, const double&, const double&, const std::string unit="");
         
         FITSform(const FITSform&);
         
         virtual ~FITSform(){};
         
-#pragma mark * acessor
+#pragma endregion
+#pragma region -- acessor
         inline const std::string& getName() const {return fname;}
         inline const dtype&       getType() const {return ftype;}
         inline const std::string& getUnit() const {return funit;}
@@ -103,30 +121,47 @@ namespace DSL
         inline const int64_t&    getNelem()  const {return frepeat;}
         inline const int64_t&    getWidth()  const {return fwidth;}
 
-#pragma mark * modifier
-        inline void setUnit    (const std::string& s){funit.clear(); funit+=s;}
-        inline void setPosition(const size_t& p){fpos = p;}
-        
-#pragma mark * modifier
-        virtual void Dump( std::ostream& ) const;
-    };
+#pragma endregion
 
-#pragma mark - FITScolumn class definition
+#pragma region -- pur virtual function
+
+        virtual size_t size() const =0;
+        virtual void push_back(const std::any& value) = 0;
+        virtual std::unique_ptr<FITSform> clone() const = 0; // add
+
+#pragma endregion
+
+#pragma region -- modifier
+        inline void setUnit    (const std::string& s){funit.clear(); funit+=s;}
+        inline void setPosition(const size_t& p)    {fpos = p;}
+        
+#pragma endregion
+#pragma region -- Saving & printing
+        virtual void Dump( std::ostream& ) const;
+        virtual void write(const std::shared_ptr<fitsfile>&, const int64_t&)=0;
+#pragma endregion
+    };
+#pragma endregion
+
+#pragma region - FITScolumn class definition
     
     template<typename T>
-    class FITScolumn: public std::map<size_t,T>, public FITSform
+    class FITScolumn: public FITSform
     {
         /**
          * @class FITScolumn  FITStable.h "fitsExtractor/FITStable.h"
          * @author GILLARD William
-         * @version 1.0.0
          * @date 08/08/2017
          * @brief Helper class to read and write FITS columns data
          * @details This class provide methods to intercats with the data contained into columns of FITS ASCII and BINARY table. Once modified, it does not alter the fitsfile content. In order the modification are propagated to the fitsfile, the FITScolumn instance have to be passed to the FITStable instance. The later is directly responsible to managing the FITStable within the fitsfile.
          **/
-        
+    protected:
+        typedef std::vector<T> col_map;
+        col_map data;
+
     private:
-#pragma mark * private member function
+
+#pragma region -- private member function
         FITScolumn();
         
         void Update(const std::string&);
@@ -143,6 +178,9 @@ namespace DSL
         
         template<typename U>
         void Update(const std::vector<std::pair<U,U>>&);
+
+        template<typename InputIt>
+        void Update(InputIt, InputIt);
         
         template<typename U>
         void dump( std::ostream&, const U& ) const;
@@ -158,33 +196,66 @@ namespace DSL
         
     public:
         
-#pragma mark * definition
-        typedef typename std::vector<T>  vec_data;
-        typedef typename std::map<size_t,T>  col_map;
-        typedef typename std::pair<size_t,T> col_data;
-        typedef typename col_map::iterator iterator;
-        typedef typename col_map::const_iterator const_iterator;
+#pragma endregion
+#pragma region -- definition
+
+        typedef typename std::vector<T>::iterator iterator;
+        typedef typename std::vector<T>::const_iterator const_iterator;
         
-        std::pair< typename FITScolumn<T>::iterator, bool > insert(const typename FITScolumn<T>::col_data&);
         
-#pragma mark * ctor/dtor
+#pragma endregion
+#pragma region -- ctor/dtor
         FITScolumn(const std::string&, const dtype&, const std::string unit="", const size_t pos=0);
         FITScolumn(const std::string&, const dtype&, const double&, const double&, const std::string unit="", const size_t pos=0);
         FITScolumn(const FITScolumn&);
-        FITScolumn(const FITSform&);
-        //FITScolumn(typename std::map<size_t,T>::const_iterator, typename std::map<size_t,T>::const_iterator, const std::string&, const dtype&);
         
         virtual ~FITScolumn();
         
-#pragma mark * accessor
+#pragma endregion
+#pragma region -- accessor
 
+        size_t size() const override { return data.size(); }
+        void push_back(const std::any& value) override
+        {
+            data.push_back( std::any_cast<T>(value) );
+        }
         
-#pragma mark * diagnoze
-        virtual void Dump( std::ostream& ) const;
+#pragma endregion
+#pragma region -- diagnoze
+        virtual void Dump( std::ostream& ) const override;
         
+        std::unique_ptr<FITSform> clone() const override
+        {
+            return std::unique_ptr<FITSform>( new FITScolumn<T>(*this) );
+        }
+#pragma endregion
+#pragma region -- Saving
+        virtual void write(const std::shared_ptr<fitsfile>&, const int64_t&) override;
+#pragma endregion
     };
+
+// Scalar type specializations
+template<> void FITScolumn<FITSform::complex>   ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<FITSform::dblcomplex>::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<std::string>         ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+
+// Vector type specializations
+template<> void FITScolumn<FITSform::int8Vector>      ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<FITSform::uint8Vector>     ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<FITSform::int16Vector>     ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<FITSform::uint16Vector>    ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<FITSform::int32Vector>     ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<FITSform::uint32Vector>    ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<FITSform::int64Vector>     ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<FITSform::uint64Vector>    ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<FITSform::floatVector>     ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<FITSform::doubleVector>    ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<FITSform::complexVector>   ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<FITSform::dblcomplexVector>::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
     
-#pragma mark - FITStable class definition
+#pragma endregion
+#pragma region - FITStable class definition
     class FITStable
     {
         /**
@@ -195,93 +266,105 @@ namespace DSL
          * @brief Helper class to work with FITS ASCII and BINARY tables.
          * @details This class provide foreground method to read and write FITS ASCII and BINARY tables. The FITStable class point toward the HDU block containing the requested tables and it is the reponsibility of the User to deleted and close the fits file that contains the ASCII and/or BINARY table.
          **/
+
+    public:
+        typedef std::vector< std::unique_ptr<FITSform> > columns_list;
+        typedef std::vector< std::vector<std::string> > clist;
+
+    protected:
+        columns_list fcolumns;
+
     private:
-#pragma mark * private member
-        int tbl_status;
+#pragma endregion
+#pragma region -- private member
         const volatile ttype ftbl_type;
-        const volatile std::string fextname;
-        const volatile int fhdu_num;
-        
-#if __cplusplus < 201103L
-        fitsfile* fptr;
-#else
-        std::shared_ptr<fitsfile> fptr;
-        void CloseFile(fitsfile* in);
-#endif
+        FITShdu hdu;                              //!< Header of the table
 
-#pragma mark * private member function
-        void rload();
-        const std::string getFileName(fitsfile *fptr) const;
-        const std::string getExtName() const;
-        const ttype getExtType() const;
-        const int getHDUindex() const;
-        
-        bool isValid() const;
-        
-        FITSform* readArray(const FITSform& , const int64_t&);
-        
-        template <typename T>
-        FITScolumn<T>* read(const FITSform&, const int64_t&);
-        
-        template <typename T>
-        FITScolumn< std::vector<T> >* readVector(const FITSform&, const size_t&);
+#pragma endregion
+#pragma region -- private member function
+        void load(const std::shared_ptr<fitsfile>&);
+        std::unique_ptr<FITSform> readColumn(const std::shared_ptr<fitsfile>&, const size_t&, const size_t&);
+    
 
-        void writeArray(const FITSform*, const int64_t&);
+        //FITSform* readArray(const FITSform& , const int64_t&);
         
         template <typename T>
-        void write      (const FITScolumn<T>*, const int64_t&);
+        void read(FITScolumn<T>*, const std::shared_ptr<fitsfile>& fptr, const size_t&);
         
         template <typename T>
-        void writeVector(const FITScolumn<std::vector<T> >*, const int64_t&);
+        void readVector(FITScolumn< std::vector<T> >*, const std::shared_ptr<fitsfile>& fptr, const size_t&);
         
     public:
 
-#pragma mark * ctor/dtor
+#pragma endregion
+#pragma region -- ctor/dtor
         
-#if __cplusplus < 201103L
-        FITStable(fitsfile *, const int&);
-        FITStable(fitsfile *, const std::string&);
-#else
-        FITStable(std::shared_ptr<fitsfile>, const int&);
-        FITStable(std::shared_ptr<fitsfile>, const std::string&);
-#endif
+        FITStable(const std::shared_ptr<fitsfile>&, const int&);
+        FITStable(const std::shared_ptr<fitsfile>&, const std::string&);
         
-        FITStable(const FITStable&);
+        FITStable(const FITStable& tbl): ftbl_type(tbl.ftbl_type), hdu(tbl.hdu)
+        {
+            for(const auto& c : tbl.fcolumns)
+            {
+                fcolumns.push_back( c->clone() );
+            }
+        }
         
         ~FITStable();
         
-#pragma mark * Properties
-        size_t getNrows();
-        size_t getNcols();
+#pragma endregion
+#pragma region -- Properties
+        size_t nrows() const;
+        size_t ncols() const;
         
-        const clist listColumns();
-        const FITSform columnProperties(const std::string&);
-        const FITSform columnProperties(const size_t&);
+        const clist    listColumns();
+        //const FITSform columnProperties(const std::string&);
+        //const FITSform columnProperties(const size_t&);
+
+        /**
+            @brief Retrive the name of the table extension
+            @return The extension name of \c this table or an empty string if the EXTNAME keyword wasn't found into the HDU.
+        */
+        inline const std::string GetName() const {if(hdu.Exists("EXTNAME")) return hdu.GetValueForKey("EXTNAME"); else return std::string("NO NAME");}       //!< Get the name of the image      
+
+#pragma endregion
+#pragma region -- Accessor
+        inline const FITShdu& HDU() const {return hdu;}
+        inline       FITShdu& HDU() {return hdu;}
+#pragma endregion
+#pragma region -- Accessing coulumn data
+        //FITSform* readColumn(const std::string&);
+        //FITSform* readColumn(const size_t&);
         
-#pragma mark * Accessing coulumn data
-        FITSform* readColumn(const std::string&);
-        FITSform* readColumn(const size_t&);
+        //FITSform* readColumn(const std::string&, const size_t&);
+        //FITSform* readColumn(const size_t&, const size_t&);
+#pragma endregion
+#pragma region -- Inserting/Updating data to column
+
+#pragma region 1- Inseting new column
         
-        FITSform* readColumn(const std::string&, const size_t&);
-        FITSform* readColumn(const size_t&, const size_t&);
+        void InsertColumn(const std::string& cname, const dtype& type, const std::string& tunit);
+        void InsertColumn( std::shared_ptr<FITSform> col );
         
-#pragma mark * Inserting/Updating data to column
-#pragma mark 1- Inseting new column
+#pragma endregion
+#pragma region 2- Inseting value to an existing column
         
-        void InsertColumn(const std::string&, const std::string&, const std::string& tunit=std::string(), int* colnum = NULL);
-        void InsertColumn(FITSform*);
+#pragma endregion
+#pragma region 3- Updating value from an existing column
         
-#pragma mark 2- Inseting value to an existing column
-        
-#pragma mark 3- Updating value from an existing column
-        
-#pragma mark * Diagnoze
-        inline const int Status() const {return tbl_status;}
+#pragma endregion
+#pragma endregion
+#pragma region -- Diagnoze
         void Dump( std::ostream& );
+#pragma endregion
+
+#pragma region -- Saving to file
+        void writeArray(const std::shared_ptr<fitsfile>& fptr, const int64_t&);
+#pragma endregion
 
     };
-    
-#pragma mark - FITStable Template implementation
+#pragma endregion
+#pragma region - FITStable Template implementation
     
     /**
      @brief Read column content
@@ -292,22 +375,15 @@ namespace DSL
      @return FITScolumn<T> instance that contains FITS column prperties as well as std::map<size_t,T> container with the requested data.
      */
     template< typename T>
-    FITScolumn<T>* FITStable::read(const FITSform& tform, const int64_t& row)
-    {
-        FITScolumn<T>* data = new FITScolumn<T>(tform);
-        
-        int64_t nelem = (static_cast<int64_t>(getNrows())-(row-1));
+    void FITStable::read(FITScolumn<T>* data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
+    {      
+        int64_t nelem = (static_cast<int64_t>(nrows())-(row-1));
         
         T*    array     = new T   [nelem];
         char* nullarray = new char[nelem];
+        int tbl_status  = 0;
         
-        if(
-#if __cplusplus < 201103L
-           ffgcf(fptr      , static_cast<int>(tform.getType()), static_cast<int>(tform.getPosition()), row, 1, nelem, array, nullarray, NULL, &tbl_status)
-#else
-           ffgcf(fptr.get(), static_cast<int>(tform.getType()), static_cast<int>(tform.getPosition()), row, 1, nelem, array, nullarray, NULL, &tbl_status)
-#endif
-            )
+        if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem, array, nullarray, NULL, &tbl_status))
         {
             delete [] array;
             delete [] nullarray;
@@ -318,13 +394,13 @@ namespace DSL
         for(size_t k = 0; static_cast<int64_t>(k) < nelem; k++)
         {
             if(! std::atoi(&nullarray[k]) )
-                data->insert(typename FITScolumn<T>::col_data(data->size()+row,array[k]));
+                data->push_back(array[k]);
         }
         
         delete [] array;
         delete [] nullarray;
         
-        return data;
+        return;
         
     }
     
@@ -337,23 +413,16 @@ namespace DSL
      @return FITScolumn<std::vector<T>> instance that contains FITS column prperties as well as std::map<size_t,std::vector<T>> container with the requested data.
      */
     template< typename T>
-    FITScolumn< std::vector< T > >* FITStable::readVector(const FITSform& tform, const size_t& row)
+    void FITStable::readVector(FITScolumn< std::vector<T> >* data,  const std::shared_ptr<fitsfile>& fptr,  const size_t& row)
     {
-        FITScolumn< std::vector< T > >* data = new FITScolumn< std::vector<T> >(tform);
-        
-        int64_t nelem = ( static_cast<int64_t>(getNrows())-static_cast<int64_t>(row-1) )* static_cast<int64_t>(tform.getNelem());
+        int64_t nelem = ( static_cast<int64_t>(nrows())-static_cast<int64_t>(row-1) )* static_cast<int64_t>(data->getNelem());
         
         T*   array      = new T   [nelem];
         char* nullarray = new char[nelem];
         int   anynull   = 0;
+        int tbl_status  = 0;
         
-        if(
-#if __cplusplus < 201103L
-           ffgcf(fptr      , static_cast<int>(tform.getType()), static_cast<int>(tform.getPosition()), row, 1, static_cast<LONGLONG>(tform.getNelem()), array, nullarray, &anynull, &tbl_status)
-#else
-           ffgcf(fptr.get(), static_cast<int>(tform.getType()), static_cast<int>(tform.getPosition()), row, 1, nelem , array, nullarray, &anynull, &tbl_status)
-#endif
-           )
+        if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem , array, nullarray, &anynull, &tbl_status))
         {
             delete[] array;
             delete[] nullarray;
@@ -361,7 +430,7 @@ namespace DSL
             throw FITSexception(tbl_status,"FITStable","read<T>");
         }
         
-        for(int64_t k = 0; k < nelem; k += tform.getNelem())
+        for(int64_t k = 0; k < nelem; k += data->getNelem())
         {
             if(anynull && std::atoi(&nullarray[k]) )
                 continue;
@@ -369,23 +438,19 @@ namespace DSL
             //data->insert(typename FITScolumn< std::vector<T> >::col_data(k+1,std::vector<T>(tform.getNelem())));
             
             
-            std::vector<T> tmpv = std::vector<T>(tform.getNelem());
+            std::vector<T> tmpv = std::vector<T>(data->getNelem());
             
-            for(int64_t l = 0; l < tform.getNelem(); l++ )
+            for(int64_t l = 0; l < data->getNelem(); l++ )
             {
-                if( k+l >= nelem*tform.getNelem())
+                if( k+l >= nelem*data->getNelem())
                 {
-                    std::cout<<l<<" + "<<k<<" = "<<l+k<<" % "<<nelem * static_cast<int64_t>(tform.getNelem())<<std::endl;
-#if __cplusplus < 201103L
-                    throw FITSwarning("FITStable","readVector","Out of range : "+std::to_string(static_cast<long long>(k+l))+" <-> "+std::to_string((static_cast<long long>(getNrows())-static_cast<long long>(row))*tform.getNelem()));
-#else
-                    throw FITSwarning("FITStable","readVector","Out of range : "+std::to_string(k+l)+" <-> "+std::to_string((static_cast<int64_t>(getNrows())-static_cast<int64_t>(row))*tform.getNelem()));
-#endif
+                    std::cout<<l<<" + "<<k<<" = "<<l+k<<" % "<<nelem * static_cast<int64_t>(data->getNelem())<<std::endl;
+                    throw FITSwarning("FITStable","readVector","Out of range : "+std::to_string(k+l)+" <-> "+std::to_string((static_cast<int64_t>(nrows())-static_cast<int64_t>(row))*data->getNelem()));
                 }
                 tmpv[l] = array[k+l];
             }
             
-            data->insert(typename FITScolumn< std::vector<T> >::col_data(data->size()+row,tmpv));
+            data->push_back(tmpv);
         }
         
         if(array != NULL)
@@ -393,110 +458,53 @@ namespace DSL
         
         if(nullarray != NULL)
             delete[]  nullarray;
-        
-        return data;
     }
     
-    /**
-     @brief Write column content into FITS file
-     @details Private methods used to write  the content of FITS vector array into a FITS column. .
-     
-     @param data The column and data to be written into the FITS table
-     @param first_row Row position of the first element to write into the table
-     */
-    template< typename T>
-    void FITStable::write(const FITScolumn<T>* data, const int64_t& first_row)
+#pragma endregion
+#pragma region - FITScolumn class implementation
+
+#pragma region --saving
+    template< typename T >
+    void FITScolumn<T>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        if(data->size() < 1)
+        if(fptr == nullptr)
         {
-            throw FITSexception(NOT_TABLE,"FITStable","write<T>");
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<T>","write");
         }
-        
-        T   array=0;
-        
+
+        if(data.size() < 1)
+        {
+            throw FITSexception(NOT_TABLE,"FITScolumn<T>","write");
+        }
+
         int64_t n = 0;
-        for(typename FITScolumn<T>::const_iterator it = data->cbegin(); it != data->cend(); it++)
+        int tbl_status  = 0;
+
+        for(typename col_map::const_iterator it = data.cbegin(); it != data.cend(); it++)
         {
             if(n >= (first_row-1))
             {
-                array = it->second;
+                T array = (*it);
                 
-                if(
-#if __cplusplus < 201103L
-                   ffpcl(fptr      , static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), n+1, 1, data->getNelem(), &array, &tbl_status)
-#else
-                   ffpcl(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), n+1, 1, data->getNelem(),  &array, &tbl_status)
-#endif
-                   )
+                if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), n+1, 1, getNelem(),  &array, &tbl_status))
                 {
                     throw FITSexception(tbl_status,"FITStable","write<T>");
                 }
             }
             n++;
         }
-        
-        return;
     }
     
-    /**
-     @brief Read column content
-     @details Private methods used to read  the content of FITS vector array. The method access the FITS column data and fill up a FITScolumn<std::vector<T>> instance with the corresponding data.
-     
-     @param data Pointer to the std::vector containing the data to be writtent to the table
-     @param first_row First row to be read
-     */
-    template< typename T>
-    void FITStable::writeVector(const FITScolumn<std::vector<T> >* data, const int64_t& first_row)
-    {
-        const int64_t nelem = data->getNelem();
-        T* array =new T[nelem];
-        
-        int64_t n = 0;
-        for(typename FITScolumn< std::vector<T> >::const_iterator it = data->cbegin(); it != data->cend(); it++)
-        {
-            if( n < (first_row-1))
-            {
-                n++;
-                continue;
-            }
-            
-            for(size_t k =0; k < static_cast<size_t>(nelem); k++)
-            {
-                if(k < it->second.size())
-                    array[k] = it->second.at(k);
-                else
-                    array[k] = std::numeric_limits<T>::quiet_NaN();
-            }
-            
-            if(
-#if __cplusplus < 201103L
-               ffpcl(fptr      , static_cast<int>(data->getType()), static_cast<int>(data.getPosition()), n+1, 1, nelem, array, &tbl_status)
-#else
-               ffpcl(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), n+1, 1, nelem, array, &tbl_status)
-#endif
-               )
-            {
-                delete [] array;
-                throw FITSexception(tbl_status,"FITStable","writeVector<std::vector<T>>");
-            }
-            
-            n++;
-        }
-
-        delete [] array;
-        return;
-    }
-    
-#pragma mark - FITScolumn class implementation
+#pragma endregion
+#pragma region -- ctor/dtor
     
     /**
      @brief Empty constructor
      @note Empty constructor is made private because \c this->fname and \c this->ftype are required.
      */
     template< typename T >
-    FITScolumn<T>::FITScolumn():std::map<size_t,T>(),FITSform()
+    FITScolumn<T>::FITScolumn():FITSform(),data()
     {
-        
     }
     
     /**
@@ -505,7 +513,7 @@ namespace DSL
      @param type FITS column type
      */
     template< typename T >
-    FITScolumn<T>::FITScolumn(const std::string& name , const dtype& type, const std::string unit, const size_t pos):std::map<size_t,T>(),FITSform(pos,name,type,unit)
+    FITScolumn<T>::FITScolumn(const std::string& name , const dtype& type, const std::string unit, const size_t pos):FITSform(pos,name,type,unit),data()
     {
         
     }
@@ -523,7 +531,7 @@ namespace DSL
      @param pos Column position in the FITStable
      */
     template< typename T >
-    FITScolumn<T>::FITScolumn(const std::string& name, const dtype& type, const double& scale, const double& zero, const std::string unit, const size_t pos):std::map<size_t,T>(),FITSform(pos,name,type,scale,zero,unit)
+    FITScolumn<T>::FITScolumn(const std::string& name, const dtype& type, const double& scale, const double& zero, const std::string unit, const size_t pos):FITSform(pos,name,type,scale,zero,unit),data()
     {
         
     }
@@ -533,13 +541,7 @@ namespace DSL
      @param col FITS column to be copyed to this
      */
     template< typename T >
-    FITScolumn<T>::FITScolumn(const FITScolumn<T>& col):std::map<size_t,T>(col),FITSform(col)
-    {
-        
-    }
-    
-    template< typename T >
-    FITScolumn<T>::FITScolumn(const FITSform& form):std::map<size_t,T>(),FITSform(form)
+    FITScolumn<T>::FITScolumn(const FITScolumn<T>& col):FITSform(col),data(col.data)
     {
         
     }
@@ -547,18 +549,97 @@ namespace DSL
     template< typename T >
     FITScolumn<T>::~FITScolumn()
     {
-        dynamic_cast<typename std::map<size_t,T>*>(this)->clear();
+        data.clear();
     }
+#pragma endregion
     
+    /*
     template< typename T >
-    std::pair< typename FITScolumn<T>::iterator, bool> FITScolumn<T>::insert(const  typename FITScolumn<T>::col_data& d)
+    FITScolumn<T>::iterator FITScolumn<T>::insert(FITScolumn<T>::const_iterator pos, const  T& value)
     {
-        std::pair< typename FITScolumn<T>::iterator, bool> p =  std::map<size_t,T>::insert(std::pair<size_t,T>(d));
-        
-        const T& val = d.second;
-        Update(val);
+        typename std::vector<T>::iterator p = std::vector<T>::insert(pos, value);
+        Update(value);
         
         return p;
+    }
+
+    template< typename T >
+    FITScolumn<T>::iterator FITScolumn<T>::insert(FITScolumn<T>::const_iterator pos, const  T&& value)
+    {
+        typename std::vector<T>::iterator p = std::vector<T>::insert(pos, value);
+        Update(value);
+
+        int64_t newSize = static_cast<int64_t>(std::vector<T>::size());
+        if(getNelem() < newSize) setNelem(newSize);
+        
+        return p;
+    }
+
+    template< typename T >
+    FITScolumn<T>::iterator FITScolumn<T>::insert(FITScolumn<T>::const_iterator pos , size_type count, const T& value)
+    {
+        typename std::vector<T>::iterator p = std::vector<T>::insert(pos, count, value);
+        Update(value);
+
+        int64_t newSize = static_cast<int64_t>(std::vector<T>::size());
+        if(getNelem() < newSize) setNelem(newSize);
+        
+        return p;
+    }
+
+    template< typename T >
+    FITScolumn<T>::iterator FITScolumn<T>::insert(FITScolumn<T>::const_iterator pos, std::initializer_list<T> ilist )
+    {
+        typename std::vector<T>::iterator p = std::vector<T>::insert(pos, ilist);
+        Update(std::vector<T>(ilist));
+
+        int64_t newSize = static_cast<int64_t>(std::vector<T>::size());
+        if(getNelem() < newSize) setNelem(newSize);
+        
+        return p;
+    }
+
+    template< typename T >
+    template< class InputIt >
+    FITScolumn<T>::iterator FITScolumn<T>::insert(FITScolumn<T>::const_iterator pos, InputIt first, InputIt last )
+    {
+        typename std::vector<T>::iterator p = std::vector<T>::insert(pos, first, last);
+        Update(std::vector<T>(ilist));
+
+        int64_t newSize = static_cast<int64_t>(std::vector<T>::size());
+        if(getNelem() < newSize) setNelem(newSize);
+        
+        return p;
+    }
+    */
+
+    template< typename T >
+    template<typename InputIt>
+    void FITScolumn<T>::Update(InputIt first, InputIt last)
+    {
+        using V = typename std::iterator_traits<InputIt>::value_type;
+
+#if __cplusplus >= 201103L
+        if(std::is_arithmetic<V>::value)
+        {
+            FITSform::setWidth(sizeof(V));
+            int64_t cnt = 0;
+            for(auto it = first; it != last; ++it) ++cnt;
+            if(cnt > getNelem()) FITSform::setNelem(cnt);
+            return;
+        }
+#endif
+
+        std::vector<V> buffer;
+#if __cplusplus >= 201103L
+        using Cat = typename std::iterator_traits<InputIt>::iterator_category;
+        if(std::is_base_of<std::random_access_iterator_tag, Cat>::value)
+            buffer.reserve(static_cast<size_t>(std::distance(first,last)));
+#endif
+        for(; first != last; ++first)
+            buffer.push_back(*first);
+
+        Update(buffer); 
     }
     
     template< typename T >
@@ -629,17 +710,20 @@ namespace DSL
     }
     
     
-#pragma mark * diagnose
+#pragma endregion
+#pragma region -- diagnose
     template< typename T >
     void FITScolumn<T>::Dump( std::ostream& fout) const
     {
         FITSform::Dump(fout);
         
-        for(typename col_map::const_iterator it = this->begin(); it != this->end(); it++)
+        size_t n=0;
+        for(typename col_map::const_iterator it = data.cbegin(); it != data.cend(); it++)
         {
-            fout<<"    ["<<it->first<<"]   "<<std::flush;
-            dump(fout,it->second);
+            fout<<"    ["<<n<<"]   "<<std::flush;
+            dump(fout,*it);
             fout<<std::endl;
+            n++;
         }
     }
     

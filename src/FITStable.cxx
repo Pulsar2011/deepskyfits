@@ -31,16 +31,16 @@ namespace DSL
 #pragma mark - cdescriptor class definition
 #pragma mark * ctor/dtor
     
-    FITSform::FITSform(const size_t p,const std::string name, const dtype t, const std::string unit):fname(name),ftype(t),funit(unit),fscale(1),fzero(0),frepeat(1),fwidth(1),fpos(p)
+    FITSform::FITSform(const size_t& p,const std::string& name, const dtype& t, const std::string unit):fname(name),ftype(t),funit(unit),fscale(1),fzero(0),frepeat(1),fwidth(1),fpos(p)
     {};
     
-    FITSform::FITSform(const size_t p, const std::string name, const dtype t, const double s, const double z, const std::string unit):fname(name),ftype(t),funit(unit),fscale(s),fzero(z),frepeat(1),fwidth(1),fpos(p)
+    FITSform::FITSform(const size_t& p, const std::string& name, const dtype& t, const double& s, const double& z, const std::string unit):fname(name),ftype(t),funit(unit),fscale(s),fzero(z),frepeat(1),fwidth(1),fpos(p)
     {};
     
-    FITSform::FITSform(const size_t p,const std::string name, const dtype t, const int64_t r, const int64_t w, const std::string unit):fname(name),ftype(t),funit(unit),fscale(1),fzero(0),frepeat(r),fwidth(w),fpos(p)
+    FITSform::FITSform(const size_t& p,const std::string& name, const dtype& t, const int64_t& r, const int64_t& w, const std::string unit):fname(name),ftype(t),funit(unit),fscale(1),fzero(0),frepeat(r),fwidth(w),fpos(p)
     {};
     
-    FITSform::FITSform(const size_t p, const std::string name, const dtype t, const int64_t r, const int64_t w, const double s, const double z, const std::string unit):fname(name),ftype(t),funit(unit),fscale(s),fzero(z),frepeat(r),fwidth(w),fpos(p)
+    FITSform::FITSform(const size_t& p, const std::string& name, const dtype& t, const int64_t& r, const int64_t& w, const double& s, const double& z, const std::string unit):fname(name),ftype(t),funit(unit),fscale(s),fzero(z),frepeat(r),fwidth(w),fpos(p)
     {};
     
     
@@ -310,22 +310,15 @@ namespace DSL
 #pragma mark * template specialization
     
     template< >
-    FITScolumn<FITSform::complex>* FITStable::read(const FITSform& tform, const int64_t& row)
+    void FITStable::read(FITScolumn<FITSform::complex>* data,  const std::shared_ptr<fitsfile>& fptr,  const size_t& row)
     {
-        FITScolumn<FITSform::complex>* data = new FITScolumn<FITSform::complex>(tform);
-        
-        int64_t nelem = (static_cast<int64_t>(getNrows())-(row-1))*2;
+        int64_t nelem = (static_cast<int64_t>(nrows())-(row-1))*2;
         
         float   *array  = new float [nelem];
         char *nullarray = new char  [nelem];
+        int tbl_status  = 0;
         
-        if(
-#if __cplusplus < 201103L
-           ffgcf(fptr      , static_cast<int>(tform.getType()), static_cast<int>(tform.getPosition()), row, 1, row, 1, nelem/2, array, nullarray, NULL, &tbl_status)
-#else
-           ffgcf(fptr.get(), static_cast<int>(tform.getType()), static_cast<int>(tform.getPosition()), row, 1, nelem/2, array, nullarray, NULL, &tbl_status)
-#endif
-           )
+        if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem/2, array, nullarray, NULL, &tbl_status))
         {
             delete [] array;
             delete [] nullarray;
@@ -336,33 +329,26 @@ namespace DSL
         for(size_t k = 0; k < static_cast<size_t>(nelem); k+=2)
         {
             if(! std::atoi(&nullarray[k]) )
-                data->insert(FITScolumn<FITSform::complex>::col_data(data->size()+row,FITSform::complex(array[k],array[k+1])));
+                data->push_back(FITSform::complex(array[k],array[k+1]));
         }
         
         delete [] array;
         delete [] nullarray;
         
-        return data;
+        return;
         
     }
     
     template< >
-    FITScolumn<FITSform::dblcomplex>* FITStable::read(const FITSform& tform, const int64_t& row)
+    void FITStable::read(FITScolumn<FITSform::dblcomplex>* data,  const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
-        FITScolumn<FITSform::dblcomplex>* data = new FITScolumn<FITSform::dblcomplex>(tform);
-        
-        int64_t nelem = (static_cast<int64_t>(getNrows())-(row-1))*2;
+        int64_t nelem = (static_cast<int64_t>(nrows())-(row-1))*2;
         
         double   *array = new double [nelem];
         char *nullarray = new char   [nelem];
+        int tbl_status  = 0;
         
-        if(
-#if __cplusplus < 201103L
-           ffgcf(fptr      , static_cast<int>(tform.getType()), static_cast<int>(tform.getPosition()), row, 1, nelem/2, array, nullarray, NULL, &tbl_status)
-#else
-           ffgcf(fptr.get(), static_cast<int>(tform.getType()), static_cast<int>(tform.getPosition()), row, 1, nelem/2, array, nullarray, NULL, &tbl_status)
-#endif
-           )
+        if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem/2, array, nullarray, NULL, &tbl_status))
         {
             delete [] array;
             delete [] nullarray;
@@ -373,23 +359,18 @@ namespace DSL
         for(size_t k = 0; k < static_cast<size_t>(nelem); k+=2)
         {
             if(! std::atoi(&nullarray[k]) )
-                data->insert(FITScolumn<FITSform::dblcomplex>::col_data(data->size()+row,FITSform::complex(array[k],array[k+1])));
+                data->push_back(FITSform::dblcomplex(array[k],array[k+1]));
         }
         
         delete [] array;
-        delete [] nullarray;
-        
-        return data;
-        
+        delete [] nullarray;        
     }
     
     template< >
-    FITScolumn<std::string>* FITStable::read(const FITSform& tform, const int64_t& row)
+    void FITStable::read( FITScolumn<std::string>* data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
-        FITScolumn<std::string>* data = new FITScolumn<std::string>(tform);
-        
-        int64_t nrow  = ( static_cast<int64_t>( getNrows() )-(row-1) );
-        int64_t nelem =   static_cast<int64_t>( tform.getNelem() );
+        int64_t nrow  = ( static_cast<int64_t>( nrows() )-(row-1) );
+        int64_t nelem =   static_cast<int64_t>( data->getNelem() );
         
         char  **array = new char *[nrow];
         
@@ -398,16 +379,11 @@ namespace DSL
         
         char  nullarray[5];
         int   anynull = 0;
+        int tbl_status  = 0;
         
         strcpy(nullarray,"NULL");
             
-        if(
-#if __cplusplus < 201103L
-            ffgcf(fptr      , static_cast<int>(tform.getType()), static_cast<int>(tform.getPosition()), row, 1, nelem, array, nullarray, NULL, &tbl_status)
-#else
-            ffgcvs(fptr.get(), static_cast<int>(tform.getPosition()), row, 1, nrow, nullarray, array, &anynull, &tbl_status)
-#endif
-            )
+        if(ffgcvs(fptr.get(), static_cast<int>(data->getPosition()), row, 1, nrow, nullarray, array, &anynull, &tbl_status))
         {
             delete [] array;
             throw FITSexception(tbl_status,"FITStable","read<std::string>");
@@ -419,44 +395,34 @@ namespace DSL
             if(! std::string(array[k]).compare("NULL"))
                 continue;
             
-            data->insert(FITScolumn<std::string>::col_data(data->size()+row,std::string(array[k])));
+            data->push_back(std::string(array[k]));
         }
         
         for(int64_t k = 0; k < nrow; k++)
             delete [] array[k];
         
-        delete [] array;
-        
-        return data;
-        
+        delete [] array;        
     }
     
     template< >
-    FITScolumn< std::vector<std::string> >* FITStable::readVector(const FITSform& tform, const size_t& row)
+    void FITStable::readVector(FITScolumn< std::vector<std::string> >* data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
-        FITScolumn< std::vector<std::string> >* data = new FITScolumn< std::vector<std::string> >(tform);
-        
-        int64_t nrow  = ( static_cast<int64_t>( getNrows() )-(row-1) );
-        int64_t nelem =   static_cast<int64_t>( tform.getNelem() );
-        int64_t nstr  = nelem/tform.getWidth();
+        int64_t nrow  = ( static_cast<int64_t>( nrows() )-(row-1) );
+        int64_t nelem =   static_cast<int64_t>( data->getNelem() );
+        int64_t nstr  = nelem/data->getWidth();
         
         char  **array = new char* [nelem];
         
         for(int64_t n = 0; n < nelem; n++)
-            array[n] = new char[tform.getWidth()];
+            array[n] = new char[data->getWidth()];
         
         char  nullarray[5];
         int   anynull = 0;
+        int tbl_status  = 0;
         
         strcpy(nullarray,"NULL");
         
-        if(
-#if __cplusplus < 201103L
-            ffgcvs(fptr, static_cast<int>(tform.getPosition()), row, 1, nrow*nstr, nullarray, array, &anynull, &tbl_status)
-#else
-           ffgcvs(fptr.get(), static_cast<int>(tform.getPosition()), row, 1, nrow*nstr, nullarray, array, &anynull, &tbl_status)
-#endif
-           )
+        if(ffgcvs(fptr.get(), static_cast<int>(data->getPosition()), row, 1, nrow*nstr, nullarray, array, &anynull, &tbl_status))
         {
             throw FITSexception(tbl_status,"FITStable","read<std::string>");
         }
@@ -473,494 +439,424 @@ namespace DSL
             if(! (s%nstr) )
             {
                 if(str.size() > 0)
-		  data->insert(FITScolumn< std::vector<std::string> >::col_data(data->size()+static_cast<size_t>(row),std::vector<std::string>(str)));
+		            data->push_back(std::vector<std::string>(str));
                 str.clear();
                 s=0;
             }
            
             s++;
         }
-               
-        return data;
-        
     }
     
     template< >
-    void FITStable::write<FITSform::complex>(const FITScolumn<FITSform::complex>* data, const int64_t& first_row)
+    void FITScolumn< FITSform::complex >::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        float   array[2];
-        
+        if(fptr == nullptr)
+        {
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<complex>","write");
+        }
+
+        if(data.size() < 1)
+        {
+            throw FITSexception(NOT_TABLE,"FITScolumn<complex>","write");
+        }
+
         int64_t n = 0;
-        for(typename FITScolumn<FITSform::complex>::const_iterator it = data->cbegin(); it != data->cend() && static_cast<size_t>(n) < data->size(); it++)
+        int tbl_status = 0;
+
+        for(col_map::const_iterator it = data.cbegin(); it != data.cend(); it++)
         {
             if(n >= (first_row-1))
             {
-                array[0] = it->second.first;
-                array[1] = it->second.second;
+                float arr[2] = {it->first, it->second};
                 
-                if(
-#if __cplusplus < 201103L
-                   ffpcl(fptr      , static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), n+1, 1, 1, array, &tbl_status)
-#else
-                   ffpcl(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), n+1, 1, 1, array, &tbl_status)
-#endif
-                   )
+                if(ffpclc(fptr.get(), static_cast<int>(getPosition()), n+1, 1, 1, arr, &tbl_status))
                 {
                     throw FITSexception(tbl_status,"FITStable","write<complex>");
                 }
             }
             n++;
         }
-        
-        return;
     }
-    
+
     template< >
-    void FITStable::write<FITSform::dblcomplex>(const FITScolumn<FITSform::dblcomplex>* data, const int64_t& first_row)
+    void FITScolumn<FITSform::dblcomplex>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        double   array[2];
-        
+        if(fptr == nullptr)
+        {
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<dblcomplex>","write");
+        }
+
+        if(data.size() < 1)
+        {
+            throw FITSexception(NOT_TABLE,"FITScolumn<dblcomplex>","write");
+        }
+
         int64_t n = 0;
-        for(typename FITScolumn<FITSform::dblcomplex>::const_iterator it = data->cbegin(); it != data->cend()  && static_cast<size_t>(n) < data->size(); it++)
+        int tbl_status = 0;
+
+        for(col_map::const_iterator it = data.cbegin(); it != data.cend(); it++)
         {
             if(n >= (first_row-1))
             {
-                array[0] = it->second.first;
-                array[1] = it->second.second;
+                double arr[2] = {it->first, it->second};
                 
-                if(
-#if __cplusplus < 201103L
-                   ffpcl(fptr      , static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), n+1, 1, 1, array, &tbl_status)
-#else
-                   ffpcl(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), n+1, 1, 1, array, &tbl_status)
-#endif
-                   )
+                if(ffpclm(fptr.get(), static_cast<int>(getPosition()), n+1, 1, 1, arr, &tbl_status))
                 {
-                    throw FITSexception(tbl_status,"FITStable","write<complex>");
+                    throw FITSexception(tbl_status,"FITStable","write<dblcomplex>");
                 }
             }
             n++;
         }
-        
-        return;
     }
     
     template< >
-    void FITStable::write<std::string>(const FITScolumn<std::string>* data, const int64_t& first_row)
+    void FITScolumn<std::string>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        const int64_t nelem    = data->getWidth();
-        char   **array = new char* [1];
-        array [0]      = new char [nelem];
-        
-        size_t n = 0;
-        for(typename FITScolumn<std::string>::const_iterator it = data->cbegin(); it != data->cend() && n < data->size(); it++)
+        if(fptr == nullptr)
         {
-           
-            if(n >= static_cast<size_t>(first_row-1))
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<std::string>","write");
+        }
+
+        if(data.size() < 1)
+        {
+            throw FITSexception(NOT_TABLE,"FITScolumn<std::string>","write");
+        }
+
+        int64_t n = 0;
+        int tbl_status = 0;
+
+        for(col_map::const_iterator it = data.cbegin(); it != data.cend(); it++)
+        {
+            if(n >= (first_row-1))
             {
-                strcpy(array[0],const_cast<char*>(it->second.c_str()));
+                char* str = const_cast<char*>(it->c_str());
                 
-                if(
-#if __cplusplus < 201103L
-                   ffpcls(fptr      , static_cast<int>(data->getPosition()), n+1, 1, 1, array, &tbl_status)
-#else
-                   ffpcls(fptr.get(), static_cast<int>(data->getPosition()), n+1, 1, 1, array, &tbl_status)
-#endif
-                   )
+                if(ffpcls(fptr.get(), static_cast<int>(getPosition()), n+1, 1, 1, &str, &tbl_status))
                 {
                     throw FITSexception(tbl_status,"FITStable","write<std::string>");
                 }
             }
-            
             n++;
         }
-        
-        delete [ ] array[0];
-        delete [ ] array;
-        
-        return;
     }
     
     template<>
-    void FITStable::writeVector(const FITScolumn<std::vector<FITSform::complex> >* data, const int64_t& first_row)
+    void FITScolumn<FITSform::int8Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        const int64_t nelem = data->getNelem();
-        // FIX: Use dynamic allocation instead of VLA
-        float* array = new float[nelem*2];
+        if(!fptr)
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<int8Vector>","write");
+        
+        if(data.empty())
+            throw FITSexception(NOT_TABLE,"FITScolumn<int8Vector>","write");
 
-        size_t n = 0;
-        for(typename FITScolumn< std::vector<FITSform::complex> >::const_iterator it = data->cbegin(); it != data->cend(); it++)
+        const int64_t nelem = getNelem();
+        int8_t* buffer = new int8_t[nelem];
+        int tbl_status = 0;
+        size_t row = 0;
+
+        for(auto it = data.cbegin(); it != data.cend(); ++it, ++row)
         {
-            if( n < static_cast<size_t>(first_row-1))
-            {
-                n++;
+            if(row < static_cast<size_t>(first_row-1)) 
                 continue;
-            }
-            
-            int64_t pos = 0;
-            for(size_t k =0; k < static_cast<size_t>(data->getNelem()); k++)
+
+            for(int64_t i=0;i<nelem;++i)
+                buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : int8_t(0);
+            if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
             {
-                if(k < it->second.size())
+                delete [] buffer;
+                throw FITSexception(tbl_status,"FITScolumn<int8Vector>","write");
+            }
+        }
+        delete [] buffer;
+    }
+
+    template<>
+    void FITScolumn<FITSform::uint8Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
+    {
+        if(!fptr)
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<uint8Vector>","write");
+
+        if(data.empty())
+            throw FITSexception(NOT_TABLE,"FITScolumn<uint8Vector>","write");
+
+        const int64_t nelem = getNelem();
+        uint8_t* buffer = new uint8_t[nelem];
+        int tbl_status = 0;
+        size_t row = 0;
+
+        for(auto it = data.cbegin(); it != data.cend(); ++it, ++row)
+        {
+            if(row < static_cast<size_t>(first_row-1))
+                continue;
+            for(int64_t i=0;i<nelem;++i)
+                buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : uint8_t(0);
+            
+            if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
+            {
+                delete [] buffer;
+                throw FITSexception(tbl_status,"FITScolumn<uint8Vector>","write");
+            }
+        }
+        delete [] buffer;
+    }
+
+    template<>
+    void FITScolumn<FITSform::int16Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
+    {
+        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<int16Vector>","write");
+        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<int16Vector>","write");
+        const int64_t nelem = getNelem();
+        int16_t* buffer = new int16_t[nelem];
+        int tbl_status = 0;
+        size_t row=0;
+        for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
+        {
+            if(row < static_cast<size_t>(first_row-1)) continue;
+            for(int64_t i=0;i<nelem;++i) buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : int16_t(0);
+            if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
+            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<int16Vector>","write"); }
+        }
+        delete [] buffer;
+    }
+
+    template<>
+    void FITScolumn<FITSform::uint16Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
+    {
+        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<uint16Vector>","write");
+        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<uint16Vector>","write");
+        const int64_t nelem = getNelem();
+        uint16_t* buffer = new uint16_t[nelem];
+        int tbl_status = 0;
+        size_t row=0;
+        for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
+        {
+            if(row < static_cast<size_t>(first_row-1)) continue;
+            for(int64_t i=0;i<nelem;++i) buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : uint16_t(0);
+            if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
+            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<uint16Vector>","write"); }
+        }
+        delete [] buffer;
+    }
+
+    template<>
+    void FITScolumn<FITSform::int32Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
+    {
+        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<int32Vector>","write");
+        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<int32Vector>","write");
+        const int64_t nelem = getNelem();
+        int32_t* buffer = new int32_t[nelem];
+        int tbl_status = 0;
+        size_t row=0;
+        for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
+        {
+            if(row < static_cast<size_t>(first_row-1)) continue;
+            for(int64_t i=0;i<nelem;++i) buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : int32_t(0);
+            if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
+            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<int32Vector>","write"); }
+        }
+        delete [] buffer;
+    }
+
+    template<>
+    void FITScolumn<FITSform::uint32Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
+    {
+        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<uint32Vector>","write");
+        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<uint32Vector>","write");
+        const int64_t nelem = getNelem();
+        uint32_t* buffer = new uint32_t[nelem];
+        int tbl_status = 0;
+        size_t row=0;
+        for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
+        {
+            if(row < static_cast<size_t>(first_row-1)) continue;
+            for(int64_t i=0;i<nelem;++i) buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : uint32_t(0);
+            if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
+            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<uint32Vector>","write"); }
+        }
+        delete [] buffer;
+    }
+
+    template<>
+    void FITScolumn<FITSform::int64Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
+    {
+        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<int64Vector>","write");
+        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<int64Vector>","write");
+        const int64_t nelem = getNelem();
+        int64_t* buffer = new int64_t[nelem];
+        int tbl_status = 0;
+        size_t row=0;
+        for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
+        {
+            if(row < static_cast<size_t>(first_row-1)) continue;
+            for(int64_t i=0;i<nelem;++i) buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : int64_t(0);
+            if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
+            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<int64Vector>","write"); }
+        }
+        delete [] buffer;
+    }
+
+    template<>
+    void FITScolumn<FITSform::uint64Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
+    {
+        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<uint64Vector>","write");
+        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<uint64Vector>","write");
+        const int64_t nelem = getNelem();
+        uint64_t* buffer = new uint64_t[nelem];
+        int tbl_status = 0;
+        size_t row=0;
+        for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
+        {
+            if(row < static_cast<size_t>(first_row-1)) continue;
+            for(int64_t i=0;i<nelem;++i) buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : uint64_t(0);
+            if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
+            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<uint64Vector>","write"); }
+        }
+        delete [] buffer;
+    }
+
+    template<>
+    void FITScolumn<FITSform::floatVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
+    {
+        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<floatVector>","write");
+        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<floatVector>","write");
+        const int64_t nelem = getNelem();
+        float* buffer = new float[nelem];
+        int tbl_status = 0;
+        size_t row=0;
+        for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
+        {
+            if(row < static_cast<size_t>(first_row-1)) continue;
+            for(int64_t i=0;i<nelem;++i) buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : std::numeric_limits<float>::quiet_NaN();
+            if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
+            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<floatVector>","write"); }
+        }
+        delete [] buffer;
+    }
+
+    template<>
+    void FITScolumn<FITSform::doubleVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
+    {
+        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<doubleVector>","write");
+        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<doubleVector>","write");
+        const int64_t nelem = getNelem();
+        double* buffer = new double[nelem];
+        int tbl_status = 0;
+        size_t row=0;
+        for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
+        {
+            if(row < static_cast<size_t>(first_row-1)) continue;
+            for(int64_t i=0;i<nelem;++i) buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : std::numeric_limits<double>::quiet_NaN();
+            if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
+            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<doubleVector>","write"); }
+        }
+        delete [] buffer;
+    }
+
+    template<>
+    void FITScolumn<FITSform::complexVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
+    {
+        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<complexVector>","write");
+        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<complexVector>","write");
+        const int64_t nelem = getNelem();
+        float* buffer = new float[nelem*2];
+        int tbl_status = 0;
+        size_t row=0;
+        for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
+        {
+            if(row < static_cast<size_t>(first_row-1)) continue;
+            int64_t pos=0;
+            for(int64_t i=0;i<nelem;++i)
+            {
+                if(i < static_cast<int64_t>(it->size()))
                 {
-                    array[pos  ] = it->second[k].first;
-                    array[pos+1] = it->second[k].second;
+                    buffer[pos]   = it->at(static_cast<size_t>(i)).first;
+                    buffer[pos+1] = it->at(static_cast<size_t>(i)).second;
                 }
                 else
                 {
-                    array[pos  ] = std::numeric_limits<float>::quiet_NaN();
-                    array[pos+1] = std::numeric_limits<float>::quiet_NaN();
+                    buffer[pos]   = std::numeric_limits<float>::quiet_NaN();
+                    buffer[pos+1] = std::numeric_limits<float>::quiet_NaN();
                 }
                 pos+=2;
             }
-            
-            if(
-#if __cplusplus < 201103L
-               ffpcl(fptr      , static_cast<int>(data->getType()), static_cast<int>(data.getPosition()), n+1, 1, nelem, array, &tbl_status)
-#else
-               ffpcl(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), n+1, 1, nelem, array, &tbl_status)
-#endif
-               )
-            {
-                delete[] array;
-                throw FITSexception(tbl_status,"FITStable","writeVector<std::vector<FITSform::complex>>");
-            }
-            
-            n++;
+            if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
+            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<complexVector>","write"); }
         }
+        delete [] buffer;
+    }
 
-        delete[] array;
-        return;
+    template<>
+    void FITScolumn<FITSform::dblcomplexVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
+    {
+        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<dblcomplexVector>","write");
+        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<dblcomplexVector>","write");
+        const int64_t nelem = getNelem();
+        double* buffer = new double[nelem*2];
+        int tbl_status = 0;
+        size_t row=0;
+        for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
+        {
+            if(row < static_cast<size_t>(first_row-1)) continue;
+            int64_t pos=0;
+            for(int64_t i=0;i<nelem;++i)
+            {
+                if(i < static_cast<int64_t>(it->size()))
+                {
+                    buffer[pos]   = it->at(static_cast<size_t>(i)).first;
+                    buffer[pos+1] = it->at(static_cast<size_t>(i)).second;
+                }
+                else
+                {
+                    buffer[pos]   = std::numeric_limits<double>::quiet_NaN();
+                    buffer[pos+1] = std::numeric_limits<double>::quiet_NaN();
+                }
+                pos+=2;
+            }
+            if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
+            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<dblcomplexVector>","write"); }
+        }
+        delete [] buffer;
     }
     
     template<>
-    void FITStable::writeVector(const FITScolumn<std::vector<FITSform::dblcomplex> >* data, const int64_t& first_row)
+    void FITScolumn<FITSform::stringVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        const int64_t nelem = data->getNelem();
-        // FIX: Use dynamic allocation instead of VLA
-        double* array = new double[nelem*2];
+        if(fptr == nullptr)
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<stringVector>","write");
+        if(data.size() < 1)
+            throw FITSexception(NOT_TABLE,"FITScolumn<stringVector>","write");
 
-        size_t n = 0;
-        for(typename FITScolumn< std::vector<FITSform::dblcomplex> >::const_iterator it = data->cbegin(); it != data->cend(); it++)
+        const int64_t width  = getWidth();   // chars per string
+        size_t row = 0;
+        int tbl_status = 0;
+
+        for(col_map::const_iterator it = data.cbegin(); it != data.cend(); ++it, ++row)
         {
-            if( n < static_cast<size_t>(first_row-1))
-            {
-                n++;
-                continue;
-            }
-            
-            int64_t pos = 0;
-            for(size_t k =0; k < static_cast<size_t>(data->getNelem()); k++)
-            {
-                if(k < it->second.size())
-                {
-                    array[pos  ] = it->second[k].first;
-                    array[pos+1] = it->second[k].second;
-                }
-                else
-                {
-                    array[pos  ] = std::numeric_limits<float>::quiet_NaN();
-                    array[pos+1] = std::numeric_limits<float>::quiet_NaN();
-                }
-                pos+=2;
-            }
-            
-            if(
-#if __cplusplus < 201103L
-               ffpcl(fptr      , static_cast<int>(data->getType()), static_cast<int>(data.getPosition()), n+1, 1, nelem, array, &tbl_status)
-#else
-               ffpcl(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), n+1, 1, nelem, array, &tbl_status)
-#endif
-               )
-            {
-                delete[] array;
-                throw FITSexception(tbl_status,"FITStable","writeVector<std::vector<FITSform::complex>>");
-            }
-            
-            n++;
-        }
+            if(row < static_cast<size_t>(first_row-1)) continue;
 
-        delete[] array;
-        return;
-    }
-    
-    template< >
-    void FITStable::writeVector<std::string>(const FITScolumn<std::vector<std::string>>* data, const int64_t& first_row)
-    {
-        const int64_t nelem    = data->getWidth();
-        char   **array = new char* [1];
-        array[0] = new char [nelem];
-        
-        size_t n = 0;
-        for(typename FITScolumn<std::vector<std::string> >::const_iterator it = data->cbegin(); it != data->cend() && n < data->size(); it++)
-        {
-            if(n < static_cast<size_t>(first_row-1))
+            for(size_t k = 0; k < static_cast<size_t>(getNelem()); ++k)
             {
-                n++;
-                continue;
-            }
-            
-            for(size_t k = 0; k < static_cast<size_t>(data->getNelem()); k++)
-            {
-                std::string tmpstr = std::string();
-                int64_t nchar = 0;
-                
-                if( k < it->second.size() )
-                {
-                    nchar = static_cast<int64_t>(it->second[k].size());
-                
-                    if(it->second[k].size() > 0)
-                        tmpstr += it->second[k];
-                    else
-                        tmpstr += "NULL";
-                }
-                else
-                {
-                    tmpstr += "NULL";
-                    nchar = static_cast<int64_t>(tmpstr.size());
-                }
-                
-                int64_t setw = 0;
-                while(setw < nelem-nchar)
-                {
-                    tmpstr+=" ";
-                    setw++;
-                }
-                
-                strcpy(array[0], const_cast<char*>(tmpstr.c_str()));
-                std::cout<<array[0]<<std::endl;
-            
-                if(
-#if __cplusplus < 201103L
-                   ffpcls(fptr      , static_cast<int>(data->getPosition()), n+1, static_cast<int>(k)+1, 1, array, &tbl_status)
-#else
-                   ffpcls(fptr.get(), static_cast<int>(data->getPosition()), n+1, static_cast<int>(k)+1, 1, array, &tbl_status)
-#endif
-                   )
-                {
-                    throw FITSexception(tbl_status,"FITStable","write<std::vector<std::string>>");
-                }
-            }
-            
-            n++;
-        }
+                std::string tmp = (k < it->size() && !it->at(k).empty()) ? it->at(k) : "NULL";
+                tmp.resize(static_cast<size_t>(width), ' ');
+                char* buf = const_cast<char*>(tmp.c_str());
 
-        delete [ ] array[0];
-        delete [ ] array;
-        
-        return;
+                if(ffpcls(fptr.get(), static_cast<int>(getPosition()), static_cast<LONGLONG>(row+1),
+                          static_cast<LONGLONG>(k+1), 1, &buf, &tbl_status))
+                    throw FITSexception(tbl_status,"FITScolumn<stringVector>","write");
+            }
+        }
     }
-    
+
 #pragma mark * private member function
- 
-#if __cplusplus >= 201103L
     
-    /**
-     * @brief Cleanly close the fits file and free memory
-     * @param in Pointer to the fitsfile one want to close.
-     **/
-    void FITStable::CloseFile(fitsfile* in)
-    {
-        int status = 0;
-        if(fits_close_file(in, &status))
-            throw FITSexception(status,"FITStable","Close");
-        
-         std::cout<<"File CLOSED"<<std::endl;
-        
-        return;
-    }
-#endif
-    
-    
-    /**
-     @brief Check Fitsfile pointer validity
-     @return true if fitsfile pointer isn't a null pointer
-     @throw std::invalid_argument if fitsfile pointer is null. This may happen if the file wasn't properly openned or if the file have already been closed.
-     */
-    bool FITStable::isValid() const
-    {
-        if(
-#if __cplusplus < 201103L
-           fptr == NULL
-#else
-           fptr.use_count() == 0
-#endif
-           )
-            throw FITSexception(SHARED_NULPTR,"FITStable","ctor"," received nullptr");
-        
-        return true;
-    }
-    
-    const std::string FITStable::getFileName(fitsfile *fptr) const
-    {
-        int status;
-        
-        isValid();
-        
-        char ffname[999];
-        ffflnm(fptr, ffname, &status);
-        
-        return std::string(ffname);
-    }
-    
-    /**
-     @brief Retrive the name of the current extension
-     @return The extension name of the current HDU block or an empty string if the EXTNAME keyword wasn't found into the current HDU.
-     */
-    const std::string FITStable::getExtName() const
-    {
-        isValid();
-        
-        if(getHDUindex() == 1)
-            return std::string("PRIMARY");
-        
-        char ffname[999];
-        char ffcomment[999];
-        int status = 0;
-        
-        try
-        {
-            if(
-#if __cplusplus < 201103L
-               ffgkey(fptr, "EXTNAME",ffname, ffcomment, &status)
-#else
-               ffgkey(fptr.get(), "EXTNAME", ffname, ffcomment, &status)
-#endif
-               )
-            {
-                throw FITSexception(status,"FITStable","getExtName","FITS keyword EXTNAME wasn't found in the current HDU.");
-            }
-        }
-        catch(std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-            return std::string();
-        }
-        
-        std::string ss =  std::string(ffname);
-        while(ss.find_first_of("'") != std::string::npos)
-            ss.erase(ss.find_first_of("'"), 1);
-        
-        while(ss.find_first_of(" ") != std::string::npos)
-            ss.erase(ss.find_first_of(" "), 1);
-        
-        return ss;
-    }
-    
-    /**
-     @brief Retrive the data type of the current extension
-     @return The data type of the current HDU block.
-     */
-    const ttype FITStable::getExtType() const
-    {
-        isValid();
-        int status = 0;
-        
-        int tt = ANY_HDU;
-        
-        try
-        {
-#if __cplusplus < 201103L
-            ffghdt(fptr, &tt, &status);
-#else
-            ffghdt(fptr.get(), &tt, &status);
-#endif
-            if(status)
-                throw FITSexception(status,"FITStable","getExtType");
-        }
-        catch(std::exception& e)
-        {
-            std::cerr<<e.what()<<std::flush;
-            return static_cast<ttype>(ANY_HDU);
-        }
-        
-        return static_cast<ttype>(tt);
-    }
-    
-    /**
-     @brief Retrive the data type of the current extension
-     @return The data type of the current HDU block.
-     */
-    const int FITStable::getHDUindex() const
-    {
-        isValid();
-        
-        int tt = 0;
-        
-#if __cplusplus < 201103L
-        ffghdn(fptr, &tt);
-#else
-        ffghdn(fptr.get(), &tt);
-#endif
-        return tt;
-    }
-    
-    
-    /**
-     @brief Relaod HDU block
-     @details Make sure the fitsfile is still pointing onto the correct HDU block related to this FITStable. If it is not the case, we move back to the corresponding HDU block.
-     @note The verification of the HDU block is done by comparing the FITS header extension name of the current HDU to \c this->fextname. If \c this->fextname is empty, the comparison is done thank to the HDU block number and HDU data type. 
-     @throw logic_error if the HDU block corresponding to \c this isn't found. This may happen if the corresponding block have been deleted from the fitsfile by an other instance.
-     */
-    void FITStable::rload()
-    {
-        tbl_status = 0;
-        std::string extName     = std::string(*const_cast<std::string*>(&fextname));
-        
-        //-1 Check fits file is still valid
-        try
-        {
-            isValid();
-        }
-        catch (std::exception &e)
-        {
-            std::cerr<<e.what()<<std::endl;
-            throw;
-        }
-        
-        //-2 Check the current HDU extension name correspond to \c this->fextname
-        int hdu_type = ANY_HDU;
-        
-        if (extName.size() == 0)
-        {
-            if( fhdu_num != getHDUindex() )
-            {
-#if __cplusplus < 201103L
-                fits_movabs_hdu(fptr, fhdu_num, &hdu_type, &tbl_status);
-#else
-                fits_movabs_hdu(fptr.get(), fhdu_num, &hdu_type, &tbl_status);
-#endif
-            }
-        }
-        else if( (extName.compare(getExtName())) )
-        {
-#if __cplusplus < 201103L
-                    fits_movnam_hdu(fptr, ANY_HDU, const_cast<char*>(extName.c_str()), 0, &tbl_status)
-#else
-                    fits_movnam_hdu(fptr.get(), ANY_HDU, const_cast<char*>(extName.c_str()), 0, &tbl_status);
-#endif
-        }
-        
-        extName.clear();
-        
-        if(tbl_status)
-            throw FITSexception(tbl_status, "FITStable","rload");
-        
-        //-2 Check the current HDU extension name correspond to \c this->fextname
-        if( ftbl_type != getExtType() )
-        {
-            tbl_status = NOT_TABLE;
-            throw FITSexception(tbl_status,"FITStable","rload","Current HDU data type has been changed !!!.");
-        }
-    }
-    
-    
-    /**
+    /*
      @brief Read FITS columns and fill a FITScolumn container
      @details Reads FITS HDU block and extract all, or part, of the data associated to a TFORM.
      @param tform TForm one wish to read
      @param start Row index of the first element of the row to read
      @return pointer to the extracted FITSform
-     */
+     
     FITSform* FITStable::readArray(const FITSform& tform, const int64_t& start)
     {
         if(start < 1 || start > static_cast<int64_t>(getNrows()))
@@ -1089,7 +985,7 @@ namespace DSL
         }
         
         return new FITSform(tform);
-    }
+    }*/
     
     
     
@@ -1105,35 +1001,30 @@ namespace DSL
      @throw invalid_argument if the HDU block you wish to access does not exist.
      @throw logic_error if the HDU block you wish to access neither contains a FITS BINARY nor a FITS ASCII table.
      */
-    FITStable::FITStable(
-#if __cplusplus < 201103L
-                         fitsfile* fits
-#else
-                         std::shared_ptr<fitsfile> fits
-#endif
-                         , const int& iHDU):tbl_status(0),ftbl_type(ttype::tbinary), fextname(), fhdu_num(iHDU)
+    FITStable::FITStable(const std::shared_ptr<fitsfile>& fits,
+                        const int& iHDU):ftbl_type(ttype::tbinary),hdu(FITShdu())
     {
-        
-        int hdu_type = ANY_HDU;
+        int tbl_status = 0;
 
-        //Store adress of the current fits file
-#if __cplusplus < 201103L
-        fptr = fits;
-#else
-        fptr = std::shared_ptr<fitsfile>(fits);
-#endif
+        if(fits == nullptr || fits.use_count() == 0)
+        {
+            tbl_status = FILE_NOT_OPENED;
+            throw FITSexception(tbl_status,"FITStable","ctor","Input fitsfile pointer is null.");
+        }
+
+        int hdu_type = ANY_HDU;
+        int fhdu_num = 0;        
         
-        isValid();
-        
-        //Move to desired HDU block
-        if(
-#if __cplusplus < 201103L
-           fits_movabs_hdu(fptr, fhdu_num, &hdu_type, &tbl_status)
-#else
-           fits_movabs_hdu(fptr.get(), fhdu_num, &hdu_type, &tbl_status)
-#endif
-           )
-            throw FITSexception(tbl_status, "FITStable","ctor");
+        //Get current HDU position
+        if(fits_get_hdu_num(fits.get(), &fhdu_num))
+            throw FITSexception(SEEK_ERROR, "FITStable","ctor");
+
+        // Move to the desired HDU if it isn't the current HDU
+        if(fhdu_num != iHDU)
+        {
+            if(fits_movabs_hdu(fits.get(), fhdu_num, &hdu_type, &tbl_status))
+                throw FITSexception(tbl_status, "FITStable","ctor");
+        }
         
         ttype* tt = const_cast<ttype*>(&ftbl_type);
         
@@ -1158,10 +1049,11 @@ namespace DSL
             tbl_status = NOT_TABLE;
             throw FITSexception(tbl_status,"FITStable","ctor","Current HDU isn't a BINARY nor a ASCII FITS table.");
         }
-        
-        //Get the extension name of the HDU block
-        std::string *extname = const_cast<std::string*>(&fextname);
-        *extname = std::string(getExtName());
+
+        FITShdu tmp(fits);
+        hdu.swap(tmp);
+
+        load(fits);
     }
     
     
@@ -1175,38 +1067,23 @@ namespace DSL
      @throw invalid_argument if the HDU block you wish to access does not exist.
      @throw logic_error if the HDU block you wish to access neither contains a FITS BINARY nor a FITS ASCII table.
      */
-    FITStable::FITStable(
-#if __cplusplus < 201103L
-                         fitsfile* fits
-#else
-                         std::shared_ptr<fitsfile> fits
-#endif
-                         , const std::string& extname):tbl_status(0),ftbl_type(ttype::tbinary), fextname(extname), fhdu_num(0)
+    FITStable::FITStable(const std::shared_ptr<fitsfile>& fits,
+                         const std::string& extname):ftbl_type(ttype::tbinary),hdu(FITShdu())
     {
+        int tbl_status = 0;
+
+        if(fits == nullptr || fits.use_count() == 0)
+        {
+            tbl_status = FILE_NOT_OPENED;
+            throw FITSexception(tbl_status,"FITStable","ctor","Input fitsfile pointer is null.");
+        }
+
         int hdu_type = ANY_HDU;
-        
-        //Store adress of the current fits file
-        
-#if __cplusplus < 201103L
-        fptr = fits;
-#else
-        fptr = std::shared_ptr<fitsfile>(fits);
-#endif
-        
-        isValid();
-        
+
         //Move to desired HDU block
-        
-        if(
-#if __cplusplus < 201103L
-           fits_movnam_hdu(fptr, ANY_HDU, const_cast<char*>(extname.c_str()), 0, &tbl_status)
-#else
-           fits_movnam_hdu(fptr.get(), ANY_HDU, const_cast<char*>(extname.c_str()), 0, &tbl_status)
-#endif
-           )
+        if(fits_movnam_hdu(fits.get(), hdu_type, const_cast<char*>(extname.c_str()), 0, &tbl_status))
             throw FITSexception(tbl_status, "FITStable","ctor");
         
-        hdu_type = getExtType();
         ttype* tt = const_cast<ttype*>(&ftbl_type);
         
         switch (hdu_type) {
@@ -1230,7 +1107,11 @@ namespace DSL
             tbl_status = NOT_TABLE;
             throw FITSexception(tbl_status,"FITStable","ctor","Current HDU isn't a BINARY nor a ASCII FITS table.");
         }
+
+        FITShdu tmp(fits);
+        hdu.swap(tmp);
         
+        load(fits);
     }
     /**
      * @brief destructor
@@ -1239,11 +1120,320 @@ namespace DSL
      **/
     FITStable::~FITStable()
     {
-#if __cplusplus >= 201103L
-        fptr.~shared_ptr();
-#endif
+        for(columns_list::iterator n = fcolumns.begin(); n != fcolumns.end(); n++)
+        {
+            n->reset();
+        }
+        fcolumns.clear();
     }
     
+#pragma region -- Load table
+
+    /**
+     @brief List all column in the fitsfile.
+     @details Retrive column name and column datatype of all columns of the FITS table.
+     */
+    void FITStable::load(const std::shared_ptr<fitsfile>& fptr)
+    {
+        int tbl_status = 0;
+
+        if(fptr == nullptr || fptr.use_count() == 0)
+        {
+            tbl_status = FILE_NOT_OPENED;
+            throw FITSexception(tbl_status,"FITStable","load","Input fitsfile pointer is null.");
+        }
+
+        int ncols =0 ;
+
+        if(ffgncl(fptr.get(), &ncols, &tbl_status))
+            throw FITSexception(tbl_status,"FITStable","getNcols");
+        
+        columns_list list;
+        
+        for(size_t n = 1; n <= ncols; n++)
+        {
+            list.push_back(readColumn(fptr,n,0));
+        }
+    }
+
+    /** 
+     * 
+     */
+    std::unique_ptr<FITSform> FITStable::readColumn(const std::shared_ptr<fitsfile>& fptr, const size_t& n, const size_t& start)
+    {
+        int tbl_status = 0;
+
+        if(fptr == nullptr || fptr.use_count() == 0)
+        {
+            tbl_status = FILE_NOT_OPENED;
+            throw FITSexception(tbl_status,"FITStable","readColumn","Input fitsfile pointer is null.");
+        }
+
+        //1- Retrive column propertie for the desired column
+        //1.1- Retrive column name
+
+        char TFIELD[100];
+        int colnum = 0;
+
+        if(ffgcnn(fptr.get(), CASEINSEN, const_cast<char*>((std::to_string(n)).c_str()), TFIELD, &colnum, &tbl_status))
+            throw FITSexception(tbl_status,"FITStable","readColumn");
+        
+        //1.2- Retrive column data type
+        int data_type = 0;
+        LONGLONG trepeat;
+        LONGLONG twidth;
+
+        if(ffeqtyll(fptr.get(), colnum, &data_type, &trepeat, &twidth, &tbl_status))
+            throw FITSexception(tbl_status,"FITStable","readColumn");
+
+        //1.3- Retrive other column properties
+        long   tbcol = 0;
+        char   tunit[100];
+        double tscale = 0;
+        double tzero  = 0;
+
+        switch (ftbl_type)
+        {
+            case tascii:
+                if(ffgacl(fptr.get(), colnum, NULL, &tbcol, tunit, NULL, &tscale, &tzero, NULL, NULL, &tbl_status))
+                    throw FITSexception(tbl_status,"FITStable","listColumns");
+                break;
+                
+            case tbinary:
+                if(ffgbcl(fptr.get(), colnum, NULL, tunit, NULL, NULL, &tscale, &tzero, NULL, NULL, &tbl_status))
+                    throw FITSexception(tbl_status,"FITStable","listColumns");
+                break;
+                
+            default:
+                throw FITSwarning("FITStable","listColumns","Current header neither a BINARY nor an ASCII table.");
+                break;
+        }
+
+        //2- Create FITSform instance that embed all column properties
+        if(trepeat <= 1)
+        {
+            switch(data_type)
+            {
+                case tshort:
+                case tsbyte:
+                    {
+                        FITScolumn<int8_t>* tform = new FITScolumn<int8_t>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        read<int8_t>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                
+                case tushort:
+                case tbyte:
+                    {
+                        FITScolumn<uint8_t>* tform = new FITScolumn<uint8_t>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        read<uint8_t>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                    
+                case tint:
+                    {
+                        FITScolumn<int16_t>* tform = new FITScolumn<int16_t>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        read<int16_t>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                    
+                case tuint:
+                    {
+                        FITScolumn<uint16_t>* tform = new FITScolumn<uint16_t>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        read<uint16_t>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                    
+                case tlong:
+                    {
+                        FITScolumn<int32_t>* tform = new FITScolumn<int32_t>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        read<int32_t>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                
+                case tulong:
+                    {
+                        FITScolumn<uint32_t>* tform = new FITScolumn<uint32_t>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        read<uint32_t>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                    
+                case tlonglong:
+                    {
+                        FITScolumn<uint64_t>* tform = new FITScolumn<uint64_t>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        read<uint64_t>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                    
+                case tfloat:
+                    {
+                        FITScolumn<float>* tform = new FITScolumn<float>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        read<float>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                    
+                case tdouble:
+                    {
+                        FITScolumn<double>* tform = new FITScolumn<double>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        read<double>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                    
+                case tstring:
+                    {
+                        FITScolumn<std::string>* tform = new FITScolumn<std::string>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        read<std::string>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                  
+                case tbit:
+                case tlogical:
+                    {
+                        FITScolumn<char*>* tform = new FITScolumn<char*>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        read<char*>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                    
+                case tcplx:
+                    {
+                        FITScolumn<FITSform::complex>* tform = new FITScolumn<FITSform::complex>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        read<FITSform::complex>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                    
+                case tdbcplx:
+                    {
+                        FITScolumn<FITSform::dblcomplex>* tform = new FITScolumn<FITSform::dblcomplex>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        read<FITSform::dblcomplex>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                    
+                default:
+                    break;
+            }
+        }
+         else
+        {
+            switch(data_type)
+            {
+                case tsbyte:
+                case tshort:
+                    {
+                        FITScolumn< FITSform::int8Vector >* tform = new FITScolumn<FITSform::int8Vector>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        readVector<int8_t>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                
+                case tbyte:
+                case tushort:
+                    {
+                        FITScolumn< FITSform::uint8Vector >* tform = new FITScolumn<FITSform::uint8Vector>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        readVector<uint8_t>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                    
+                case tint:
+                    {
+                        FITScolumn< FITSform::int16Vector >* tform = new FITScolumn<FITSform::int16Vector>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        readVector<int16_t>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                    
+                case tuint:
+                    {
+                        FITScolumn< FITSform::uint16Vector >* tform = new FITScolumn<FITSform::uint16Vector>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        readVector<uint16_t>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                    
+                case tlong:
+                    {
+                        FITScolumn< FITSform::int32Vector >* tform = new FITScolumn<FITSform::int32Vector>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        readVector<int32_t>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                
+                case tulong:
+                    {
+                        FITScolumn< FITSform::uint32Vector >* tform = new FITScolumn<FITSform::uint32Vector>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        readVector<uint32_t>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                    
+                case tlonglong:
+                    {
+                        FITScolumn< FITSform::int64Vector >* tform = new FITScolumn<FITSform::int64Vector>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        readVector<int64_t>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                    
+                case tulonglong:
+                    {
+                        FITScolumn< FITSform::uint64Vector >* tform = new FITScolumn<FITSform::uint64Vector>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        readVector<uint64_t>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                    
+                case tfloat:
+                    {
+                        FITScolumn< FITSform::floatVector >* tform = new FITScolumn<FITSform::floatVector>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        readVector<float>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                    
+                case tdouble:
+                    {
+                        FITScolumn< FITSform::doubleVector >* tform = new FITScolumn<FITSform::doubleVector>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        readVector<double>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                    
+                case tstring:
+                    {
+                        if(trepeat / twidth <= 1)
+                        {
+                            FITScolumn< std::string >* tform = new FITScolumn<std::string>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                            read<std::string>(tform, fptr, start);
+                            return std::unique_ptr<FITSform>(tform);
+                        }
+                        else
+                        {
+                            FITScolumn< FITSform::stringVector >* tform = new FITScolumn<FITSform::stringVector>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                            readVector<std::string>(tform, fptr, start);
+                            return std::unique_ptr<FITSform>(tform);
+                        }
+                    }
+                  
+                case tbit:
+                case tlogical:
+                    {
+                        FITScolumn< FITSform::charVector >* tform = new FITScolumn<FITSform::charVector>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        readVector<char*>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                    
+                case tcplx:
+                    {
+                        FITScolumn< FITSform::complexVector >* tform = new FITScolumn<FITSform::complexVector>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        readVector<FITSform::complex>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                    
+                case tdbcplx:
+                    {
+                        FITScolumn< FITSform::dblcomplexVector >* tform = new FITScolumn<FITSform::dblcomplexVector>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),start);
+                        readVector<FITSform::dblcomplex>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+                    
+                default:
+                    break;
+            }
+        }
+        
+        return nullptr;
+    }
+#pragma endregion
     
 #pragma mark * Properties
     
@@ -1251,102 +1441,47 @@ namespace DSL
      @brief Get the number of rows.
      @return The number of rows in each columns
      */
-    size_t FITStable::getNrows()
+    size_t FITStable::nrows() const
     {
-        try
-        {
-            rload();
-        }
-        catch (std::exception &e)
-        {
-            std::cerr<<e.what()<<std::endl;
-            throw;
-        }
-    
-        LONGLONG nrows = 0;
-        
-        if(
-#if __cplusplus < 201103L
-           ffgnrwll(fptr, &nrows, &tbl_status)
-#else
-           ffgnrwll(fptr.get(), &nrows, &tbl_status)
-           
-#endif
-           )
-            throw FITSexception(tbl_status,"FITStable","getNrows");
-        
-        return static_cast<size_t>(nrows);
+        if(fcolumns.empty()) return 0;
+        return fcolumns.front()->size();
     }
-    
+
     /**
-     @brief Get the number of columns in the FITStable.
-     @return The number of columns.
+     @brief Get the number of rows.
+     @return The number of rows in each columns
      */
-    size_t FITStable::getNcols()
+    size_t FITStable::ncols() const
     {
-        try
-        {
-            rload();
-        }
-        catch (std::exception &e)
-        {
-            std::cerr<<e.what()<<std::endl;
-            throw;
-        }
-        
-        int ncols = 0;
-        
-        if(
-#if __cplusplus < 201103L
-           ffgncl(fptr, &ncols, &tbl_status)
-#else
-           ffgncl(fptr.get(), &ncols, &tbl_status)
-#endif
-           )
-            throw FITSexception(tbl_status,"FITStable","getNcols");
-        
-        return static_cast<size_t>(ncols);
+        if(fcolumns.empty()) return 0;
+        return fcolumns.size();
     }
-    
     
     /**
      @brief List all column.
      @details Retrive column name and column datatype of all columns of the FITS table.
      @return The list of column with their index, name and embeded datatype.
      */
-    const clist FITStable::FITStable::listColumns()
-    {
-        size_t ncols;
-        try
+    const FITStable::clist FITStable::listColumns()
+    {      
+        std::vector< std::vector<std::string> > list;
+        for(columns_list::const_iterator n = fcolumns.cbegin(); n != fcolumns.cend(); n++)
         {
-            ncols = getNcols();
-        }
-        catch (std::exception& e)
-        {
-            std::cerr<<e.what()<<std::endl;
-            throw;
-        }
-        
-        clist list = clist();
-        
-        for(size_t n = 1; n <= ncols; n++)
-        {
-            FITSform tform = columnProperties(n);
-            list.insert(std::pair<size_t,FITSform>(tform.getPosition(), tform));
+            std::vector<std::string> tform({n->get()->getName(),n->get()->getTTYPE(),n->get()->getUnit()});
+            list.push_back(tform);
         }
         
         return list;
-        
     }
     
     
-    /**
+    /*
      @brief Get FITS column properties
      @details Search FITStable header block for a specific column and retrive its intrinsec properties
      @param name name of the column of interest, defined by the TTYPEn fits keyword.
      @return container that embed the column's properties
      @note The input name may be either the correct name of the searched column or, it may contains wild card caracthers (*,? or #) or the non-null unsigned integer number of the desired column. Wild card caracters allows to provide REGEX pattern to search for the first column with TTYPEn that match the REGEX. The '*' match any sequence of caraters while '?' matches any single caracter. The '#' will matches any consecutive string of decimal digit (0-9). If more than one matches is found, the first match is returned and \c this->tbl_status is set to \c COL_NOT_UNIQUE.
-     */
+    
     const FITSform FITStable::columnProperties(const std::string& name)
     {
         //1- Make sure the current header point toward this table
@@ -1376,6 +1511,7 @@ namespace DSL
         //3- retrive column properties
         return columnProperties(colnum);
     }
+    */
     
     
     /**
@@ -1383,7 +1519,7 @@ namespace DSL
      @details Search FITStable header block for a specific column and retrive its intrinsec properties
      @param size_t& Non null unsigned inter number of the desired column
      @return container that embed the column's properties
-     */
+    
     const FITSform FITStable::columnProperties(const size_t& n)
     {
         //1- Check column indexing validity
@@ -1466,40 +1602,42 @@ namespace DSL
         //4 Deliver the container
         return tform;
     }
+    */
     
 #pragma mark * Accessing coulumn data
-    /**
+    /*
      @brief Get FITS column
      @details Search FITStable header block for a specific column and retrive the entire column
      @param name name of the column of interest, defined by the TTYPEn fits keyword.
      @return container that embed the column's properties and data
      @note The input name may be either the correct name of the searched column or, it may contains wild card caracthers (*,? or #) or the non-null unsigned integer number of the desired column. Wild card caracters allows to provide REGEX pattern to search for the first column with TTYPEn that match the REGEX. The '*' match any sequence of caraters while '?' matches any single caracter. The '#' will matches any consecutive string of decimal digit (0-9). If more than one matches is found, the first match is returned and \c this->tbl_status is set to \c COL_NOT_UNIQUE.
-     */
     FITSform* FITStable::readColumn(const std::string& name)
     {
         return readColumn(name, 1);
     }
+    */
     
     
-    /**
+    /*
      @brief Get FITS column
      @details Search FITStable header block for a specific column and retrive the entire column
      @param colnum non-null usinged integer number of the column of interest
      @return container that embed the column's properties and data
-     */
+    
     FITSform* FITStable::readColumn(const size_t& colnum)
     {
         return readColumn(colnum, 1);
     }
+    */
     
-    /**
+    /*
      @brief Get part of a FITS column
      @details Search FITStable header block for a specific column and retrive the entire column
      @param name name of the column of interest, defined by the TTYPEn fits keyword.
      @param start starting row one which to extract the data
      @return container that embed the column's properties and data
      @note The input name may be either the correct name of the searched column or, it may contains wild card caracthers (*,? or #) or the non-null unsigned integer number of the desired column. Wild card caracters allows to provide REGEX pattern to search for the first column with TTYPEn that match the REGEX. The '*' match any sequence of caraters while '?' matches any single caracter. The '#' will matches any consecutive string of decimal digit (0-9). If more than one matches is found, the first match is returned and \c this->tbl_status is set to \c COL_NOT_UNIQUE.
-     */
+    
     FITSform* FITStable::readColumn(const std::string& name, const size_t& start)
     {
         //1- Get columnProperties for the column of interest
@@ -1508,6 +1646,7 @@ namespace DSL
         //2- Retrive data
         return readColumn(form.getPosition(), start);
     }
+    */
     
     /**
      @brief Get FITS column
@@ -1515,7 +1654,7 @@ namespace DSL
      @param colnum non-null usinged integer number of the column of interest
      @param start starting row one which to extract the data
      @return container that embed the column's properties and data
-     */
+    
     FITSform* FITStable::readColumn(const size_t& column, const size_t& start)
     {
         //1- Get columnProperties for the column of interest
@@ -1523,6 +1662,7 @@ namespace DSL
         
         return readArray(form, start);
     }
+    */
     
 #pragma mark * Inserting/Updating data to column
 #pragma mark 1- Inseting new column
@@ -1535,70 +1675,160 @@ namespace DSL
      @param cname The name of the new collumn
      @param dataType The datatype of the new column
      */
-    void FITStable::InsertColumn(const std::string& cname, const std::string& tform, const std::string& tunit, int* colnum)
+    void FITStable::InsertColumn(const std::string& cname, const dtype& type, const std::string& tunit)
     {
-        try
-        {            
-            if(!
-#if __cplusplus < 201103L
-                ffgcno(fptr, CASESEN, cname.c_str(), colnum, &tbl_status)
-#else
-                ffgcno(fptr.get(), CASESEN, const_cast<char*>(cname.c_str()), colnum, &tbl_status)
-#endif
-               )
-            {
-                tbl_status = COL_NOT_UNIQUE;
-                throw FITSwarning("FITStable","InsertColumn","Column "+cname+" already exists. Please, provide a new name");
-            }
-            
-            if(
-#if __cplusplus < 201103L
-               fficol(fptr, static_cast<int>( getNcols( ) )+1, const_cast<char*>(cname.c_str()), const_cast<char*>(tform.c_str()), &tbl_status )
-#else
-               fficol(fptr.get(), static_cast<int>( getNcols( ) )+1, const_cast<char*>(cname.c_str()), const_cast<char*>(tform.c_str()), &tbl_status )
-#endif
-               )
-            {
-                throw FITSexception(tbl_status,"FITStable","InsertColumn");
-            }
-            
-            if(
-#if __cplusplus < 201103L
-               ffgcno(fptr, CASESEN, cname.c_str(), colnum, &tbl_status)
-#else
-               ffgcno(fptr.get(), CASESEN, const_cast<char*>(cname.c_str()), colnum, &tbl_status)
-#endif
-               )
-            {
-                throw FITSexception(tbl_status,"FITStable","InsertColumn","Column "+cname+" not found");
-            }
-            
-            if(tunit.size() > 0)
-            {
-                if
-                (
-#if __cplusplus < 201103L
-                 long long p = *colnum
-                 ffuky(fptr, TSTRING, const_cast<char*>(std::string("TUNIT"+std::to_string(p)).c_str()), const_cast<char*>(tunit.c_str()), "Data unit", &tbl_status )
-#else
-                 ffuky(fptr.get(), TSTRING, const_cast<char*>(std::string("TUNIT"+std::to_string(*colnum)).c_str()), const_cast<char*>(tunit.c_str()), "Data unit", &tbl_status )
-#endif
-                )
-                {
-                    throw FITSexception(tbl_status,"FITStable","InsertColumn");
-                }
-            }
-        }
-        catch (std::exception& e)
+        size_t pos = fcolumns.back()->getPosition()+1;
+        size_t nrows = fcolumns.front()->size();
+
+        switch(type)
         {
-            if(tbl_status == COL_NOT_UNIQUE)
-            {
-                std::cerr<<e.what()<<std::endl;
-                return;
-            }
-            else
-                throw;
+            case tshort:
+            case tsbyte:
+                {
+                    FITScolumn<int8_t>* col = new FITScolumn<int8_t>(cname, type, tunit,pos);
+                    for(size_t n = 0; n < nrows; n++)
+                        col->push_back(int8_t(0));
+
+                    fcolumns.push_back(std::unique_ptr<FITSform>(col));
+                    break;
+                }
+
+            case tbyte:
+            case tushort:
+                {
+                    FITScolumn<uint8_t>* col = new FITScolumn<uint8_t>(cname, type, tunit,pos);
+                    for(size_t n = 0; n < nrows; n++)
+                        col->push_back(uint8_t(0));
+
+                    fcolumns.push_back(std::unique_ptr<FITSform>(col));
+                    break;
+                }
+
+            case tint:
+                {
+                    FITScolumn<int16_t>* col = new FITScolumn<int16_t>(cname, type, tunit,pos);
+                    for(size_t n = 0; n < nrows; n++)
+                        col->push_back(int16_t(0));
+
+                    fcolumns.push_back(std::unique_ptr<FITSform>(col));
+                    break;
+                }
+
+            case tuint:
+                {
+                    FITScolumn<uint16_t>* col = new FITScolumn<uint16_t>(cname, type, tunit,pos);
+                    for(size_t n = 0; n < nrows; n++)
+                        col->push_back(uint16_t(0));
+
+                    fcolumns.push_back(std::unique_ptr<FITSform>(col));
+                    break;
+                }
+
+            case tlong:
+                {
+                    FITScolumn<int32_t>* col = new FITScolumn<int32_t>(cname, type, tunit,pos);
+                    for(size_t n = 0; n < nrows; n++)
+                        col->push_back(int32_t(0));
+
+                    fcolumns.push_back(std::unique_ptr<FITSform>(col));
+                    break;
+                }
+
+            case tulong:
+                {
+                    FITScolumn<uint32_t>* col = new FITScolumn<uint32_t>(cname, type, tunit,pos);
+                    for(size_t n = 0; n < nrows; n++)
+                        col->push_back(uint32_t(0));
+
+                    fcolumns.push_back(std::unique_ptr<FITSform>(col));
+                    break;
+                }
+
+            case tlonglong:
+                {
+                    FITScolumn<int64_t>* col = new FITScolumn<int64_t>(cname, type, tunit,pos);
+                    for(size_t n = 0; n < nrows; n++)
+                        col->push_back(int64_t(0));
+
+                    fcolumns.push_back(std::unique_ptr<FITSform>(col));
+                    break;
+                }
+
+            case tulonglong:
+                {
+                    FITScolumn<uint64_t>* col = new FITScolumn<uint64_t>(cname, type, tunit,pos);
+                    for(size_t n = 0; n < nrows; n++)
+                        col->push_back(uint64_t(0));
+
+                    fcolumns.push_back(std::unique_ptr<FITSform>(col));
+                    break;
+                }
+
+            case tfloat:
+                {
+                    FITScolumn<float>* col = new FITScolumn<float>(cname, type, tunit,pos);
+                    for(size_t n = 0; n < nrows; n++)
+                        col->push_back(float(0));
+
+                    fcolumns.push_back(std::unique_ptr<FITSform>(col));
+                    break;
+                }
+
+            case tdouble:
+                {
+                    FITScolumn<double>* col = new FITScolumn<double>(cname, type, tunit,pos);
+                    for(size_t n = 0; n < nrows; n++)
+                        col->push_back(double(0));
+
+                    fcolumns.push_back(std::unique_ptr<FITSform>(col));
+                    break;
+                }
+
+            case tstring:
+                {
+                    FITScolumn<std::string>* col = new FITScolumn<std::string>(cname, type, tunit,pos);
+                    for(size_t n = 0; n < nrows; n++)
+                        col->push_back(std::string("NULL"));
+
+                    fcolumns.push_back(std::unique_ptr<FITSform>(col));
+                    break;
+                }
+
+            case tbit:
+            case tlogical:
+                {
+                    FITScolumn<char*>* col = new FITScolumn<char*>(cname, type, tunit,pos);
+                    for(size_t n = 0; n < nrows; n++)
+                        col->push_back(const_cast<char*>("F"));
+
+                    fcolumns.push_back(std::unique_ptr<FITSform>(col));
+                    break;
+                }
+
+            case tcplx:
+                {
+                    FITScolumn<FITSform::complex>* col = new FITScolumn<FITSform::complex>(cname, type, tunit,pos);
+                    for(size_t n = 0; n < nrows; n++)
+                        col->push_back(FITSform::complex(0.0f,0.0f));
+
+                    fcolumns.push_back(std::unique_ptr<FITSform>(col));
+                    break;
+                }
+
+            case tdbcplx:
+                {
+                    FITScolumn<FITSform::dblcomplex>* col = new FITScolumn<FITSform::dblcomplex>(cname, type, tunit,pos);
+                    for(size_t n = 0; n < nrows; n++)
+                        col->push_back(FITSform::dblcomplex(0.0,0.0));
+
+                    fcolumns.push_back(std::unique_ptr<FITSform>(col));
+                    break;
+                }
+                
+            default:
+                throw FITSexception(BAD_TFORM_DTYPE,"FITStable","InsertColumn","Unsupported data type for the new column.");
         }
+
         
         return;
     }
@@ -1610,26 +1840,17 @@ namespace DSL
      
      @param col The column that will be inserted into the table.
      */
-    void FITStable::InsertColumn( FITSform* col )
+    void FITStable::InsertColumn( std::shared_ptr<FITSform> col )
     {
-        try
+        size_t nrows = fcolumns.front()->size();
+        if(col->size() != nrows)
         {
-            int colnum = 0;
-            InsertColumn(col->getName(), col->getTTYPE(), col->getUnit(), &colnum);
-            
-            if(tbl_status == COL_NOT_UNIQUE)
-                return;
-            
-            col->setPosition(colnum);
-            
-            writeArray(col,1);
-            
+            throw FITSexception(BAD_DIMEN,"FITStable","InsertColumn","The number of rows in the new column does not match the number of rows in the table.");
         }
-        catch (std::exception& e)
-        {
-            std::cerr<<e.what()<<std::endl;
-            throw;
-        }
+
+        col->setPosition(fcolumns.size()+1);
+        fcolumns.push_back(col->clone());
+
     }
     
 #pragma mark 2- Inseting value to an existing column
@@ -1640,128 +1861,21 @@ namespace DSL
      @param tform The data to be written
      @param start The row index to which one whish to start writting data
      */
-    void FITStable::writeArray(const FITSform* tform, const int64_t& start)
+    void FITStable::writeArray(const std::shared_ptr<fitsfile>& fptr, const int64_t& start)
     {
-        rload();
+        int tbl_status = 0;
         
-        if(start < 1 || start > static_cast<int64_t>(getNrows()+1))
+        if(start < 1 || start > static_cast<int64_t>(nrows()+1))
         {
             tbl_status  = BAD_ROW_NUM;
             throw FITSexception(tbl_status,"FITStable","writeArray");
         }
         
-        if(tform->getNelem() <= 1)
+        for(columns_list::const_iterator n = fcolumns.cbegin(); n != fcolumns.cend(); n++)
         {
-            switch(tform->getType())
-            {
-                case tsbyte:
-                    return write<int8_t>(dynamic_cast<const FITScolumn<int8_t>*>(tform), start);
-                    
-                case tshort:
-                    return write<short>(dynamic_cast<const FITScolumn<short>*>(tform), start);
-                    
-                case tushort:
-                    return write<unsigned short>(dynamic_cast<const FITScolumn<unsigned short>*>(tform), start);
-                    
-                case tint:
-                    return write<int>(dynamic_cast<const FITScolumn<int>*>(tform), start);
-                    
-                case tuint:
-                    return write<unsigned int>(dynamic_cast<const FITScolumn<unsigned int>*>(tform), start);
-                    
-                case tlong:
-                    return write<long int>(dynamic_cast<const FITScolumn<long int>*>(tform), start);
-                    
-                case tlonglong:
-                    return write<int64_t>(dynamic_cast<const FITScolumn<int64_t>*>(tform), start);
-                    
-                case tulong:
-                    return write<unsigned long int>(dynamic_cast<const FITScolumn<unsigned long int>*>(tform), start);
-                    
-                case tfloat:
-                    return write<float>(dynamic_cast<const FITScolumn<float>*>(tform), start);
-                    
-                case tdouble:
-                    return write<double>(dynamic_cast<const FITScolumn<double>*>(tform), start);
-                    
-                case tstring:
-                    return write<std::string>(dynamic_cast<const FITScolumn<std::string>*>(tform), start);
-                    
-                case tlogical:
-                    return write<char*>(dynamic_cast<const FITScolumn<char*>*>(tform), start);
-                    
-                case tbit:
-                    return write<char*>(dynamic_cast<const FITScolumn<char*>*>(tform), start);
-                    
-                case tbyte:
-                    return write<uint8_t>(dynamic_cast<const FITScolumn<uint8_t>*>(tform), start);
-                    
-                case tcplx:
-                    return write<FITSform::complex>(dynamic_cast<const FITScolumn<FITSform::complex>*>(tform), start);
-                    
-                case tdbcplx:
-                    return write<FITSform::dblcomplex>(dynamic_cast<const FITScolumn<FITSform::dblcomplex>*>(tform), start);
-                    
-                default:
-                    break;
-            }
+            (*n)->write(fptr, start);
         }
-        else
-        {
-            switch(tform->getType())
-            {
-                case tsbyte:
-                    return writeVector<int8_t>(dynamic_cast<const FITScolumn<std::vector<int8_t>>*>(tform), start);
-                    
-                case tshort:
-                    return writeVector<short>(dynamic_cast<const FITScolumn<std::vector<short>>*>(tform), start);
-                    
-                case tushort:
-                    return writeVector<unsigned short>(dynamic_cast<const FITScolumn<std::vector<unsigned short>>*>(tform), start);
-                    
-                case tint:
-                    return writeVector<int>(dynamic_cast<const FITScolumn<std::vector<int>>*>(tform), start);
-                    
-                case tuint:
-                    return writeVector<unsigned int>(dynamic_cast<const FITScolumn<std::vector<unsigned int>>*>(tform), start);
-                    
-                case tlong:
-                    return writeVector<long int>(dynamic_cast<const FITScolumn<std::vector<long int>>*>(tform), start);
-                    
-                case tlonglong:
-                    return writeVector<int64_t>(dynamic_cast<const FITScolumn<std::vector<int64_t>>*>(tform), start);
-                    
-                case tulong:
-                    return writeVector<unsigned long int>(dynamic_cast<const FITScolumn<std::vector<unsigned long int>>*>(tform), start);
-                    
-                case tfloat:
-                    return writeVector<float>(dynamic_cast<const FITScolumn<std::vector<float>>*>(tform), start);
-                    
-                case tdouble:
-                    return writeVector<double>(dynamic_cast<const FITScolumn<std::vector<double>>*>(tform), start);
-                    
-                case tstring:
-                    return writeVector<std::string>(dynamic_cast<const FITScolumn<std::vector<std::string>>*>(tform), start);
-                    
-                case tlogical:
-                    return writeVector<char*>(dynamic_cast<const FITScolumn<std::vector<char*>>*>(tform), start);
-                    
-                case tbit:
-                    return writeVector<char*>(dynamic_cast<const FITScolumn<std::vector<char*>>*>(tform), start);
-                    
-                case tbyte:
-                    return writeVector<uint8_t>(dynamic_cast<const FITScolumn<std::vector<uint8_t>>*>(tform), start);
-                    
-                case tcplx:
-                    return writeVector<FITSform::complex>(dynamic_cast<const FITScolumn<std::vector<FITSform::complex>>*>(tform), start);
-                    
-                case tdbcplx:
-                    return writeVector<FITSform::dblcomplex>(dynamic_cast<const FITScolumn<std::vector<FITSform::dblcomplex>>*>(tform), start);
-                    
-                default:
-                    break;
-            }
-        }
+            
         
         return;
     }
@@ -1778,25 +1892,8 @@ namespace DSL
      */
     void FITStable::Dump( std::ostream& out)
     {
-        try
-        {
-            rload();
-        }
-        catch(std::exception& e)
-        {
-            throw;
-        }
         
-        out<<"\033[31m --- "<<
-#if __cplusplus < 201103L
-            getFileName(fptr)
-#else
-            getFileName(fptr.get())<<" (\033[34m"<<fptr.use_count()<<"\033[31m)"
-#endif
-        <<" --- \033[0m"<<std::endl;
-        
-        out<<"\033[31m   |- HDU #    :\033[0m"<<fhdu_num<<" (infile ptr on HDU "<<getHDUindex()<<")"<<std::endl
-        <<"\033[31m   |- HDU TITLE:\033[0m"<<*(const_cast<std::string*>(&fextname))<<" (infile ptr on HDU "<<getExtName()<<")"<<std::endl;
+        out<<"\033[31m --- "<< (hdu.Exists("EXTNAME")? hdu.GetValueForKey("EXTNAME") : "NO NAME")<<" --- \033[0m"<<std::endl;
         
         switch (ftbl_type)
         {
@@ -1812,25 +1909,24 @@ namespace DSL
                 break;
         }
         
-        out<<"\033[31m   |- N ROWS   :\033[0m"<<getNrows()<<std::endl
-           <<"\033[31m   |- N COLS   :\033[0m"<<getNcols()<<std::endl;
+        out<<"\033[31m   |- N ROWS   :\033[0m"<<nrows()<<std::endl
+           <<"\033[31m   |- N COLS   :\033[0m"<<ncols()<<std::endl;
         
-        clist columns = listColumns();
-        for(clist::const_iterator it = columns.cbegin(); it != columns.cend(); it++)
+        for(columns_list::const_iterator it = fcolumns.cbegin(); it != fcolumns.cend(); it++)
         {
             
-            out<<"\033[31m   |- COL #\033[0m"<<it->second.getPosition()<<std::endl
-               <<"\033[31m   |   |- NAME  : \033[0m"<<it->second.getName()<<std::endl
-               <<"\033[31m   |   |- UNIT  : \033[0m"<<it->second.getUnit()<<std::endl
-               <<"\033[31m   |   |- TYPE  : \033[0m"<<FITSform::getDataType(it->second.getType())<<std::endl
-               <<"\033[31m   |   |- SCALE : \033[0m"<<it->second.getScale()<<std::endl;
+            out<<"\033[31m   |- COL #\033[0m"<<(*it)->getPosition()<<std::endl
+               <<"\033[31m   |   |- NAME  : \033[0m"<<(*it)->getName()<<std::endl
+               <<"\033[31m   |   |- UNIT  : \033[0m"<<(*it)->getUnit()<<std::endl
+               <<"\033[31m   |   |- TYPE  : \033[0m"<<FITSform::getDataType((*it)->getType())<<std::endl
+               <<"\033[31m   |   |- SCALE : \033[0m"<<(*it)->getScale()<<std::endl;
             
-            if(it->second.getNelem() > 1)
-                out<<"\033[31m   |   |- NELEM : \033[0m"<<it->second.getNelem()<<std::endl;
-            if(it->second.getWidth() > 0)
-                out<<"\033[31m   |   |- WIDTH : \033[0m"<<it->second.getWidth()<<" bytes/elmts"<<std::endl;
+            if((*it)->getNelem() > 1)
+                out<<"\033[31m   |   |- NELEM : \033[0m"<<(*it)->getNelem()<<std::endl;
+            if((*it)->getWidth() > 0)
+                out<<"\033[31m   |   |- WIDTH : \033[0m"<<(*it)->getWidth()<<" bytes/elmts"<<std::endl;
             
-            out<<"\033[31m   |   `- ZERO  : \033[0m"<<it->second.getZero()<<std::endl;
+            out<<"\033[31m   |   `- ZERO  : \033[0m"<<(*it)->getZero()<<std::endl;
         }
         
         out<<"\033[31m   `- \033[34mDONE\033[0m"<<std::endl;
