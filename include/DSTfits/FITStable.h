@@ -23,6 +23,7 @@
 #include <limits>
 #include <stdexcept>
 #include <functional>
+#include <iomanip> // added for hex formatting
 
 #include "FITShdu.h"
 #include "FITSdata.h"
@@ -217,7 +218,9 @@ namespace DSL
         size_t size() const override { return data.size(); }
         void push_back(const std::any& value) override
         {
-            data.push_back( std::any_cast<T>(value) );
+            const T v = std::any_cast<T>(value);
+            Update(v);              // update width/repeat metadata
+            data.push_back(v);
         }
         
 #pragma endregion
@@ -716,7 +719,6 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
     void FITScolumn<T>::Dump( std::ostream& fout) const
     {
         FITSform::Dump(fout);
-        
         size_t n=0;
         for(typename col_map::const_iterator it = data.cbegin(); it != data.cend(); it++)
         {
@@ -724,6 +726,145 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
             dump(fout,*it);
             fout<<std::endl;
             n++;
+        }
+    }
+
+    // --- Added specialized Dump implementations for byte/short columns ---
+
+    template<>
+    inline void DSL::FITScolumn<int8_t>::Dump(std::ostream& fout) const
+    {
+        FITSform::Dump(fout);
+        size_t n = 0;
+        for(const auto& v : data)
+        {
+            switch (getType())
+            {
+                case tshort:
+                    fout << "    ["<<n<<"]   "
+                         << static_cast<int16_t>(v)
+                         << std::endl;
+                    break;
+                
+                default:
+                    fout << "    ["<<n<<"]   0x"
+                         << std::uppercase << std::hex
+                         << std::setw(2) << std::setfill('0')
+                         << static_cast<unsigned int>(static_cast<uint8_t>(v))
+                         << std::dec << std::nouppercase << std::endl;
+                    break;
+            }
+            ++n;
+        }
+    }
+
+    template<>
+    inline void DSL::FITScolumn<uint8_t>::Dump(std::ostream& fout) const
+    {
+        FITSform::Dump(fout);
+        size_t n = 0;
+        for(const auto& v : data)
+        {
+            switch (getType())
+            {
+                case tushort:
+                    fout << "    ["<<n<<"]   "
+                         << static_cast<uint16_t>(v)
+                         << std::endl;
+                    break;
+
+                default:
+                    fout << "    ["<<n<<"]   0x"
+                         << std::uppercase << std::hex
+                         << std::setw(2) << std::setfill('0')
+                         << static_cast<unsigned int>(static_cast<uint8_t>(v))
+                         << std::dec << std::nouppercase << std::endl;
+                    break;
+            }
+            ++n;
+        }
+    }
+
+    template<>
+    inline void DSL::FITScolumn< std::vector<uint8_t> >::Dump(std::ostream& fout) const
+    {
+        FITSform::Dump(fout);
+        size_t row = 0;
+        for(const auto& vec : data)
+        {
+            fout << "    ["<<row<<"]   size="<<vec.size();
+            if(!vec.empty())
+            {
+                switch (getType())
+                {
+                    case tushort:
+                        fout << " first=" << static_cast<uint16_t>(vec.front())
+                             << " last="  << static_cast<uint16_t>(vec.back());
+                        break;
+                    default:
+                        fout << " first=0x"
+                             << std::uppercase << std::hex << std::setw(2) << std::setfill('0')
+                             << static_cast<unsigned int>(vec.front())
+                             << " last=0x"
+                             << std::setw(2) << std::setfill('0')
+                             << static_cast<unsigned int>(vec.back())
+                             << std::dec << std::nouppercase;
+                        break;
+                }
+            }
+            fout << std::endl;
+            size_t idx = 0;
+            for(const auto& b : vec)
+            {
+                switch (getType())
+                {
+                    case tushort:
+                        fout << "         ("<<idx<<")   "
+                             << static_cast<uint16_t>(b)
+                             << std::endl;
+                        break;
+                    default:
+                        fout << "         ("<<idx<<")  0x"
+                             << std::uppercase << std::hex << std::setw(2) << std::setfill('0')
+                             << static_cast<unsigned int>(b)
+                             << std::dec << std::nouppercase << std::endl;
+                        break;
+                }
+                ++idx;
+            }
+            ++row;
+        }
+    }
+
+    template<>
+    inline void DSL::FITScolumn< std::vector<int8_t> >::Dump(std::ostream& fout) const
+    {
+        FITSform::Dump(fout);
+        size_t row = 0;
+        for(const auto& vec : data)
+        {
+            fout << "    ["<<row<<"]   size="<<vec.size();
+            if(!vec.empty())
+            {
+                fout << " first=0x"
+                     << std::uppercase << std::hex << std::setw(2) << std::setfill('0')
+                     << static_cast<unsigned int>(vec.front())
+                     << " last=0x"
+                     << std::setw(2) << std::setfill('0')
+                     << static_cast<int>(vec.back())
+                     << std::dec << std::nouppercase;
+            }
+            fout << std::endl;
+            size_t idx = 0;
+            for(const auto& b : vec)
+            {
+                fout << "         ("<<idx<<")  0x"
+                     << std::uppercase << std::hex << std::setw(2) << std::setfill('0')
+                     << static_cast<int>(b)
+                     << std::dec << std::nouppercase << std::endl;
+                ++idx;
+            }
+            ++row;
         }
     }
     
@@ -745,25 +886,38 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
     template< typename Q >
     void FITScolumn<T>::dump( std::ostream& fout, const std::vector<Q>& data) const
     {
-        if(data.size() < 1)
+        // Fixed: treat 'data' as a single row vector, not a vector-of-vectors.
+        if(data.empty())
             return;
-        
-        fout<<data[0]<<" ... "<<data[data.size()-1]<<std::endl;
-        for(size_t n = 0; n < data.size(); n++)
-            fout<<"         ("<<n<<")   "<<data[n]<<std::endl;
+        fout << "size=" << data.size()
+             << " first=" << data.front()
+             << " last="  << data.back()
+             << std::endl;
+        size_t idx = 0;
+        for(const auto& v : data)
+        {
+            fout << "         ("<<idx<<")   " << v << std::endl;
+            ++idx;
+        }
     }
     
     template< typename T>
     template< typename L >
     void FITScolumn<T>::dump( std::ostream& fout, const std::vector< std::pair<L,L> >& data) const
     {
-        if(data.size() < 1)
+        // Fixed: same logic as above for vector of pairs.
+        if(data.empty())
             return;
-
-        fout<<data[0].first<<" , "<<data[0].second<<" ... "<<data[data.size()-1].first<<" , "<<data[data.size()-1].second<<std::endl;
-        for(size_t n = 0; n < data.size(); n++)
-            fout<<"         ("<<n<<")   "<<data[n].first<<" , "<<data[n].second<<std::endl;
-        
+        fout << "size=" << data.size()
+             << " first=" << data.front().first << " , " << data.front().second
+             << " last="  << data.back().first  << " , " << data.back().second
+             << std::endl;
+        size_t idx = 0;
+        for(const auto& p : data)
+        {
+            fout << "         ("<<idx<<")   " << p.first << " , " << p.second << std::endl;
+            ++idx;
+        }
     }
     
 }

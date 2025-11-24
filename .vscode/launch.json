@@ -58,6 +58,17 @@
         "cwd": "${workspaceRoot}",
         "MIMode": "lldb",
         "preLaunchTask": "make gtest"
+    },
+    {
+        "type": "cppdbg",
+        "request": "launch",
+        "name": "gTest_form (LLDB)",
+        "program": "${workspaceRoot}/build/exe/gTest_form",
+        "args": [],
+        "env": [],
+        "cwd": "${workspaceRoot}",
+        "MIMode": "lldb",
+        "preLaunchTask": "make gtest"
     }
     ]
 }

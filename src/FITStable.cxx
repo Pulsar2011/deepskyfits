@@ -279,18 +279,18 @@ namespace DSL
 #pragma mark * modifier
     void FITSform::Dump( std::ostream& out) const
     {
-        out<<"\033[31m- COL #\033[0m"<<fpos<<std::endl
-           <<"\033[31m   |- NAME  : \033[0m"<<fname<<std::endl
-           <<"\033[31m   |- UNIT  : \033[0m"<<funit<<std::endl
-           <<"\033[31m   |- TYPE  : \033[0m"<<getDataType(ftype)<<std::endl;
+        out<<"\033[32m- COL #\033[0m "<<fpos<<std::endl
+           <<"\033[32m   |- NAME  : \033[0m"<<fname<<std::endl
+           <<"\033[32m   |- UNIT  : \033[0m"<<funit<<std::endl
+           <<"\033[32m   |- TYPE  : \033[0m"<<getDataType(ftype)<<std::endl;
         
         if(frepeat > 1)
-            out<<"\033[31m   |- NELEM : \033[0m"<<frepeat<<std::endl;
+            out<<"\033[32m   |- NELEM : \033[0m"<<frepeat<<std::endl;
         if(fwidth > 0)
-            out<<"\033[31m   |- WIDTH : \033[0m"<<fwidth<<" bytes/elmts"<<std::endl;
+            out<<"\033[32m   |- WIDTH : \033[0m"<<fwidth<<" bytes/elmts"<<std::endl;
         
-        out<<"\033[31m   |- SCALE : \033[0m"<<fscale<<std::endl
-           <<"\033[31m   `- ZERO  : \033[0m"<<fzero<<std::endl;
+        out<<"\033[32m   |- SCALE : \033[0m"<<fscale<<std::endl
+           <<"\033[32m   `- ZERO  : \033[0m"<<fzero<<std::endl;
         
         return;
     }
