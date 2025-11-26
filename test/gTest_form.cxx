@@ -22,14 +22,14 @@ TEST(FITSform_TypeMapping, getDataType_and_getDataTypeID_All)
 {
     struct Case { dtype id; const char* name; const char* ttypeSuffix; };
     std::vector<Case> cases = {
-        { tsbyte,     "SBYTE",  "S" },
+        { tsbyte,     "SBYTE",  "B" },
         { tshort,     "SHORT",  "I" },
-        { tushort,    "USHORT", "U" },
-        { tint,       "INT",    "I4" },
-        { tuint,      "UINT",   "V" },
-        { tlong,      "LONG",   "I8" },
+        { tushort,    "USHORT", "I" },
+        { tint,       "INT",    "I" },
+        { tuint,      "UINT",   "I" },
+        { tlong,      "LONG",   "J" },
         { tlonglong,  "LONGLONG","K" },
-        { tulong,     "ULONG",  "U8" },
+        { tulong,     "ULONG",  "J" },
         { tfloat,     "FLOAT",  "E" },
         { tdouble,    "DOUBLE", "D" },
         { tlogical,   "BOOL",   "L" },
@@ -58,14 +58,16 @@ TEST(FITScolumn_Scalar, SByte)
     EXPECT_EQ(col.size(), 1u);
     EXPECT_EQ(col.getNelem(), 1);
     EXPECT_EQ(col.getWidth(), (int64_t)sizeof(int8_t));
-    ExpectTTYPE(col, "S");
+    EXPECT_EQ(col.getScale(), 1.0);
+    EXPECT_EQ(col.getZero(), -128);
+    ExpectTTYPE(col, "B");
     auto dup = col.clone();
     EXPECT_EQ(dup->size(), col.size());
     std::ostringstream oss; col.Dump(oss);
     std::string dump = oss.str();
     EXPECT_NE(dump.find("COL_SB"), std::string::npos);
     EXPECT_NE(dump.find("SBYTE"), std::string::npos);
-    EXPECT_NE(dump.find("[0]"), std::string::npos);
+    EXPECT_NE(dump.find("\033[31m[\033[0m0\033[31m]\033[0m"), std::string::npos);
     EXPECT_NE(dump.find("0x2A"), std::string::npos);
 }
 
@@ -77,24 +79,28 @@ TEST(FITScolumn_Scalar, Byte)
     EXPECT_EQ(col.size(), 1u);
     EXPECT_EQ(col.getNelem(), 1);
     EXPECT_EQ(col.getWidth(), (int64_t)sizeof(uint8_t));
+    EXPECT_EQ(col.getScale(), 1.0);
+    EXPECT_EQ(col.getZero(), 0.);
     ExpectTTYPE(col, "B");
     std::ostringstream oss; col.Dump(oss);
     std::string dump = oss.str();
     EXPECT_NE(dump.find("COL_UB"), std::string::npos);
     EXPECT_NE(dump.find("BYTE"), std::string::npos);
-    EXPECT_NE(dump.find("[0]"), std::string::npos);
+    EXPECT_NE(dump.find("\033[31m[\033[0m0\033[31m]\033[0m"), std::string::npos);
     EXPECT_NE(dump.find("0x11"), std::string::npos);
 }
 
-TEST(FITScolumn_Scalar, Int8)
+TEST(FITScolumn_Scalar, Short)
 {
-    FITScolumn<int8_t> col("COL_S8", tshort, "", 1);
-    col.push_back(std::any(int8_t(42)));
+    FITScolumn<int16_t> col("COL_S8", tshort, "", 1);
+    col.push_back(std::any(int16_t(42)));
     EXPECT_EQ(col.getName(), "COL_S8");
     EXPECT_EQ(col.getType(), tshort);
     EXPECT_EQ(col.size(), 1u);
     EXPECT_EQ(col.getNelem(), 1);
-    EXPECT_EQ(col.getWidth(), (int64_t)sizeof(int8_t));
+    EXPECT_EQ(col.getWidth(), (int64_t)sizeof(int16_t));
+    EXPECT_EQ(col.getScale(), 1.0);
+    EXPECT_EQ(col.getZero(), 0.);
     ExpectTTYPE(col, "I");
     auto dup = col.clone();
     EXPECT_EQ(dup->size(), col.size());
@@ -102,28 +108,30 @@ TEST(FITScolumn_Scalar, Int8)
     std::string dump = oss.str();
     EXPECT_NE(dump.find("COL_S8"), std::string::npos);
     EXPECT_NE(dump.find("SHORT"), std::string::npos);
-    EXPECT_NE(dump.find("[0]"), std::string::npos);
+    EXPECT_NE(dump.find("\033[31m[\033[0m0\033[31m]\033[0m"), std::string::npos);
     EXPECT_NE(dump.find("42"), std::string::npos);
 }
 
-TEST(FITScolumn_Scalar, UInt8)
+TEST(FITScolumn_Scalar, UShort)
 {
-    FITScolumn<uint8_t> col("COL_UB", tushort, "", 1);
-    col.push_back((uint8_t) 17 );
+    FITScolumn<uint16_t> col("COL_UB", tushort, "", 1);
+    col.push_back((uint16_t) 17 );
     EXPECT_EQ(col.getType(), tushort);
     EXPECT_EQ(col.size(), 1u);
     EXPECT_EQ(col.getNelem(), 1);
-    EXPECT_EQ(col.getWidth(), (int64_t)sizeof(uint8_t));
-    ExpectTTYPE(col, "U");
+    EXPECT_EQ(col.getWidth(), (int64_t)sizeof(uint16_t));
+    EXPECT_EQ(col.getScale(), 1.0);
+    EXPECT_EQ(col.getZero(), 32768);
+    ExpectTTYPE(col, "I");
     std::ostringstream oss; col.Dump(oss);
     std::string dump = oss.str();
     EXPECT_NE(dump.find("COL_UB"), std::string::npos);
     EXPECT_NE(dump.find("USHORT"), std::string::npos);
-    EXPECT_NE(dump.find("[0]"), std::string::npos);
+    EXPECT_NE(dump.find("\033[31m[\033[0m0\033[31m]\033[0m"), std::string::npos);
     EXPECT_NE(dump.find("17"), std::string::npos);
 }
 
-TEST(FITScolumn_Scalar, Int16)
+TEST(FITScolumn_Scalar, Int)
 {
     FITScolumn<int16_t> col("COL_I16", tint, "", 2);
     col.push_back(std::any(int16_t(-3)));
@@ -131,16 +139,18 @@ TEST(FITScolumn_Scalar, Int16)
     EXPECT_EQ(col.size(), 1u);
     EXPECT_EQ(col.getNelem(), 1);
     EXPECT_EQ(col.getWidth(), (int64_t)sizeof(int16_t));
-    ExpectTTYPE(col, "I4");
+    EXPECT_EQ(col.getScale(), 1.0);
+    EXPECT_EQ(col.getZero(), 0.);
+    ExpectTTYPE(col, "J");
     std::ostringstream oss; col.Dump(oss);
     std::string dump = oss.str();
     EXPECT_NE(dump.find("COL_I16"), std::string::npos);
     EXPECT_NE(dump.find("INT"), std::string::npos);
-    EXPECT_NE(dump.find("[0]"), std::string::npos);
+    EXPECT_NE(dump.find("\033[31m[\033[0m0\033[31m]\033[0m"), std::string::npos);
     EXPECT_NE(dump.find("-3"), std::string::npos);
 }
 
-TEST(FITScolumn_Scalar, Uint16)
+TEST(FITScolumn_Scalar, UInt)
 {
     FITScolumn<uint16_t> col("COL_U16", tuint, "", 3);
     col.push_back(std::any(uint16_t(65535)));
@@ -148,16 +158,18 @@ TEST(FITScolumn_Scalar, Uint16)
     EXPECT_EQ(col.size(), 1u);
     EXPECT_EQ(col.getNelem(), 1);
     EXPECT_EQ(col.getWidth(), (int64_t)sizeof(uint16_t));
-    ExpectTTYPE(col, "V");
+    EXPECT_EQ(col.getScale(), 1.0);
+    EXPECT_EQ(col.getZero(), 2147483648.0);
+    ExpectTTYPE(col, "J");
     std::ostringstream oss; col.Dump(oss);
     std::string dump = oss.str();
     EXPECT_NE(dump.find("COL_U16"), std::string::npos);
     EXPECT_NE(dump.find("UINT"), std::string::npos);
-    EXPECT_NE(dump.find("[0]"), std::string::npos);
+    EXPECT_NE(dump.find("\033[31m[\033[0m0\033[31m]\033[0m"), std::string::npos);
     EXPECT_NE(dump.find("65535"), std::string::npos);
 }
 
-TEST(FITScolumn_Scalar, Int32)
+TEST(FITScolumn_Scalar, Long)
 {
     FITScolumn<int32_t> col("COL_I32", tlong, "", 4);
     col.push_back(std::any(int32_t(-123456)));
@@ -165,16 +177,18 @@ TEST(FITScolumn_Scalar, Int32)
     EXPECT_EQ(col.size(), 1u);
     EXPECT_EQ(col.getNelem(), 1);
     EXPECT_EQ(col.getWidth(), (int64_t)sizeof(int32_t));
-    ExpectTTYPE(col, "I8");
+    EXPECT_EQ(col.getScale(), 1.0);
+    EXPECT_EQ(col.getZero(), 0.);
+    ExpectTTYPE(col, "J");
     std::ostringstream oss; col.Dump(oss);
     std::string dump = oss.str();
     EXPECT_NE(dump.find("COL_I32"), std::string::npos);
     EXPECT_NE(dump.find("LONG"), std::string::npos);
-    EXPECT_NE(dump.find("[0]"), std::string::npos);
+    EXPECT_NE(dump.find("\033[31m[\033[0m0\033[31m]\033[0m"), std::string::npos);
     EXPECT_NE(dump.find("-123456"), std::string::npos);
 }
 
-TEST(FITScolumn_Scalar, UInt32)
+TEST(FITScolumn_Scalar, ULong)
 {
     FITScolumn<uint32_t> col("COL_U32", tulong, "", 5);
     col.push_back(std::any(uint32_t(123456)));
@@ -182,16 +196,18 @@ TEST(FITScolumn_Scalar, UInt32)
     EXPECT_EQ(col.size(), 1u);
     EXPECT_EQ(col.getNelem(), 1);
     EXPECT_EQ(col.getWidth(), (int64_t)sizeof(uint32_t));
-    ExpectTTYPE(col, "U8");
+    EXPECT_EQ(col.getScale(), 1.0);
+    EXPECT_EQ(col.getZero(), 2147483648.);
+    ExpectTTYPE(col, "J");
     std::ostringstream oss; col.Dump(oss);
     std::string dump = oss.str();
     EXPECT_NE(dump.find("COL_U32"), std::string::npos);
     EXPECT_NE(dump.find("ULONG"), std::string::npos);
-    EXPECT_NE(dump.find("[0]"), std::string::npos);
+    EXPECT_NE(dump.find("\033[31m[\033[0m0\033[31m]\033[0m"), std::string::npos);
     EXPECT_NE(dump.find("123456"), std::string::npos);
 }
 
-TEST(FITScolumn_Scalar, Int64)
+TEST(FITScolumn_Scalar, LongLong)
 {
     FITScolumn<int64_t> col("COL_I64", tlonglong, "", 6);
     col.push_back(std::any(int64_t(-9)));
@@ -199,12 +215,14 @@ TEST(FITScolumn_Scalar, Int64)
     EXPECT_EQ(col.size(), 1u);
     EXPECT_EQ(col.getNelem(), 1);
     EXPECT_EQ(col.getWidth(), (int64_t)sizeof(int64_t));
+    EXPECT_EQ(col.getScale(), 1.0);
+    EXPECT_EQ(col.getZero(), 0.);
     ExpectTTYPE(col, "K");
     std::ostringstream oss; col.Dump(oss);
     std::string dump = oss.str();
     EXPECT_NE(dump.find("COL_I64"), std::string::npos);
     EXPECT_NE(dump.find("LONGLONG"), std::string::npos);
-    EXPECT_NE(dump.find("[0]"), std::string::npos);
+    EXPECT_NE(dump.find("\033[31m[\033[0m0\033[31m]\033[0m"), std::string::npos);
     EXPECT_NE(dump.find("-9"), std::string::npos);
 }
 
@@ -221,7 +239,7 @@ TEST(FITScolumn_Scalar, Float)
     std::string dump = oss.str();
     EXPECT_NE(dump.find("COL_F"), std::string::npos);
     EXPECT_NE(dump.find("FLOAT"), std::string::npos);
-    EXPECT_NE(dump.find("[0]"), std::string::npos);
+    EXPECT_NE(dump.find("\033[31m[\033[0m0\033[31m]\033[0m"), std::string::npos);
     EXPECT_NE(dump.find("1.25"), std::string::npos);
 }
 
@@ -238,11 +256,11 @@ TEST(FITScolumn_Scalar, Double)
     std::string dump = oss.str();
     EXPECT_NE(dump.find("COL_D"), std::string::npos);
     EXPECT_NE(dump.find("DOUBLE"), std::string::npos);
-    EXPECT_NE(dump.find("[0]"), std::string::npos);
+    EXPECT_NE(dump.find("\033[31m[\033[0m0\033[31m]\033[0m"), std::string::npos);
     EXPECT_NE(dump.find("-2.5"), std::string::npos);
 }
 
-TEST(FITScolumn_Scalar, ComplexFloatPair)
+TEST(FITScolumn_Scalar, ComplexFloat)
 {
     FITScolumn<FITSform::complex> col("COL_CF", tcplx, "", 9);
     col.push_back(std::any(FITSform::complex(1.0f,2.0f)));
@@ -255,11 +273,11 @@ TEST(FITScolumn_Scalar, ComplexFloatPair)
     std::string dump = oss.str();
     EXPECT_NE(dump.find("COL_CF"), std::string::npos);
     EXPECT_NE(dump.find("COMPLEX"), std::string::npos);
-    EXPECT_NE(dump.find("[0]"), std::string::npos);
+    EXPECT_NE(dump.find("\033[31m[\033[0m0\033[31m]\033[0m"), std::string::npos);
     EXPECT_NE(dump.find("1 , 2"), std::string::npos);
 }
 
-TEST(FITScolumn_Scalar, ComplexDoublePair)
+TEST(FITScolumn_Scalar, ComplexDouble)
 {
     FITScolumn<FITSform::dblcomplex> col("COL_CD", tdbcplx, "", 10);
     col.push_back(std::any(FITSform::dblcomplex(3.0,4.0)));
@@ -272,11 +290,11 @@ TEST(FITScolumn_Scalar, ComplexDoublePair)
     std::string dump = oss.str();
     EXPECT_NE(dump.find("COL_CD"), std::string::npos);
     EXPECT_NE(dump.find("DOUBLE COMPLEX"), std::string::npos);
-    EXPECT_NE(dump.find("[0]"), std::string::npos);
+    EXPECT_NE(dump.find("\033[31m[\033[0m0\033[31m]\033[0m"), std::string::npos);
     EXPECT_NE(dump.find("3 , 4"), std::string::npos);
 }
 
-TEST(FITScolumn_Scalar, LogicalCharPtr)
+TEST(FITScolumn_Scalar, Logical)
 {
     FITScolumn<char*> col("COL_LOG", tlogical, "", 11);
     col.push_back(std::any((char*)"T"));
@@ -289,11 +307,11 @@ TEST(FITScolumn_Scalar, LogicalCharPtr)
     std::string dump = oss.str();
     EXPECT_NE(dump.find("COL_LOG"), std::string::npos);
     EXPECT_NE(dump.find("BOOL"), std::string::npos);
-    EXPECT_NE(dump.find("[0]"), std::string::npos);
+    EXPECT_NE(dump.find("\033[31m[\033[0m0\033[31m]\033[0m"), std::string::npos);
     EXPECT_NE(dump.find("T"), std::string::npos);
 }
 
-TEST(FITScolumn_Scalar, BitCharPtr)
+TEST(FITScolumn_Scalar, Bit)
 {
     FITScolumn<char*> col("COL_BIT", tbit, "", 12);
     col.push_back(std::any((char*)"F"));
@@ -306,7 +324,7 @@ TEST(FITScolumn_Scalar, BitCharPtr)
     std::string dump = oss.str();
     EXPECT_NE(dump.find("COL_BIT"), std::string::npos);
     EXPECT_NE(dump.find("BIT"), std::string::npos);
-    EXPECT_NE(dump.find("[0]"), std::string::npos);
+    EXPECT_NE(dump.find("\033[31m[\033[0m0\033[31m]\033[0m"), std::string::npos);
     EXPECT_NE(dump.find("F"), std::string::npos);
 }
 
@@ -323,7 +341,7 @@ TEST(FITScolumn_Scalar, String)
     std::string dump = oss.str();
     EXPECT_NE(dump.find("COL_STR"), std::string::npos);
     EXPECT_NE(dump.find("STRING"), std::string::npos);
-    EXPECT_NE(dump.find("[0]"), std::string::npos);
+    EXPECT_NE(dump.find("\033[31m[\033[0m0\033[31m]\033[0m"), std::string::npos);
     EXPECT_NE(dump.find("ABC"), std::string::npos);
 }
 
@@ -349,7 +367,7 @@ TEST(FITScolumn_Vector, SByteVector)
     EXPECT_EQ(col.size(), 1u);
     EXPECT_EQ(col.getNelem(), 3);
     EXPECT_EQ(col.getWidth(), (int64_t)sizeof(int8_t));
-    ExpectTTYPEVec(col, "S");
+    ExpectTTYPEVec(col, "B");
     std::ostringstream oss; col.Dump(oss);
     std::string dump = oss.str();
     EXPECT_NE(dump.find("V_SB"), std::string::npos);
@@ -378,43 +396,43 @@ TEST(FITScolumn_Vector, ByteVector)
     EXPECT_NE(dump.find("(2)  0x45"), std::string::npos);
 }
 
-TEST(FITScolumn_Vector, Int16Vector)
+TEST(FITScolumn_Vector, ShortVector)
 {
-    FITScolumn<std::vector<int16_t>> col("V_I16", tint, "", 3);
+    FITScolumn<std::vector<int16_t>> col("V_I16", tshort, "", 3);
     col.push_back(std::vector<int16_t>{ -3, 4, 8 });
-    EXPECT_EQ(col.getType(), tint);
+    EXPECT_EQ(col.getType(), tshort);
     EXPECT_EQ(col.size(), 1u);
     EXPECT_EQ(col.getNelem(), 3);
     EXPECT_EQ(col.getWidth(), (int64_t)sizeof(int16_t));
-    ExpectTTYPEVec(col, "I4");
+    ExpectTTYPEVec(col, "I");
     std::ostringstream oss; col.Dump(oss);
     std::string dump = oss.str();
     EXPECT_NE(dump.find("V_I16"), std::string::npos);
-    EXPECT_NE(dump.find("INT"), std::string::npos);
+    EXPECT_NE(dump.find("SHORT"), std::string::npos);
     EXPECT_NE(dump.find("(0)   -3"), std::string::npos);
     EXPECT_NE(dump.find("(1)   4"), std::string::npos);
     EXPECT_NE(dump.find("(2)   8"), std::string::npos);
 }
 
-TEST(FITScolumn_Vector, UInt16Vector)
+TEST(FITScolumn_Vector, UShortVector)
 {
-    FITScolumn<std::vector<uint16_t>> col("V_U16", tuint, "", 4);
+    FITScolumn<std::vector<uint16_t>> col("V_U16", tushort, "", 4);
     col.push_back(std::vector<uint16_t>{ 65535, 1, 2 });
-    EXPECT_EQ(col.getType(), tuint);
+    EXPECT_EQ(col.getType(), tushort);
     EXPECT_EQ(col.size(), 1u);
     EXPECT_EQ(col.getNelem(), 3);
     EXPECT_EQ(col.getWidth(), (int64_t)sizeof(uint16_t));
-    ExpectTTYPEVec(col, "V");
+    ExpectTTYPEVec(col, "I");
     std::ostringstream oss; col.Dump(oss);
     std::string dump = oss.str();
     EXPECT_NE(dump.find("V_U16"), std::string::npos);
-    EXPECT_NE(dump.find("UINT"), std::string::npos);
+    EXPECT_NE(dump.find("USHORT"), std::string::npos);
     EXPECT_NE(dump.find("(0)   65535"), std::string::npos);
     EXPECT_NE(dump.find("(1)   1"), std::string::npos);
     EXPECT_NE(dump.find("(2)   2"), std::string::npos);
 }
 
-TEST(FITScolumn_Vector, Int32Vector)
+TEST(FITScolumn_Vector, LongVector)
 {
     FITScolumn<std::vector<int32_t>> col("V_I32", tlong, "", 5);
     col.push_back(std::vector<int32_t>{ -123456, 7, 99 });
@@ -422,7 +440,7 @@ TEST(FITScolumn_Vector, Int32Vector)
     EXPECT_EQ(col.size(), 1u);
     EXPECT_EQ(col.getNelem(), 3);
     EXPECT_EQ(col.getWidth(), (int64_t)sizeof(int32_t));
-    ExpectTTYPEVec(col, "I8");
+    ExpectTTYPEVec(col, "J");
     std::ostringstream oss; col.Dump(oss);
     std::string dump = oss.str();
     EXPECT_NE(dump.find("V_I32"), std::string::npos);
@@ -432,7 +450,7 @@ TEST(FITScolumn_Vector, Int32Vector)
     EXPECT_NE(dump.find("(2)   99"), std::string::npos);
 }
 
-TEST(FITScolumn_Vector, UInt32Vector)
+TEST(FITScolumn_Vector, ULongVector)
 {
     FITScolumn<std::vector<uint32_t>> col("V_U32", tulong, "", 6);
     col.push_back(std::vector<uint32_t>{ 123456, 42, 314 });
@@ -440,7 +458,7 @@ TEST(FITScolumn_Vector, UInt32Vector)
     EXPECT_EQ(col.size(), 1u);
     EXPECT_EQ(col.getNelem(), 3);
     EXPECT_EQ(col.getWidth(), (int64_t)sizeof(uint32_t));
-    ExpectTTYPEVec(col, "U8");
+    ExpectTTYPEVec(col, "J");
     std::ostringstream oss; col.Dump(oss);
     std::string dump = oss.str();
     EXPECT_NE(dump.find("V_U32"), std::string::npos);
@@ -450,7 +468,7 @@ TEST(FITScolumn_Vector, UInt32Vector)
     EXPECT_NE(dump.find("(2)   314"), std::string::npos);
 }
 
-TEST(FITScolumn_Vector, Int64Vector)
+TEST(FITScolumn_Vector, LongLongVector)
 {
     FITScolumn<std::vector<int64_t>> col("V_I64", tlonglong, "", 7);
     col.push_back(std::vector<int64_t>{ -9, 0, 9, 18 });
@@ -520,7 +538,6 @@ TEST(FITScolumn_Vector, ComplexFloatVector)
     EXPECT_NE(dump.find("(0)   1 , 2"), std::string::npos);
     EXPECT_NE(dump.find("(1)   3 , 4"), std::string::npos);
     EXPECT_NE(dump.find("(2)   5 , 6"), std::string::npos);
-    col.Dump(std::cout);
 }
 
 TEST(FITScolumn_Vector, ComplexDoubleVector)

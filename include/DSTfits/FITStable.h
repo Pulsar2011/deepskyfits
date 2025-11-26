@@ -53,8 +53,8 @@ namespace DSL
         const dtype ftype;
         std::string funit;
         
-        const double fscale;
-        const double fzero;
+        mutable double fscale;
+        mutable double fzero;
         
         int64_t frepeat;
         int64_t fwidth;
@@ -68,6 +68,38 @@ namespace DSL
         
         inline void setNelem(const int64_t& n) {frepeat = n;}
         inline void setWidth(const int64_t& w) {fwidth  = w;}
+
+        void initWithType()
+        {
+            switch(ftype)
+            {
+                case tsbyte:
+                    fscale = 1.0;
+                    fzero  = -128;
+                    break;
+                
+                case tushort:
+                    fscale = 1.0;
+                    fzero  = 32768;
+                    break;
+
+                case tuint:
+                case tulong:
+                    fscale = 1.0;
+                    fzero  = 2147483648;
+                    break;
+                
+                case tulonglong:
+                    fscale = 1.0;
+                    fzero = static_cast<double>(1ULL << 63);
+                    break;
+                
+                default:
+                    fscale = 1.0;
+                    fzero  = 0.0;
+                    break;
+            }
+        }
         
     public:
 #pragma endregion
@@ -121,6 +153,20 @@ namespace DSL
         
         inline const int64_t&    getNelem()  const {return frepeat;}
         inline const int64_t&    getWidth()  const {return fwidth;}
+
+        // CFITSIO storage type to use when writing table cells.
+        // Unsigned types are stored using signed equivalents with BZERO/BSCALE set by getTTYPE().
+        inline int getCFITSIOStorageType() const
+        {
+            switch(ftype)
+            {
+                case tushort:       return static_cast<int>(tshort);     // store as SHORT with BZERO=32768
+                case tuint:
+                case tulong:        return static_cast<int>(tlong);      // store as LONG with BZERO=2147483648
+                case tsbyte:        return static_cast<int>(tbyte);      // store as BYTE with BZERO=-128
+                default:            return static_cast<int>(ftype);      // other types as-is
+            }
+        }
 
 #pragma endregion
 
@@ -285,23 +331,23 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
 
 #pragma endregion
 #pragma region -- private member function
-        void load(const std::shared_ptr<fitsfile>&);
+        void load(const std::shared_ptr<fitsfile>&, const size_t& start=1);
         std::unique_ptr<FITSform> readColumn(const std::shared_ptr<fitsfile>&, const size_t&, const size_t&);
     
 
         //FITSform* readArray(const FITSform& , const int64_t&);
         
         template <typename T>
-        void read(FITScolumn<T>*, const std::shared_ptr<fitsfile>& fptr, const size_t&);
+        void read(FITScolumn<T>*, const std::shared_ptr<fitsfile>& fptr, const size_t& row=1);
         
         template <typename T>
-        void readVector(FITScolumn< std::vector<T> >*, const std::shared_ptr<fitsfile>& fptr, const size_t&);
+        void readVector(FITScolumn< std::vector<T> >*, const std::shared_ptr<fitsfile>& fptr, const size_t& row=1);
         
     public:
 
 #pragma endregion
 #pragma region -- ctor/dtor
-        
+        FITStable();
         FITStable(const std::shared_ptr<fitsfile>&, const int&);
         FITStable(const std::shared_ptr<fitsfile>&, const std::string&);
         
@@ -335,13 +381,7 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
         inline const FITShdu& HDU() const {return hdu;}
         inline       FITShdu& HDU() {return hdu;}
 #pragma endregion
-#pragma region -- Accessing coulumn data
-        //FITSform* readColumn(const std::string&);
-        //FITSform* readColumn(const size_t&);
-        
-        //FITSform* readColumn(const std::string&, const size_t&);
-        //FITSform* readColumn(const size_t&, const size_t&);
-#pragma endregion
+
 #pragma region -- Inserting/Updating data to column
 
 #pragma region 1- Inseting new column
@@ -362,7 +402,8 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
 #pragma endregion
 
 #pragma region -- Saving to file
-        void writeArray(const std::shared_ptr<fitsfile>& fptr, const int64_t&);
+        void write(const std::shared_ptr<fitsfile>& fptr, const int64_t&);
+        void write(const std::string&, const int64_t&, bool replace=false);
 #pragma endregion
 
     };
@@ -438,8 +479,6 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
             if(anynull && std::atoi(&nullarray[k]) )
                 continue;
             
-            //data->insert(typename FITScolumn< std::vector<T> >::col_data(k+1,std::vector<T>(tform.getNelem())));
-            
             
             std::vector<T> tmpv = std::vector<T>(data->getNelem());
             
@@ -482,14 +521,15 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
 
         int64_t n = 0;
         int tbl_status  = 0;
+        const int cfitsType = getCFITSIOStorageType();
 
         for(typename col_map::const_iterator it = data.cbegin(); it != data.cend(); it++)
         {
             if(n >= (first_row-1))
             {
                 T array = (*it);
-                
-                if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), n+1, 1, getNelem(),  &array, &tbl_status))
+
+                if(ffpcl(fptr.get(), cfitsType, static_cast<int>(getPosition()), n+1, 1, getNelem(),  &array, &tbl_status))
                 {
                     throw FITSexception(tbl_status,"FITStable","write<T>");
                 }
@@ -555,66 +595,6 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
         data.clear();
     }
 #pragma endregion
-    
-    /*
-    template< typename T >
-    FITScolumn<T>::iterator FITScolumn<T>::insert(FITScolumn<T>::const_iterator pos, const  T& value)
-    {
-        typename std::vector<T>::iterator p = std::vector<T>::insert(pos, value);
-        Update(value);
-        
-        return p;
-    }
-
-    template< typename T >
-    FITScolumn<T>::iterator FITScolumn<T>::insert(FITScolumn<T>::const_iterator pos, const  T&& value)
-    {
-        typename std::vector<T>::iterator p = std::vector<T>::insert(pos, value);
-        Update(value);
-
-        int64_t newSize = static_cast<int64_t>(std::vector<T>::size());
-        if(getNelem() < newSize) setNelem(newSize);
-        
-        return p;
-    }
-
-    template< typename T >
-    FITScolumn<T>::iterator FITScolumn<T>::insert(FITScolumn<T>::const_iterator pos , size_type count, const T& value)
-    {
-        typename std::vector<T>::iterator p = std::vector<T>::insert(pos, count, value);
-        Update(value);
-
-        int64_t newSize = static_cast<int64_t>(std::vector<T>::size());
-        if(getNelem() < newSize) setNelem(newSize);
-        
-        return p;
-    }
-
-    template< typename T >
-    FITScolumn<T>::iterator FITScolumn<T>::insert(FITScolumn<T>::const_iterator pos, std::initializer_list<T> ilist )
-    {
-        typename std::vector<T>::iterator p = std::vector<T>::insert(pos, ilist);
-        Update(std::vector<T>(ilist));
-
-        int64_t newSize = static_cast<int64_t>(std::vector<T>::size());
-        if(getNelem() < newSize) setNelem(newSize);
-        
-        return p;
-    }
-
-    template< typename T >
-    template< class InputIt >
-    FITScolumn<T>::iterator FITScolumn<T>::insert(FITScolumn<T>::const_iterator pos, InputIt first, InputIt last )
-    {
-        typename std::vector<T>::iterator p = std::vector<T>::insert(pos, first, last);
-        Update(std::vector<T>(ilist));
-
-        int64_t newSize = static_cast<int64_t>(std::vector<T>::size());
-        if(getNelem() < newSize) setNelem(newSize);
-        
-        return p;
-    }
-    */
 
     template< typename T >
     template<typename InputIt>
@@ -722,7 +702,7 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
         size_t n=0;
         for(typename col_map::const_iterator it = data.cbegin(); it != data.cend(); it++)
         {
-            fout<<"    ["<<n<<"]   "<<std::flush;
+            fout<<"\033[32m   |       \033[31m[\033[0m"<<n<<"\033[31m]\033[0m   "<<std::flush;
             dump(fout,*it);
             fout<<std::endl;
             n++;
@@ -741,13 +721,13 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
             switch (getType())
             {
                 case tshort:
-                    fout << "    ["<<n<<"]   "
+                        fout<<"\033[32m   |       \033[31m[\033[0m"<<n<<"\033[31m]\033[0m   "
                          << static_cast<int16_t>(v)
                          << std::endl;
                     break;
                 
                 default:
-                    fout << "    ["<<n<<"]   0x"
+                        fout<<"\033[32m   |       \033[31m[\033[0m"<<n<<"\033[31m]\033[0m   0x"
                          << std::uppercase << std::hex
                          << std::setw(2) << std::setfill('0')
                          << static_cast<unsigned int>(static_cast<uint8_t>(v))
@@ -768,13 +748,13 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
             switch (getType())
             {
                 case tushort:
-                    fout << "    ["<<n<<"]   "
+                        fout<<"\033[32m   |       \033[31m[\033[0m"<<n<<"\033[31m]\033[0m   "
                          << static_cast<uint16_t>(v)
                          << std::endl;
                     break;
 
                 default:
-                    fout << "    ["<<n<<"]   0x"
+                        fout<<"\033[32m   |       \033[31m[\033[0m"<<n<<"\033[31m]\033[0m   0x"
                          << std::uppercase << std::hex
                          << std::setw(2) << std::setfill('0')
                          << static_cast<unsigned int>(static_cast<uint8_t>(v))
@@ -792,7 +772,7 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
         size_t row = 0;
         for(const auto& vec : data)
         {
-            fout << "    ["<<row<<"]   size="<<vec.size();
+            fout<<"\033[32m   |       \033[31m[\033[0m"<<row<<"\033[31m]\033[0m   size="<<vec.size();
             if(!vec.empty())
             {
                 switch (getType())
@@ -819,12 +799,12 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
                 switch (getType())
                 {
                     case tushort:
-                        fout << "         ("<<idx<<")   "
+                        fout << "   \033[32m|\033[0m      ("<<idx<<")   "
                              << static_cast<uint16_t>(b)
                              << std::endl;
                         break;
                     default:
-                        fout << "         ("<<idx<<")  0x"
+                        fout << "   \033[32m|\033[0m      ("<<idx<<")  0x"
                              << std::uppercase << std::hex << std::setw(2) << std::setfill('0')
                              << static_cast<unsigned int>(b)
                              << std::dec << std::nouppercase << std::endl;
@@ -843,7 +823,7 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
         size_t row = 0;
         for(const auto& vec : data)
         {
-            fout << "    ["<<row<<"]   size="<<vec.size();
+            fout<<"\033[32m   \033[32m|\033[0m       \033[31m[\033[0m"<<row<<"\033[31m]\033[0m   size="<<vec.size();
             if(!vec.empty())
             {
                 fout << " first=0x"
@@ -858,7 +838,7 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
             size_t idx = 0;
             for(const auto& b : vec)
             {
-                fout << "         ("<<idx<<")  0x"
+                fout << "   \033[32m|\033[0m      ("<<idx<<")  0x"
                      << std::uppercase << std::hex << std::setw(2) << std::setfill('0')
                      << static_cast<int>(b)
                      << std::dec << std::nouppercase << std::endl;
@@ -896,7 +876,7 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
         size_t idx = 0;
         for(const auto& v : data)
         {
-            fout << "         ("<<idx<<")   " << v << std::endl;
+            fout << "   \033[32m|\033[0m      ("<<idx<<")   " << v << std::endl;
             ++idx;
         }
     }
