@@ -254,6 +254,8 @@ namespace DSL
 #pragma region -- ctor/dtor
         FITScolumn(const std::string&, const dtype&, const std::string unit="", const size_t pos=0);
         FITScolumn(const std::string&, const dtype&, const double&, const double&, const std::string unit="", const size_t pos=0);
+        FITScolumn(const std::string&, const dtype&, const int64_t&, const int64_t&, const std::string unit="", const size_t pos=0);
+        FITScolumn(const std::string&, const dtype&, const int64_t&, const int64_t&, const double&, const double&, const std::string unit="", const size_t pos=0);
         FITScolumn(const FITScolumn&);
         
         virtual ~FITScolumn();
@@ -268,6 +270,9 @@ namespace DSL
             Update(v);              // update width/repeat metadata
             data.push_back(v);
         }
+
+        // Read-only accessor for testing
+        inline const col_map& values() const { return data; }
         
 #pragma endregion
 #pragma region -- diagnoze
@@ -284,9 +289,11 @@ namespace DSL
     };
 
 // Scalar type specializations
+template<> void FITScolumn<uint32_t>            ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
 template<> void FITScolumn<FITSform::complex>   ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
 template<> void FITScolumn<FITSform::dblcomplex>::write(const std::shared_ptr<fitsfile>&, const int64_t&);
 template<> void FITScolumn<std::string>         ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<char*>               ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
 
 // Vector type specializations
 template<> void FITScolumn<FITSform::int8Vector>      ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
@@ -302,6 +309,7 @@ template<> void FITScolumn<FITSform::doubleVector>    ::write(const std::shared_
 template<> void FITScolumn<FITSform::complexVector>   ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
 template<> void FITScolumn<FITSform::dblcomplexVector>::write(const std::shared_ptr<fitsfile>&, const int64_t&);
 template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<FITSform::charVector>      ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
     
 #pragma endregion
 #pragma region - FITStable class definition
@@ -328,6 +336,7 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
 #pragma region -- private member
         const volatile ttype ftbl_type;
         FITShdu hdu;                              //!< Header of the table
+        mutable size_t nrows_cache;          //!< Cache for number of rows
 
 #pragma endregion
 #pragma region -- private member function
@@ -381,6 +390,9 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
         inline const FITShdu& HDU() const {return hdu;}
         inline       FITShdu& HDU() {return hdu;}
 #pragma endregion
+        const std::unique_ptr<FITSform>& getColumn(const std::string& cname) const;
+        const std::unique_ptr<FITSform>& getColumn(const size_t& cindex) const;
+
 
 #pragma region -- Inserting/Updating data to column
 
@@ -421,31 +433,184 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
     template< typename T>
     void FITStable::read(FITScolumn<T>* data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {      
-        int64_t nelem = (static_cast<int64_t>(nrows())-(row-1));
-        
-        T*    array     = new T   [nelem];
-        char* nullarray = new char[nelem];
-        int tbl_status  = 0;
-        
-        if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem, array, nullarray, NULL, &tbl_status))
-        {
-            delete [] array;
-            delete [] nullarray;
-            
+        long nrows = 0; 
+        int tbl_status = 0;
+
+        fits_get_num_rows(fptr.get(), &nrows, &tbl_status);
+        if(tbl_status)
             throw FITSexception(tbl_status,"FITStable","read<T>");
-        }
+
+        nrows_cache = static_cast<size_t>(nrows);
+        int64_t nelem  = ( static_cast<int64_t>( nrows )-(row-1) );
         
-        for(size_t k = 0; static_cast<int64_t>(k) < nelem; k++)
+        char* nullarray = new char[nelem];
+        int   anynull   = 0;
+
+        if(data->getType() == tshort)
         {
-            if(! std::atoi(&nullarray[k]) )
-                data->push_back(array[k]);
+            // Special case for signed int32_t stored as unsigned in FITS (with BZERO/BSCALE)
+            short* uarray = new short[nelem];
+
+            if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem, uarray, nullarray, &anynull, &tbl_status))
+            {
+                delete[] nullarray;
+                delete[] uarray;
+                
+                throw FITSexception(tbl_status,"FITStable","read<short>");
+            }
+            for(size_t k = 0; static_cast<int64_t>(k) < nelem; k++)
+            {
+                data->push_back(static_cast<T>(uarray[k]));
+            }
+            delete[] uarray;
         }
-        
-        delete [] array;
-        delete [] nullarray;
-        
+        else if(data->getType() == tushort)
+        {
+            // Special case for signed int32_t stored as unsigned in FITS (with BZERO/BSCALE)
+            unsigned short* uarray = new unsigned short[nelem];
+
+            if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem, uarray, nullarray, &anynull, &tbl_status))
+            {
+                delete[] nullarray;
+                delete[] uarray;
+                
+                throw FITSexception(tbl_status,"FITStable","read<unsigned short>");
+            }
+            for(size_t k = 0; static_cast<int64_t>(k) < nelem; k++)
+            {
+                data->push_back(static_cast<T>(uarray[k]));
+            }
+            delete[] uarray;
+        }
+        else if(data->getType() == tint)
+        {
+            // Special case for signed int32_t stored as unsigned in FITS (with BZERO/BSCALE)
+            int* uarray = new int[nelem];
+
+            if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem, uarray, nullarray, &anynull, &tbl_status))
+            {
+                delete[] nullarray;
+                delete[] uarray;
+                
+                throw FITSexception(tbl_status,"FITStable","read<int>");
+            }
+            for(size_t k = 0; static_cast<int64_t>(k) < nelem; k++)
+            {
+                data->push_back(static_cast<T>(uarray[k]));
+            }
+            delete[] uarray;
+        }
+        else if(data->getType() == tuint)
+        {
+            // Special case for signed int32_t stored as unsigned in FITS (with BZERO/BSCALE)
+            unsigned int* uarray = new unsigned int[nelem];
+
+            if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem, uarray, nullarray, &anynull, &tbl_status))
+            {
+                delete[] nullarray;
+                delete[] uarray;
+                
+                throw FITSexception(tbl_status,"FITStable","read<unsigned int>");
+            }
+            for(size_t k = 0; static_cast<int64_t>(k) < nelem; k++)
+            {
+                data->push_back(static_cast<T>(uarray[k]));
+            }
+            delete[] uarray;
+        }
+        else if(data->getType() == tlong)
+        {
+            // Special case for signed int32_t stored as unsigned in FITS (with BZERO/BSCALE)
+            long* uarray = new long[nelem];
+
+            if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem, uarray, nullarray, &anynull, &tbl_status))
+            {
+                delete[] nullarray;
+                delete[] uarray;
+                
+                throw FITSexception(tbl_status,"FITStable","read<long>");
+            }
+            for(size_t k = 0; static_cast<int64_t>(k) < nelem; k++)
+            {
+                data->push_back(static_cast<T>(uarray[k]));
+            }
+            delete[] uarray;
+        }
+        else if(data->getType() == tulong)
+        {
+            // Special case for signed int32_t stored as unsigned in FITS (with BZERO/BSCALE)
+            unsigned long* uarray = new unsigned long[nelem];
+
+            if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem, uarray, nullarray, &anynull, &tbl_status))
+            {
+                delete[] nullarray;
+                delete[] uarray;
+                
+                throw FITSexception(tbl_status,"FITStable","read<unsigned long>");
+            }
+            for(size_t k = 0; static_cast<int64_t>(k) < nelem; k++)
+            {
+                data->push_back(static_cast<T>(uarray[k]));
+            }
+            delete[] uarray;
+        }
+        else if(data->getType() == tlonglong)
+        {
+            // Special case for signed int32_t stored as unsigned in FITS (with BZERO/BSCALE)
+            LONGLONG* uarray = new LONGLONG [nelem];
+
+            if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem, uarray, nullarray, &anynull, &tbl_status))
+            {
+                delete[] nullarray;
+                delete[] uarray;
+                
+                throw FITSexception(tbl_status,"FITStable","read<lonlong>");
+            }
+            for(size_t k = 0; static_cast<int64_t>(k) < nelem; k++)
+            {
+                data->push_back(static_cast<T>(uarray[k]));
+            }
+            delete[] uarray;
+        }
+        else if(data->getType() == tulonglong)
+        {
+            // Special case for signed int32_t stored as unsigned in FITS (with BZERO/BSCALE)
+            ULONGLONG* uarray = new ULONGLONG [nelem];
+
+            if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem, uarray, nullarray, &anynull, &tbl_status))
+            {
+                delete[] nullarray;
+                delete[] uarray;
+                
+                throw FITSexception(tbl_status,"FITStable","read<unsigned longlong>");
+            }
+            for(size_t k = 0; static_cast<int64_t>(k) < nelem; k++)
+            {
+                data->push_back(static_cast<T>(uarray[k]));
+            }
+            delete[] uarray;
+        }
+        else
+        {
+            T*    array  = new T   [nelem];
+
+            if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>    (data->getPosition()), row, 1, nelem, array, nullarray, &anynull, &tbl_status))
+            {
+                delete[] nullarray;
+                delete[] array;
+
+                throw FITSexception(tbl_status,"FITStable","read<T>");
+            }
+
+            for(size_t k = 0; static_cast<int64_t>(k) < nelem; k++)
+            {
+                data->push_back(static_cast<T>(array[k]));
+            }
+
+            delete[] array;
+        }
+
         return;
-        
     }
     
     /**
@@ -459,47 +624,259 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
     template< typename T>
     void FITStable::readVector(FITScolumn< std::vector<T> >* data,  const std::shared_ptr<fitsfile>& fptr,  const size_t& row)
     {
-        int64_t nelem = ( static_cast<int64_t>(nrows())-static_cast<int64_t>(row-1) )* static_cast<int64_t>(data->getNelem());
+        long nrows = 0; 
+        int tbl_status = 0;
+        fits_get_num_rows(fptr.get(), &nrows, &tbl_status);
+        if(tbl_status)
+            throw FITSexception(tbl_status,"FITStable","read<FITSform::complex>");
+
+        nrows_cache = static_cast<size_t>(nrows);
+        int64_t nelem = ( static_cast<int64_t>(nrows)-static_cast<int64_t>(row-1) )* static_cast<int64_t>(data->getNelem());
         
-        T*   array      = new T   [nelem];
         char* nullarray = new char[nelem];
         int   anynull   = 0;
-        int tbl_status  = 0;
-        
-        if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem , array, nullarray, &anynull, &tbl_status))
+
+        if(data->getType() == tshort)
         {
-            delete[] array;
-            delete[] nullarray;
-            
-            throw FITSexception(tbl_status,"FITStable","read<T>");
-        }
-        
-        for(int64_t k = 0; k < nelem; k += data->getNelem())
-        {
-            if(anynull && std::atoi(&nullarray[k]) )
-                continue;
-            
-            
-            std::vector<T> tmpv = std::vector<T>(data->getNelem());
-            
-            for(int64_t l = 0; l < data->getNelem(); l++ )
+            // Special case for signed int32_t stored as unsigned in FITS (with BZERO/BSCALE)
+            short* uarray = new short[nelem];
+
+            if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem, uarray, nullarray, &anynull, &tbl_status))
             {
-                if( k+l >= nelem*data->getNelem())
-                {
-                    std::cout<<l<<" + "<<k<<" = "<<l+k<<" % "<<nelem * static_cast<int64_t>(data->getNelem())<<std::endl;
-                    throw FITSwarning("FITStable","readVector","Out of range : "+std::to_string(k+l)+" <-> "+std::to_string((static_cast<int64_t>(nrows())-static_cast<int64_t>(row))*data->getNelem()));
-                }
-                tmpv[l] = array[k+l];
+                delete[] nullarray;
+                delete[] uarray;
+                
+                throw FITSexception(tbl_status,"FITStable","read<short>");
             }
-            
-            data->push_back(tmpv);
+            for(int64_t k = 0; k < nelem; k += data->getNelem())
+            {
+                std::vector<T> tmpv = std::vector<T>(data->getNelem());
+                
+                for(int64_t l = 0; l < data->getNelem(); l++ )
+                {
+                    tmpv[l] = static_cast<T>(uarray[k+l]);
+                }
+                
+                data->push_back(tmpv);
+            }
+            delete[] uarray;
+            delete[] nullarray;
+            return;
         }
-        
-        if(array != NULL)
+        else if(data->getType() == tushort)
+        {
+            // Special case for signed int32_t stored as unsigned in FITS (with BZERO/BSCALE)
+            unsigned short* uarray = new unsigned short[nelem];
+
+            if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem, uarray, nullarray, &anynull, &tbl_status))
+            {
+                delete[] nullarray;
+                delete[] uarray;
+                
+                throw FITSexception(tbl_status,"FITStable","read<unsigned short>");
+            }
+            for(int64_t k = 0; k < nelem; k += data->getNelem())
+            {
+                std::vector<T> tmpv = std::vector<T>(data->getNelem());
+                
+                for(int64_t l = 0; l < data->getNelem(); l++ )
+                {
+                    tmpv[l] = static_cast<T>(uarray[k+l]);
+                }
+                
+                data->push_back(tmpv);
+            }
+            delete[] uarray;
+            delete[] nullarray;
+        }
+        else if(data->getType() == tint)
+        {
+            // Special case for signed int32_t stored as unsigned in FITS (with BZERO/BSCALE)
+            int* uarray = new int[nelem];
+
+            if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem, uarray, nullarray, &anynull, &tbl_status))
+            {
+                delete[] nullarray;
+                delete[] uarray;
+                
+                throw FITSexception(tbl_status,"FITStable","read<unsigned short>");
+            }
+            for(int64_t k = 0; k < nelem; k += data->getNelem())
+            {
+                std::vector<T> tmpv = std::vector<T>(data->getNelem());
+                
+                for(int64_t l = 0; l < data->getNelem(); l++ )
+                {
+                    tmpv[l] = static_cast<T>(uarray[k+l]);
+                }
+                
+                data->push_back(tmpv);
+            }
+            delete[] uarray;
+            delete[] nullarray;
+        }
+        else if(data->getType() == tuint)
+        {
+            // Special case for signed int32_t stored as unsigned in FITS (with BZERO/BSCALE)
+            unsigned int* uarray = new unsigned int[nelem];
+
+            if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem, uarray, nullarray, &anynull, &tbl_status))
+            {
+                delete[] nullarray;
+                delete[] uarray;
+                
+                throw FITSexception(tbl_status,"FITStable","read<unsigned int>");
+            }
+            for(int64_t k = 0; k < nelem; k += data->getNelem())
+            {
+                std::vector<T> tmpv = std::vector<T>(data->getNelem());
+                
+                for(int64_t l = 0; l < data->getNelem(); l++ )
+                {
+                    tmpv[l] = static_cast<T>(uarray[k+l]);
+                }
+                
+                data->push_back(tmpv);
+            }
+            delete[] uarray;
+            delete[] nullarray;
+        }
+        else if(data->getType() == tlong)
+        {
+            // Special case for signed int32_t stored as unsigned in FITS (with BZERO/BSCALE)
+            long* uarray = new long[nelem];
+
+            if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem, uarray, nullarray, &anynull, &tbl_status))
+            {
+                delete[] nullarray;
+                delete[] uarray;
+                
+                throw FITSexception(tbl_status,"FITStable","read<unsigned short>");
+            }
+            for(int64_t k = 0; k < nelem; k += data->getNelem())
+            {
+                std::vector<T> tmpv = std::vector<T>(data->getNelem());
+                
+                for(int64_t l = 0; l < data->getNelem(); l++ )
+                {
+                    tmpv[l] = static_cast<T>(uarray[k+l]);
+                }
+                
+                data->push_back(tmpv);
+            }
+            delete[] uarray;
+            delete[] nullarray;
+        }
+        else if(data->getType() == tulong)
+        {
+            // Special case for signed int32_t stored as unsigned in FITS (with BZERO/BSCALE)
+            unsigned long* uarray = new unsigned long[nelem];
+
+            if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem, uarray, nullarray, &anynull, &tbl_status))
+            {
+                delete[] nullarray;
+                delete[] uarray;
+                
+                throw FITSexception(tbl_status,"FITStable","read<unsigned long>");
+            }
+            for(int64_t k = 0; k < nelem; k += data->getNelem())
+            {
+                std::vector<T> tmpv = std::vector<T>(data->getNelem());
+                
+                for(int64_t l = 0; l < data->getNelem(); l++ )
+                {
+                    tmpv[l] = static_cast<T>(uarray[k+l]);
+                }
+                
+                data->push_back(tmpv);
+            }
+            delete[] uarray;
+            delete[] nullarray;
+        }
+        else if(data->getType() == tlonglong)
+        {
+            // Special case for signed int32_t stored as unsigned in FITS (with BZERO/BSCALE)
+            LONGLONG* uarray = new LONGLONG[nelem];
+
+            if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem, uarray, nullarray, &anynull, &tbl_status))
+            {
+                delete[] nullarray;
+                delete[] uarray;
+                
+                throw FITSexception(tbl_status,"FITStable","read<unsigned short>");
+            }
+            for(int64_t k = 0; k < nelem; k += data->getNelem())
+            {
+                std::vector<T> tmpv = std::vector<T>(data->getNelem());
+                
+                for(int64_t l = 0; l < data->getNelem(); l++ )
+                {
+                    tmpv[l] = static_cast<T>(uarray[k+l]);
+                }
+                
+                data->push_back(tmpv);
+            }
+            delete[] uarray;
+            delete[] nullarray;
+        }
+        else if(data->getType() == tulonglong)
+        {
+            // Special case for signed int32_t stored as unsigned in FITS (with BZERO/BSCALE)
+            ULONGLONG* uarray = new ULONGLONG[nelem];
+
+            if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem, uarray, nullarray, &anynull, &tbl_status))
+            {
+                delete[] nullarray;
+                delete[] uarray;
+                
+                throw FITSexception(tbl_status,"FITStable","read<unsigned short>");
+            }
+            for(int64_t k = 0; k < nelem; k += data->getNelem())
+            {
+                std::vector<T> tmpv = std::vector<T>(data->getNelem());
+                
+                for(int64_t l = 0; l < data->getNelem(); l++ )
+                {
+                    tmpv[l] = static_cast<T>(uarray[k+l]);
+                }
+                
+                data->push_back(tmpv);
+            }
+            delete[] uarray;
+            delete[] nullarray;
+        }
+        else
+        {
+            T* array = new T [nelem];
+
+            if(ffgcf(fptr.get(), static_cast<int>(data->getType()), static_cast<int>(data->getPosition()), row, 1, nelem , array, nullarray, &anynull, &tbl_status))
+            {
+                delete[] array;
+                delete[] nullarray;
+
+                throw FITSexception(tbl_status,"FITStable","read<T>");
+            }
+
+            for(int64_t k = 0; k < nelem; k += data->getNelem())
+            {
+                std::vector<T> tmpv = std::vector<T>(data->getNelem());
+
+                for(int64_t l = 0; l < data->getNelem(); l++ )
+                {
+                    if( k+l >= nelem*data->getNelem())
+                    {
+                        std::cout<<l<<" + "<<k<<" = "<<l+k<<" % "<<nelem * static_cast<int64_t>(data->getNelem())<<std::endl;
+                        throw FITSwarning("FITStable","readVector","Out of range : "+std::to_string(k+l)+" <-> "+std::to_string((static_cast<int64_t>(nrows)    -static_cast<int64_t>(row))*data->getNelem()));
+                    }
+                    tmpv[l] = static_cast<T>(array[k+l]);
+                }
+
+                data->push_back(tmpv);
+            }
+
             delete[]  array;
-        
-        if(nullarray != NULL)
             delete[]  nullarray;
+        }
     }
     
 #pragma endregion
@@ -521,7 +898,6 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
 
         int64_t n = 0;
         int tbl_status  = 0;
-        const int cfitsType = getCFITSIOStorageType();
 
         for(typename col_map::const_iterator it = data.cbegin(); it != data.cend(); it++)
         {
@@ -529,7 +905,7 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
             {
                 T array = (*it);
 
-                if(ffpcl(fptr.get(), cfitsType, static_cast<int>(getPosition()), n+1, 1, getNelem(),  &array, &tbl_status))
+                if(ffpcl(fptr.get(),static_cast<int>(getType()), static_cast<int>(getPosition()), n+1, 1, getNelem(),  &array, &tbl_status))
                 {
                     throw FITSexception(tbl_status,"FITStable","write<T>");
                 }
@@ -559,6 +935,18 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
     FITScolumn<T>::FITScolumn(const std::string& name , const dtype& type, const std::string unit, const size_t pos):FITSform(pos,name,type,unit),data()
     {
         
+    }
+
+    template< typename T >
+    FITScolumn<T>::FITScolumn(const std::string& name, const dtype& type, const int64_t& r, const int64_t& w, const std::string unit, const size_t pos):FITSform(pos,name,type,r,w,unit),data()
+    {
+
+    }
+    
+    template< typename T >
+    FITScolumn<T>::FITScolumn(const std::string& name, const dtype& type, const int64_t& r, const int64_t& w, const double& s, const double& z, const std::string unit, const size_t pos):FITSform(pos,name,type,r,w,s,z,unit),data()
+    {
+
     }
     
     
@@ -850,31 +1238,31 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
     
     template< typename T>
     template< typename U >
-    void FITScolumn<T>::dump( std::ostream& fout, const U& data) const
+    void FITScolumn<T>::dump( std::ostream& fout, const U& val) const
     {
-        fout<<data<<std::flush;
+        fout<<val<<std::flush;
     }
     
     template< typename T>
     template< typename P >
-    void FITScolumn<T>::dump( std::ostream& fout, const std::pair<P,P>& data) const
+    void FITScolumn<T>::dump( std::ostream& fout, const std::pair<P,P>& val) const
     {
-        fout<<data.first<<" , "<<data.second<<std::flush;
+        fout<<val.first<<" , "<<val.second<<std::flush;
     }
     
     template< typename T>
     template< typename Q >
-    void FITScolumn<T>::dump( std::ostream& fout, const std::vector<Q>& data) const
+    void FITScolumn<T>::dump( std::ostream& fout, const std::vector<Q>& val) const
     {
         // Fixed: treat 'data' as a single row vector, not a vector-of-vectors.
-        if(data.empty())
+        if(val.empty())
             return;
-        fout << "size=" << data.size()
-             << " first=" << data.front()
-             << " last="  << data.back()
+        fout << "size=" << val.size()
+             << " first=" << val.front()
+             << " last="  << val.back()
              << std::endl;
         size_t idx = 0;
-        for(const auto& v : data)
+        for(const auto& v : val)
         {
             fout << "   \033[32m|\033[0m      ("<<idx<<")   " << v << std::endl;
             ++idx;
@@ -883,17 +1271,17 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
     
     template< typename T>
     template< typename L >
-    void FITScolumn<T>::dump( std::ostream& fout, const std::vector< std::pair<L,L> >& data) const
+    void FITScolumn<T>::dump( std::ostream& fout, const std::vector< std::pair<L,L> >& val) const
     {
         // Fixed: same logic as above for vector of pairs.
-        if(data.empty())
+        if(val.empty())
             return;
-        fout << "size=" << data.size()
-             << " first=" << data.front().first << " , " << data.front().second
-             << " last="  << data.back().first  << " , " << data.back().second
+        fout << "size=" << val.size()
+             << " first=" << val.front().first << " , " << val.front().second
+             << " last="  << val.back().first  << " , " << val.back().second
              << std::endl;
         size_t idx = 0;
-        for(const auto& p : data)
+        for(const auto& p : val)
         {
             fout << "         ("<<idx<<")   " << p.first << " , " << p.second << std::endl;
             ++idx;

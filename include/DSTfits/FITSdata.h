@@ -105,7 +105,7 @@ namespace DSL
         fLong     = TLONG  ,       //!< int32_t
         fULong    = TULONG  ,      //!< uint32_t
         fLongLong = TLONGLONG,     //!< int64_t
-        fULongLong= TULONGLONG,        //!< uint64_t
+        fULongLong= TULONGLONG,    //!< uint64_t
         fBool     = TLOGICAL,      //!< boolean
         fFloat    = TFLOAT,        //!< floiting poind
         fDouble   = TDOUBLE,       //!< double floiting point

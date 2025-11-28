@@ -22,14 +22,14 @@ TEST(FITSform_TypeMapping, getDataType_and_getDataTypeID_All)
 {
     struct Case { dtype id; const char* name; const char* ttypeSuffix; };
     std::vector<Case> cases = {
-        { tsbyte,     "SBYTE",  "B" },
+        { tsbyte,     "SBYTE",  "S" },
         { tshort,     "SHORT",  "I" },
-        { tushort,    "USHORT", "I" },
+        { tushort,    "USHORT", "U" },
         { tint,       "INT",    "I" },
-        { tuint,      "UINT",   "I" },
+        { tuint,      "UINT",   "U" },
         { tlong,      "LONG",   "J" },
         { tlonglong,  "LONGLONG","K" },
-        { tulong,     "ULONG",  "J" },
+        { tulong,     "ULONG",  "V" },
         { tfloat,     "FLOAT",  "E" },
         { tdouble,    "DOUBLE", "D" },
         { tlogical,   "BOOL",   "L" },
@@ -60,7 +60,7 @@ TEST(FITScolumn_Scalar, SByte)
     EXPECT_EQ(col.getWidth(), (int64_t)sizeof(int8_t));
     EXPECT_EQ(col.getScale(), 1.0);
     EXPECT_EQ(col.getZero(), -128);
-    ExpectTTYPE(col, "B");
+    ExpectTTYPE(col, "S");
     auto dup = col.clone();
     EXPECT_EQ(dup->size(), col.size());
     std::ostringstream oss; col.Dump(oss);
@@ -122,7 +122,7 @@ TEST(FITScolumn_Scalar, UShort)
     EXPECT_EQ(col.getWidth(), (int64_t)sizeof(uint16_t));
     EXPECT_EQ(col.getScale(), 1.0);
     EXPECT_EQ(col.getZero(), 32768);
-    ExpectTTYPE(col, "I");
+    ExpectTTYPE(col, "U");
     std::ostringstream oss; col.Dump(oss);
     std::string dump = oss.str();
     EXPECT_NE(dump.find("COL_UB"), std::string::npos);
@@ -160,7 +160,7 @@ TEST(FITScolumn_Scalar, UInt)
     EXPECT_EQ(col.getWidth(), (int64_t)sizeof(uint16_t));
     EXPECT_EQ(col.getScale(), 1.0);
     EXPECT_EQ(col.getZero(), 2147483648.0);
-    ExpectTTYPE(col, "J");
+    ExpectTTYPE(col, "V");
     std::ostringstream oss; col.Dump(oss);
     std::string dump = oss.str();
     EXPECT_NE(dump.find("COL_U16"), std::string::npos);
@@ -198,7 +198,7 @@ TEST(FITScolumn_Scalar, ULong)
     EXPECT_EQ(col.getWidth(), (int64_t)sizeof(uint32_t));
     EXPECT_EQ(col.getScale(), 1.0);
     EXPECT_EQ(col.getZero(), 2147483648.);
-    ExpectTTYPE(col, "J");
+    ExpectTTYPE(col, "V");
     std::ostringstream oss; col.Dump(oss);
     std::string dump = oss.str();
     EXPECT_NE(dump.find("COL_U32"), std::string::npos);
@@ -367,7 +367,7 @@ TEST(FITScolumn_Vector, SByteVector)
     EXPECT_EQ(col.size(), 1u);
     EXPECT_EQ(col.getNelem(), 3);
     EXPECT_EQ(col.getWidth(), (int64_t)sizeof(int8_t));
-    ExpectTTYPEVec(col, "B");
+    ExpectTTYPEVec(col, "S");
     std::ostringstream oss; col.Dump(oss);
     std::string dump = oss.str();
     EXPECT_NE(dump.find("V_SB"), std::string::npos);
@@ -422,7 +422,7 @@ TEST(FITScolumn_Vector, UShortVector)
     EXPECT_EQ(col.size(), 1u);
     EXPECT_EQ(col.getNelem(), 3);
     EXPECT_EQ(col.getWidth(), (int64_t)sizeof(uint16_t));
-    ExpectTTYPEVec(col, "I");
+    ExpectTTYPEVec(col, "U");
     std::ostringstream oss; col.Dump(oss);
     std::string dump = oss.str();
     EXPECT_NE(dump.find("V_U16"), std::string::npos);
@@ -458,7 +458,7 @@ TEST(FITScolumn_Vector, ULongVector)
     EXPECT_EQ(col.size(), 1u);
     EXPECT_EQ(col.getNelem(), 3);
     EXPECT_EQ(col.getWidth(), (int64_t)sizeof(uint32_t));
-    ExpectTTYPEVec(col, "J");
+    ExpectTTYPEVec(col, "V");
     std::ostringstream oss; col.Dump(oss);
     std::string dump = oss.str();
     EXPECT_NE(dump.find("V_U32"), std::string::npos);
