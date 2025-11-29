@@ -22,7 +22,28 @@
 
 namespace DSL
 {
-    
+    template<size_t N>
+    constexpr std::array<uint64_t,N> make_onbit_lsb()
+    {
+        std::array<uint64_t,N> a{};
+        for(size_t i=0;i<N;++i) a[i] = (uint64_t(1) << i);
+        return a;
+    }
+    constexpr auto onbit_lsb = make_onbit_lsb<64>();
+
+    template<size_t N>
+    constexpr std::array<uint8_t,N> make_onbit_msb()
+    {
+        std::array<uint8_t,N> a{};
+        for(size_t i=0;i<N;++i)
+        {
+            // i=0 -> 0x80, i=1 -> 0x40, ... i=7 -> 0x01
+            a[i] = static_cast<uint8_t>(0x80 >> i);
+        }
+        return a;
+    }
+    constexpr auto onbit_msb = make_onbit_msb<8>();
+
     typedef std::vector<double> pixelCoords;
     typedef std::vector<double> worldCoords;
 

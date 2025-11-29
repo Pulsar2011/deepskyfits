@@ -390,7 +390,7 @@ namespace DSL
         nrows_cache = static_cast<size_t>(nrows);
 
         const int64_t nrow   = (static_cast<int64_t>(nrows) - (row-1));
-        const int64_t width  = static_cast<int64_t>(data->getWidth()); // chars per string
+       // const int64_t width  = static_cast<int64_t>(data->getWidth()); // chars per string
 
         // Read each row independently
         // Allocate array of pointers (one per string in this row)
@@ -1147,30 +1147,88 @@ namespace DSL
         int tbl_status = 0;
         size_t row = 0;
 
-        for(col_map::const_iterator it = data.cbegin(); it != data.cend(); ++it, ++row)
+        if(getType() == tlogical)
         {
-            if(row < static_cast<size_t>(first_row-1))
-                continue;
-
-            char val = (*it && (*it)[0] == 'T') ? 'T' : 'F';
-
-            if(ffpcl(fptr.get(),
-                     static_cast<int>(getType()),          // should be tlogical
-                     static_cast<int>(getPosition()),
-                     static_cast<LONGLONG>(row+1),
-                     1,                                     // firstelem
-                     1,                                     // nelem
-                     &val,
-                     &tbl_status))
+            for(col_map::const_iterator it = data.cbegin(); it != data.cend(); ++it, ++row)
             {
-                throw FITSexception(tbl_status,"FITScolumn<char*>","write");
+                if(row < static_cast<size_t>(first_row-1))
+                    continue;
+
+                char val = (*it && (*it)[0] == 'T') ? 1 : 0;
+
+                if(ffpcl(fptr.get(),
+                         static_cast<int>(getType()),          // should be tlogical
+                         static_cast<int>(getPosition()),
+                        static_cast<LONGLONG>(row+1),
+                        1,                                     // firstelem
+                        1,                                     // nelem
+                        &val,
+                        &tbl_status))
+                {
+                    throw FITSexception(tbl_status,"FITScolumn<char*>","write");
+                }
+            }
+        }
+        else if (getType() == tbit)
+        {
+            const int64_t nbits = getNelem();
+            if(nbits <= 0)
+                return;
+
+            int tbl_status = 0;
+            size_t row = 0;
+            std::vector<char> tmp(static_cast<size_t>(nbits), 0); // reuse buffer
+
+            for(size_t idx = 0; idx < data.size(); ++idx, ++row)
+            {
+                if(row < static_cast<size_t>(first_row - 1))
+                    continue;
+
+                char* raw = data[idx];
+
+                if(nbits == 1)
+                {
+                    // Single-bit cell: treat the pointer value itself (0/1) as the bit, never dereference.
+                    std::uintptr_t pv = reinterpret_cast<std::uintptr_t>(raw);
+                    tmp[0] = (pv & 0x1u) ? 1 : 0;
+                }
+                else
+                {
+                    if(!raw)
+                    {
+                        std::fill(tmp.begin(), tmp.end(), 0);
+                    }
+                    else
+                    {
+                        // For nbits <= 8, expand from one packed byte (MSB-first, matching CFITSIO onbit order).
+                        // If you store longer buffers elsewhere, replace this with a proper buffer-length aware copy.
+                        unsigned char byte = static_cast<unsigned char>(*raw);
+                        static const unsigned char onbit[8] = {128,64,32,16,8,4,2,1};
+                        const size_t n = static_cast<size_t>(std::min<int64_t>(nbits, 8));
+                        for(size_t b = 0; b < n; ++b)
+                            tmp[b] = (byte & onbit[b]) ? 1 : 0;
+
+                        // pad remaining bits with 0 if nbits > 8
+                        for(size_t b = n; b < static_cast<size_t>(nbits); ++b)
+                            tmp[b] = 0;
+                    }
+                }
+
+                if(ffpclx(fptr.get(),
+                          static_cast<int>(getPosition()),
+                          static_cast<LONGLONG>(row + 1),
+                          1,
+                          static_cast<long>(nbits),
+                          tmp.data(),
+                          &tbl_status))
+                    throw FITSexception(tbl_status,"FITScolumn<char*>","write");
             }
         }
     }
 
     // Write repeated logicals per row (vector of "T"/"F") into an L column
     template<>
-    void FITScolumn<std::vector<char*>>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
+    void FITScolumn< std::vector<char*> >::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
         if(!fptr)
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<std::vector<char*>>","write");
@@ -1180,30 +1238,37 @@ namespace DSL
         const int64_t nelem = getNelem(); // number of logicals per cell
         int tbl_status = 0;
         size_t row = 0;
-        std::vector<char> buffer(static_cast<size_t>(nelem), 'F');
+
+        std::vector<char> buffer(static_cast<size_t>(nelem), 0x0);
 
         for(auto it = data.cbegin(); it != data.cend(); ++it, ++row)
         {
-            if(row < static_cast<size_t>(first_row-1))
-                continue;
-
-            for(int64_t i = 0; i < nelem; ++i)
+            if(getType() == tlogical)
             {
-                const char* cstr = (i < static_cast<int64_t>(it->size())) ? it->at(static_cast<size_t>(i)) : nullptr;
-                buffer[static_cast<size_t>(i)] = (cstr && cstr[0] == 'T') ? 'T' : 'F';
-            }
+            
+                if(row < static_cast<size_t>(first_row-1))
+                    continue;
 
-            if(ffpcl(fptr.get(),
-                     static_cast<int>(getType()),           // tlogical
-                     static_cast<int>(getPosition()),
-                     static_cast<LONGLONG>(row+1),
-                     1,                                      // firstelem
-                     nelem,                                  // nelem
-                     buffer.data(),
-                     &tbl_status))
-            {
-                throw FITSexception(tbl_status,"FITScolumn<std::vector<char*>>","write");
+                for(int64_t i = 0; i < nelem; ++i)
+                {
+                    const char* cstr = (i < static_cast<int64_t>(it->size())) ? it->at(static_cast<size_t>(i)) : nullptr;
+                    buffer[static_cast<size_t>(i)] = (cstr && cstr[0] == 'T') ? 1 : 0;
+                }
+
+                if(ffpcl(fptr.get(),
+                         static_cast<int>(getType()),           // tlogical
+                         static_cast<int>(getPosition()),
+                         static_cast<LONGLONG>(row+1),
+                         1,                                      // firstelem
+                         nelem,                                  // nelem
+                         buffer.data(),
+                         &tbl_status))
+                {
+                    throw FITSexception(tbl_status,"FITScolumn<std::vector<char*>>","write");
+                }
             }
+            else if( getType() == tbit )
+                throw FITSexception(BAD_DIMEN,"FITScolumn< std::vector<char*> >","write","FITS binary tables do not support nested arrays of BIT type.");
         }
     }
 
@@ -1225,33 +1290,117 @@ namespace DSL
         if(nrow <= 0)
             return;
 
-        // CFITSIO logical reader returns 'T'/'F' in values; nullarray marks nulls when anynull != 0.
-        std::unique_ptr<char[]> values(new char[nrow]);
-        const char nulval = 'F'; // default for nulls
-        int anynul = 0;
-
-
-        if(ffgcvl(fptr.get(),
-                  static_cast<int>(data->getPosition()),
-                  static_cast<LONGLONG>(row),   // firstrow
-                  static_cast<LONGLONG>(1),     // firstelem
-                  static_cast<LONGLONG>(nrow),  // nelem
-                  nulval,
-                  values.get(),
-                  &anynul,
-                  &status))
+        if (data->getType() == tlogical)
         {
-            throw FITSexception(status,"FITStable","read<char*>");
+                
+            // CFITSIO logical reader returns 'T'/'F' in values; nullarray marks nulls when anynull != 0.
+            std::unique_ptr<char[]> values(new char[nrow]);
+            const char nulval = 'F'; // default for nulls
+            int anynul = 0;
+
+            if(ffgcvl(fptr.get(),
+                      static_cast<int>(data->getPosition()),
+                      static_cast<LONGLONG>(row),   // firstrow
+                        static_cast<LONGLONG>(1),     // firstelem
+                        static_cast<LONGLONG>(nrow),  // nelem
+                        nulval,
+                        values.get(),
+                        &anynul,
+                        &status))
+            {
+                throw FITSexception(status,"FITStable","read<char*>");
+            }
+
+            for(LONGLONG i = 0; i < nrow; ++i)
+            {
+                // Allocate C-string "T"/"F" per row
+                char* out = new char[2];
+                out[0] = (values[static_cast<size_t>(i)] == 0x1) ? 'T' : 'F';
+                out[1] = '\0';
+                data->push_back(out);
+            }
+
+            return;
+        }
+        else if (data->getType() == tbit)
+        {
+            const LONGLONG nelem = static_cast<LONGLONG>(data->getNelem());  // bits per cell
+            if (nelem <= 0) return;
+
+            // Read row by row: for each row, read exactly 'nelem' bits starting at bit 1
+            std::vector<char> bits(static_cast<size_t>(nelem), 0);
+
+            if (nelem <= 64)
+            {
+                for (LONGLONG r = 0; r < nrow; ++r)
+                {
+                    if (ffgcx(fptr.get(),
+                              static_cast<int>(data->getPosition()),
+                              static_cast<LONGLONG>(row + r),  // target row
+                              1,                                // first bit in cell (1-based)
+                              static_cast<long>(nelem),         // number of bits in this cell
+                              bits.data(),
+                              &status))
+                    {
+                        throw FITSexception(status,"FITStable","read<char*>");
+                    }
+
+                    // For 1X, put the bit in the LSB (so tests can check p[0] & 0x01)
+                    if (nelem == 1)
+                    {
+                        char* out = new char[1];
+                        out[0] = bits[0] ? char(0x01) : char(0x00);
+                        data->push_back(out);
+                        continue;
+                    }
+
+                    // For multi-bit X, pack MSB-first within each byte so patterns match input (e.g., 0x88, 0xF1).
+                    const size_t nbytes = (static_cast<size_t>(nelem) + 7) / 8;
+                    char* out = new char[nbytes];
+                    std::memset(out, 0, nbytes);
+
+                    for (size_t b = 0; b < static_cast<size_t>(nelem); ++b)
+                    {
+                        const size_t byteIndex = b / 8;
+                        const size_t bitInByte = b % 8; // 0..7
+                        if (bits[b])
+                        {
+                            const uint8_t mask = onbit_msb[bitInByte]; // 0x80,0x40,...,0x01
+                            out[byteIndex] = static_cast<char>(static_cast<uint8_t>(out[byteIndex]) | mask);
+                        }
+                    }
+
+                    data->push_back(out);
+                }
+            }
+            else
+            {
+                for (LONGLONG r = 0; r < nrow; ++r)
+                {
+                    if (ffgcx(fptr.get(),
+                              static_cast<int>(data->getPosition()),
+                              static_cast<LONGLONG>(row + r),
+                              1,
+                              static_cast<long>(nelem),
+                              bits.data(),
+                              &status))
+                    {
+                        throw FITSexception(status,"FITStable","read<char*>");
+                    }
+
+                    // Keep ASCII '0'/'1' string for large bitfields
+                    char* out = new char[static_cast<size_t>(nelem) + 1];
+                    for (LONGLONG b = 0; b < nelem; ++b)
+                        out[static_cast<size_t>(b)] = (bits[static_cast<size_t>(b)] != 0) ? '1' : '0';
+                    out[static_cast<size_t>(nelem)] = '\0';
+                    data->push_back(out);
+                }
+            }
+            return;
         }
 
-        for(LONGLONG i = 0; i < nrow; ++i)
-        {
-            // Allocate C-string "T"/"F" per row
-            char* out = new char[2];
-            out[0] = values[static_cast<size_t>(i)];
-            out[1] = '\0';
-            data->push_back(out);
-        }
+        throw FITSexception(BAD_TFORM_DTYPE,"FITStable::read<char*>","Unsupported dtype for char* column");
+
     }
 
     template<>
@@ -1277,7 +1426,7 @@ namespace DSL
 
         const char nulval = 'F'; // default for nulls
 
-        // Read each row’s repeated logical elements
+        // Read each row's repeated logical elements
         for(LONGLONG r = 0; r < nrow; ++r)
         {
             std::unique_ptr<char[]> values(new char[nelem]);
@@ -1287,7 +1436,7 @@ namespace DSL
                       static_cast<int>(data->getPosition()),
                       static_cast<LONGLONG>(row + r), // firstrow
                       1,                              // firstelem
-                      nelem,                          // number of elements in this row’s cell
+                      nelem,                          // number of elements in this row's cell
                       nulval,
                       values.get(),
                       &anynull,
@@ -1301,7 +1450,7 @@ namespace DSL
             for(LONGLONG e = 0; e < nelem; ++e)
             {
                 char* cstr = new char[2];
-                cstr[0] = values[static_cast<size_t>(e)]; // 'T' or 'F'
+                cstr[0] =  (values[static_cast<size_t>(e)] == 0x1) ? 'T' : 'F';
                 cstr[1] = '\0';
                 out.push_back(cstr);
             }
@@ -1322,7 +1471,6 @@ namespace DSL
         hdu.ValueForKey("XTENSION","BINTABLE",fChar);
         hdu.ValueForKey("BITPIX",(uint16_t) 8,"Number of bits per data pixel");
         hdu.ValueForKey("NAXIS",(uint16_t) 2,"Number of data axes");
-        
     }
     
     /**
@@ -1644,7 +1792,7 @@ namespace DSL
                 case tbit:
                 case tlogical:
                     {
-                        FITScolumn<char*>* tform = new FITScolumn<char*>(std::string(TFIELD),static_cast<dtype>(data_type),tscale,tzero,std::string(tunit),n);
+                        FITScolumn<char*>* tform = new FITScolumn<char*>(std::string(TFIELD),static_cast<dtype>(data_type),std::string(tunit),n);
                         read<char*>(tform, fptr, start);
                         return std::unique_ptr<FITSform>(tform);
                     }
@@ -1760,6 +1908,12 @@ namespace DSL
                     }
                   
                 case tbit:
+                    {
+                        FITScolumn< char* >* tform = new FITScolumn<char*>(std::string(TFIELD),static_cast<dtype>(data_type),trepeat,twidth,std::string(tunit),  n);
+                        read<char*>(tform, fptr, start);
+                        return std::unique_ptr<FITSform>(tform);
+                    }
+
                 case tlogical:
                     {
                         FITScolumn< FITSform::charVector >* tform = new FITScolumn<FITSform::charVector>(std::string(TFIELD),static_cast<dtype>(data_type),trepeat,twidth,tscale,tzero,std::string(tunit),n);
@@ -2011,9 +2165,22 @@ namespace DSL
                 }
 
             case tbit:
+                {
+                    FITScolumn<char*>* col = new FITScolumn<char*>(cname, type, tunit, pos);
+                    const int64_t repeat = col->getNelem(); // number of bits per cell
+                    for (size_t n = 0; n < nrows; ++n)
+                    {
+                        char* buf = new char[static_cast<size_t>(repeat)];
+                        std::memset(buf, 0, static_cast<size_t>(repeat)); // all bits 0
+                        col->push_back(buf);
+                    }
+                    fcolumns.push_back(std::unique_ptr<FITSform>(col));
+                    break;
+                }
+
             case tlogical:
                 {
-                    FITScolumn<char*>* col = new FITScolumn<char*>(cname, type, tunit,pos);
+                    FITScolumn<char*>* col = new FITScolumn<char*>(cname, type, tunit ,pos);
                     for(size_t n = 0; n < nrows; n++)
                         col->push_back(const_cast<char*>("F"));
 
