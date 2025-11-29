@@ -19,6 +19,8 @@
 #include <typeinfo>
 #include <cxxabi.h>
 #include <string>
+#include <array>
+#include <vector>
 
 namespace DSL
 {
@@ -43,6 +45,29 @@ namespace DSL
         return a;
     }
     constexpr auto onbit_msb = make_onbit_msb<8>();
+
+    static void expandPackedBitsMSB(const unsigned char* raw,
+        size_t raw_len,
+        int64_t nbits,
+        char* out /* 0/1 destinations */)
+    {
+        const size_t totalBits = static_cast<size_t>(nbits);
+        size_t bitIndex = 0;
+        
+        for(size_t byteIndex = 0; byteIndex < raw_len && bitIndex < totalBits; ++byteIndex)
+        {
+            const unsigned char byte = raw[byteIndex];
+            for(size_t bitInByte = 0; bitInByte < 8 && bitIndex < totalBits; ++bitInByte)
+            {
+                // Use MSB-first masks (defined below as onbit_msb)
+                const unsigned char mask = onbit_msb[bitInByte];
+                out[bitIndex++] = (byte & mask) ? 1 : 0;
+            }
+        }
+
+        while(bitIndex < totalBits)
+            out[bitIndex++] = 0;
+    }
 
     typedef std::vector<double> pixelCoords;
     typedef std::vector<double> worldCoords;

@@ -24,6 +24,7 @@
 
 #include <DSTfits/FITStable.h>
 #include <DSTfits/FITSexception.h>
+#include <DSTfits/FITSdata.h>
 
 namespace DSL
 {
@@ -1177,18 +1178,18 @@ namespace DSL
 
             int tbl_status = 0;
             size_t row = 0;
-            std::vector<char> tmp(static_cast<size_t>(nbits), 0); // reuse buffer
+            std::vector<char> tmp(static_cast<size_t>(nbits), 0); // 0/1 buffer
 
             for(size_t idx = 0; idx < data.size(); ++idx, ++row)
             {
                 if(row < static_cast<size_t>(first_row - 1))
                     continue;
 
-                char* raw = data[idx];
+                const unsigned char* raw = reinterpret_cast<unsigned char*>(data[idx]);
 
                 if(nbits == 1)
                 {
-                    // Single-bit cell: treat the pointer value itself (0/1) as the bit, never dereference.
+                    // Single-bit cell: treat pointer value LSB as the bit if no storage provided
                     std::uintptr_t pv = reinterpret_cast<std::uintptr_t>(raw);
                     tmp[0] = (pv & 0x1u) ? 1 : 0;
                 }
@@ -1200,17 +1201,12 @@ namespace DSL
                     }
                     else
                     {
-                        // For nbits <= 8, expand from one packed byte (MSB-first, matching CFITSIO onbit order).
-                        // If you store longer buffers elsewhere, replace this with a proper buffer-length aware copy.
-                        unsigned char byte = static_cast<unsigned char>(*raw);
-                        static const unsigned char onbit[8] = {128,64,32,16,8,4,2,1};
-                        const size_t n = static_cast<size_t>(std::min<int64_t>(nbits, 8));
-                        for(size_t b = 0; b < n; ++b)
-                            tmp[b] = (byte & onbit[b]) ? 1 : 0;
+                        // Preferred: use actual buffer length from your storage
+                        // size_t raw_len = user_provided_length;
+                        // Minimal assumption if you cannot pass a length:
+                        const size_t raw_len = static_cast<size_t>((nbits + 7) / 8);
 
-                        // pad remaining bits with 0 if nbits > 8
-                        for(size_t b = n; b < static_cast<size_t>(nbits); ++b)
-                            tmp[b] = 0;
+                        expandPackedBitsMSB(raw, raw_len, nbits, tmp.data());
                     }
                 }
 
