@@ -117,10 +117,98 @@ namespace DSL
         typedef std::vector< uint64_t >                 uint64Vector;
         typedef std::vector< float >                    floatVector;
         typedef std::vector< double >                   doubleVector;
-        typedef std::vector< char* >                    charVector;
+        typedef std::vector< bool  >                    boolVector;
         typedef std::vector< std::string >              stringVector;
         typedef std::vector< std::pair<float,float> >   complexVector;
         typedef std::vector< std::pair<double,double> > dblcomplexVector;
+
+        static void toBoolVector(boolVector* v, const uint8_t& bits)
+        {
+            v->clear();
+            size_t i = 8;
+            while (i--)
+            {
+                const size_t bit = i; // 7..0
+                v->push_back( ((bits >> bit) & 0x1u) != 0 );
+            }
+        }
+
+        static void toBoolVector(boolVector* v, const uint16_t& bits)
+        {
+            v->clear();
+            size_t i = 16;
+            while (i--)
+            {
+                const size_t bit = i; // 15..0
+                v->push_back( ((bits >> bit) & 0x1u) != 0 );
+            }
+        }
+
+        static void toBoolVector(boolVector* v, const uint32_t& bits)
+        {
+            v->clear();
+            size_t i = 32;
+            while (i--)
+            {
+                const size_t bit = i; // 31..0
+                v->push_back( ((bits >> bit) & 0x1u) != 0 );
+            }
+        }
+
+        static void toBoolVector(boolVector* v, const uint64_t& bits)
+        {
+            v->clear();
+            size_t i = 64;
+            while (i--)
+            {
+                const size_t bit = i; // 63..0
+                v->push_back( ((bits >> bit) & 0x1ull) != 0 );
+            }
+        }
+
+        static void fromBoolVector(const boolVector& v, uint8_t* bits)
+        {
+            (*bits) = 0;
+            const size_t N = std::min(v.size(), static_cast<size_t>(8));
+            for (size_t i = 0; i < N; ++i)
+            {
+                if (v[i])
+                    (*bits) |= static_cast<uint8_t>(0x1u << (7 - i));
+            }
+        }
+
+        static void fromBoolVector(const boolVector& v, uint16_t* bits)
+        {
+            (*bits) = 0;
+            const size_t N = std::min(v.size(), static_cast<size_t>(16));
+            for (size_t i = 0; i < N; ++i)
+            {
+                if (v[i])
+                    (*bits) |= static_cast<uint16_t>(0x1u << (15 - i));
+            }
+        }
+
+        static void fromBoolVector(const boolVector& v, uint32_t* bits)
+        {
+            (*bits) = 0;
+            const size_t N = std::min(v.size(), static_cast<size_t>(32));
+            for (size_t i = 0; i < N; ++i)
+            {
+                if (v[i])
+                    (*bits) |= static_cast<uint32_t>(0x1u << (31 - i));
+            }
+        }
+
+        static void fromBoolVector(const boolVector& v, uint64_t* bits)
+        {
+            (*bits) = 0;
+            const size_t N = std::min(v.size(), static_cast<size_t>(64));
+            for (size_t i = 0; i < N; ++i)
+            {
+                if (v[i])
+                    (*bits) |= static_cast<uint64_t>(0x1ull << (63 - i));
+            }
+        }
         
         
 #pragma endregion
@@ -289,11 +377,11 @@ namespace DSL
     };
 
 // Scalar type specializations
-template<> void FITScolumn<uint32_t>            ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
-template<> void FITScolumn<FITSform::complex>   ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
-template<> void FITScolumn<FITSform::dblcomplex>::write(const std::shared_ptr<fitsfile>&, const int64_t&);
-template<> void FITScolumn<std::string>         ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
-template<> void FITScolumn<char*>               ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<uint32_t>                  ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<FITSform::complex>         ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<FITSform::dblcomplex>      ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<std::string>               ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<bool>                      ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
 
 // Vector type specializations
 template<> void FITScolumn<FITSform::int8Vector>      ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
@@ -309,7 +397,7 @@ template<> void FITScolumn<FITSform::doubleVector>    ::write(const std::shared_
 template<> void FITScolumn<FITSform::complexVector>   ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
 template<> void FITScolumn<FITSform::dblcomplexVector>::write(const std::shared_ptr<fitsfile>&, const int64_t&);
 template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
-template<> void FITScolumn<FITSform::charVector>      ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
+template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
     
 #pragma endregion
 #pragma region - FITStable class definition

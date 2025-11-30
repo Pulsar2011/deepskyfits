@@ -353,12 +353,12 @@ TEST(FITStable,col_tdbcplx_ctor)
 TEST(FITStable,col_tlogical_ctor)
 {
     FITStable table; expect_empty_table_header(table);
-    FITScolumn<char*> col_log("COL_LOG", tlogical, "", 1);
-    col_log.push_back((char*)"T");
-    col_log.push_back((char*)"F");
-    col_log.push_back((char*)"T");
+    FITScolumn<bool> col_log("COL_LOG", tlogical, "", 1);
+    col_log.push_back(true);
+    col_log.push_back(false);
+    col_log.push_back(true);
 
-    EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<char*> >(col_log)));
+    EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<bool> >(col_log)));
     EXPECT_EQ(table.nrows(), 3u);
     EXPECT_EQ(table.ncols(), 1u);
 
@@ -375,26 +375,26 @@ TEST(FITStable,col_tlogical_ctor)
     FITStable readTable(fptr,2);
     readTable.Dump(std::cout);
     
-    auto* col = dynamic_cast< FITScolumn< char* > *>(readTable.getColumn(1).get());
+    auto* col = dynamic_cast< FITScolumn< bool > *>(readTable.getColumn(1).get());
     ASSERT_NE(col,nullptr);
     ASSERT_EQ(col->values().size(),3u);
-    EXPECT_STREQ(col->values()[0],"T");
-    EXPECT_STREQ(col->values()[1],"F");
-    EXPECT_STREQ(col->values()[2],"T");
-    status=0;
+    EXPECT_TRUE (col->values()[0]);
+    EXPECT_FALSE(col->values()[1]);
+    EXPECT_TRUE (col->values()[2]);
     
+    status=0;
     EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
 TEST(FITStable,col_tbit_ctor)
 {
     FITStable table; expect_empty_table_header(table);
-    FITScolumn<char*> col_bit("COL_1BIT", tbit, "", 1);
-    col_bit.push_back((char*)0u);
-    col_bit.push_back((char*)1u);
-    col_bit.push_back((char*)0u);
+    FITScolumn<bool> col_bit("COL_1BIT", tbit, "", 1);
+    col_bit.push_back(false);
+    col_bit.push_back(true);
+    col_bit.push_back(false);
 
-    EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<char*> >(col_bit)));
+    EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn< bool > >(col_bit)));
     EXPECT_EQ(table.nrows(), 3u);
     EXPECT_EQ(table.ncols(), 1u);
 
@@ -409,17 +409,15 @@ TEST(FITStable,col_tbit_ctor)
     ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     
     FITStable readTable(fptr,2);
-    auto* col = dynamic_cast<FITScolumn<char*>*>(readTable.getColumn(1).get());
+    auto* col = dynamic_cast< FITScolumn< bool > *>(readTable.getColumn(1).get());
     ASSERT_NE(col,nullptr);
     ASSERT_EQ(col->values().size(),3u);
-
-    // Check lowest bit in first byte of each packed buffer
-    auto bit0 = [](char* p){ return static_cast<unsigned char>(p[0]) & 0x01; };
-    EXPECT_EQ(bit0(col->values()[0]), 0u);
-    EXPECT_EQ(bit0(col->values()[1]), 1u);
-    EXPECT_EQ(bit0(col->values()[2]), 0u);
-
-    status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
+    EXPECT_FALSE (col->values()[0]);
+    EXPECT_TRUE  (col->values()[1]);
+    EXPECT_FALSE (col->values()[2]);
+    
+    status=0;
+    EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
 TEST(FITStable,col_tbyte_ctor)
@@ -833,13 +831,15 @@ TEST(FITStable,v_tstring_ctor)
 
 TEST(FITStable,v_tlogical_ctor)
 {
-    FITStable table; expect_empty_table_header(table);
-    FITScolumn<std::vector<char*>> v_log("V_LOG", tlogical, "", 1);
-    v_log.push_back(std::vector<char*>{(char*)"T",(char*)"F",(char*)"T"});
-    v_log.push_back(std::vector<char*>{(char*)"F",(char*)"T",(char*)"F"});
-    v_log.push_back(std::vector<char*>{(char*)"T",(char*)"T",(char*)"F"});
+    FITStable table;
+    expect_empty_table_header(table);
+
+    FITScolumn<FITSform::boolVector> v_log("V_LOG", tlogical, "", 1);
+    v_log.push_back(std::vector<bool>{true,false,true});
+    v_log.push_back(std::vector<bool>{false,true,false});
+    v_log.push_back(std::vector<bool>{true,true,false});
     
-    EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<char*>> >(v_log)));
+    EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<FITSform::boolVector> >(v_log)));
     EXPECT_EQ(table.nrows(), 3u);
     EXPECT_EQ(table.ncols(), 1u);
     
@@ -858,19 +858,19 @@ TEST(FITStable,v_tlogical_ctor)
     
     FITStable readTable(fptr,2);
     
-    auto* col = dynamic_cast<FITScolumn<std::vector<char*>>*>(readTable.getColumn(1).get());
+    auto* col = dynamic_cast<FITScolumn<FITSform::boolVector>*>(readTable.getColumn(1).get());
     ASSERT_NE(col,nullptr);
     ASSERT_EQ(col->values().size(),3u);
     
-    EXPECT_STREQ(col->values()[0][0],"T");
-    EXPECT_STREQ(col->values()[0][1],"F");
-    EXPECT_STREQ(col->values()[0][2],"T");
-    EXPECT_STREQ(col->values()[1][0],"F");
-    EXPECT_STREQ(col->values()[1][1],"T");
-    EXPECT_STREQ(col->values()[1][2],"F");
-    EXPECT_STREQ(col->values()[2][0],"T");
-    EXPECT_STREQ(col->values()[2][1],"T");
-    EXPECT_STREQ(col->values()[2][2],"F");
+    EXPECT_TRUE (col->values()[0][0]);
+    EXPECT_FALSE(col->values()[0][1]);
+    EXPECT_TRUE (col->values()[0][2]);
+    EXPECT_FALSE(col->values()[1][0]);
+    EXPECT_TRUE (col->values()[1][1]);
+    EXPECT_FALSE(col->values()[1][2]);
+    EXPECT_TRUE (col->values()[2][0]);
+    EXPECT_TRUE (col->values()[2][1]);
+    EXPECT_FALSE(col->values()[2][2]);
 
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0);
     EXPECT_EQ(status,0);
@@ -879,29 +879,78 @@ TEST(FITStable,v_tlogical_ctor)
 TEST(FITStable,v_8tbit_ctor)
 {
     FITStable table; expect_empty_table_header(table);
-    FITScolumn<char*> v_bit("V_8BIT", tbit, (int64_t) 8, (int64_t) 1, "", 1);
+    FITScolumn<FITSform::boolVector> v_bit("V_8BIT", tbit, (int64_t) 8, (int64_t) 1, "", 1);
     
-    // Define bytes with packed bits (MSB-first).
-    // Example patterns:
-    // row0: 0x88 -> bits 0 and 4 set (sequence indices -> display 10001000)
-    // row1: 0xF1 -> bits 0,1,2,3 and 7 set (display 11110001)
-    // row2: 0x00 -> no bits set
-    static unsigned char row0 = 0; row0 |= 0x88;
-    static unsigned char row1 = 0; row1 |= 0xF1;
-    static unsigned char row2 = 0; row2 |= 0x00;
+    uint8_t row0 = 0; row0 |= 0x88; uint8_t test0 = 0;
+    uint8_t row1 = 0; row1 |= 0xF1; uint8_t test1 = 0;
+    uint8_t row2 = 0; row2 |= 0x00; uint8_t test2 = 0;
 
-    v_bit.push_back(reinterpret_cast<char*>(&row0));
-    v_bit.push_back(reinterpret_cast<char*>(&row1));
-    v_bit.push_back(reinterpret_cast<char*>(&row2));
+    std::vector<bool> bv0;
+    FITSform::toBoolVector(&bv0, row0);
+    FITSform::fromBoolVector(bv0, &test0);
+    EXPECT_EQ(row0,test0);
+    
+    FITSform::boolVector bv1; FITSform::toBoolVector(&bv1, row1); FITSform::fromBoolVector(bv1, &test1); EXPECT_EQ(row1,test1);
+    FITSform::boolVector bv2; FITSform::toBoolVector(&bv2, row2); FITSform::fromBoolVector(bv2, &test2); EXPECT_EQ(row2,test2);
+
+    v_bit.push_back(bv0);
+    v_bit.push_back(bv1);
+    v_bit.push_back(bv2);
 
 
-    EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<char*> >(v_bit)));
+    EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<FITSform::boolVector> >(v_bit)));
+    EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
+    
+    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    
+    // Read-back
+    fitsfile* rawFptr=nullptr; int status=0;
+    
+    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    
+    std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
+    
+    int hdutype=0;
+    status=0;
+    ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
 
-    auto* col_ini = dynamic_cast< FITScolumn< char* >* >(table.getColumn(1).get());
+    FITStable readTable(fptr,2);
 
-    EXPECT_TRUE((*(col_ini->values()[0]))=='\x88');
-    EXPECT_TRUE((*(col_ini->values()[1]))=='\xF1');
-    EXPECT_TRUE((*(col_ini->values()[2]))=='\x00');
+    auto* col = dynamic_cast< FITScolumn< FITSform::boolVector >* >(readTable.getColumn(1).get());
+
+    ASSERT_NE(col,nullptr);
+    ASSERT_EQ(col->values().size(),3u);
+
+    // Each row: 8 bits packed in 1 byte
+    uint8_t vtest0 = 0;
+    uint8_t vtest1 = 0;
+    uint8_t vtest2 = 0;
+
+    FITSform::fromBoolVector(col->values()[0], &vtest0);
+    FITSform::fromBoolVector(col->values()[1], &vtest1);
+    FITSform::fromBoolVector(col->values()[2], &vtest2);
+
+    EXPECT_EQ(vtest0, row0);
+    EXPECT_EQ(vtest1, row1);
+    EXPECT_EQ(vtest2, row2);
+}
+
+TEST(FITStable,v_16tbit_ctor)
+{
+    FITStable table; expect_empty_table_header(table);
+    // 16 bits => 2 bytes
+    FITScolumn<FITSform::boolVector> v_bit("V_16BIT", tbit, (int64_t)16, (int64_t)2, "", 1);
+
+    // Little-endian layout: low byte first
+    uint16_t row0 = 0x8840; uint16_t test0=0; FITSform::boolVector bv0; FITSform::toBoolVector(&bv0, row0); FITSform::fromBoolVector(bv0, &test0); EXPECT_EQ(row0,test0); 
+    uint16_t row1 = 0xF188; uint16_t test1=0; FITSform::boolVector bv1; FITSform::toBoolVector(&bv1, row1); FITSform::fromBoolVector(bv1, &test1); EXPECT_EQ(row1,test1); 
+    uint16_t row2 = 0x001A; uint16_t test2=0; FITSform::boolVector bv2; FITSform::toBoolVector(&bv2, row2); FITSform::fromBoolVector(bv2, &test2); EXPECT_EQ(row2,test2); 
+
+    v_bit.push_back(bv0);
+    v_bit.push_back(bv1);
+    v_bit.push_back(bv2);
+
+    EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<FITSform::boolVector> >(v_bit)));
 
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
     EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
@@ -919,103 +968,129 @@ TEST(FITStable,v_8tbit_ctor)
 
     FITStable readTable(fptr,2);
 
-    auto* col = dynamic_cast< FITScolumn< char* >* >(readTable.getColumn(1).get());
+    auto* col = dynamic_cast< FITScolumn< FITSform::boolVector >* >(readTable.getColumn(1).get());
 
     ASSERT_NE(col,nullptr);
     ASSERT_EQ(col->values().size(),3u);
 
     // Each row: 8 bits packed in 1 byte
-    EXPECT_TRUE((*(col->values()[0]))=='\x88') << std::hex << int(*(col->values()[0])) << std::dec << " Expected 0x88";
-    EXPECT_TRUE((*(col->values()[1]))=='\xF1') << std::hex << int(*(col->values()[1])) << std::dec << " Expected 0xF1";
-    EXPECT_TRUE((*(col->values()[2]))=='\x00') << std::hex << int(*(col->values()[2])) << std::dec << " Expected 0x00";
+    uint16_t vtest0 = 0;
+    uint16_t vtest1 = 0;
+    uint16_t vtest2 = 0;
 
-    // Row1 0x88 (10001000): bits 7,3 set
-    unsigned char b0 = static_cast<unsigned char>(col->values()[0][0]); // 0x88
+    FITSform::fromBoolVector(col->values()[0], &vtest0);
+    FITSform::fromBoolVector(col->values()[1], &vtest1);
+    FITSform::fromBoolVector(col->values()[2], &vtest2);
 
-    // LSB-first zero-based checks (bits 7 and 3 set)
-    EXPECT_TRUE( (b0 & (1u << 7)) != 0 ); // bit7
-    EXPECT_TRUE( (b0 & (1u << 3)) != 0 ); // bit3
-    EXPECT_TRUE( (b0 & (1u << 0)) == 0 ); // bit0 clear
+    EXPECT_EQ(vtest0, row0);
+    EXPECT_EQ(vtest1, row1);
+    EXPECT_EQ(vtest2, row2);
 
-    // MSB-first one-based equivalent (positions 1 and 5 set, 8 clear)
-    EXPECT_TRUE( ((b0 >> (8 - 1)) & 0x1) == 1 ); // pos1 (bit7)
-    EXPECT_TRUE( ((b0 >> (8 - 5)) & 0x1) == 1 ); // pos5 (bit3)
-    EXPECT_TRUE( ((b0 >> (8 - 8)) & 0x1) == 0 ); // pos8 (bit0)
-
-    // Row1 0xF1 (11110001): bits 7,6,5,4,0 set
-    unsigned char b1 = static_cast<unsigned char>(col->values()[1][0]);
-    EXPECT_TRUE( (b1 & (1u << 7)) != 0 );
-    EXPECT_TRUE( (b1 & (1u << 6)) != 0 );
-    EXPECT_TRUE( (b1 & (1u << 5)) != 0 );
-    EXPECT_TRUE( (b1 & (1u << 4)) != 0 );
-    EXPECT_TRUE( (b1 & (1u << 0)) != 0 );
-
-    // Row2 0x00: none set
-    unsigned char b2 = static_cast<unsigned char>(col->values()[2][0]);
-    EXPECT_TRUE( (b2 & 0xFF) == 0 );
     
-    status=0;
-    EXPECT_EQ(fits_close_file(fptr.get(),&status),0);
-    EXPECT_EQ(status,0);
 }
 
-TEST(FITStable,v_16tbit_ctor)
+TEST(FITStable,v_32tbit_ctor)
 {
     FITStable table; expect_empty_table_header(table);
     // 16 bits => 2 bytes
-    FITScolumn<char*> v_bit("V_16BIT", tbit, (int64_t)16, (int64_t)2, "", 1);
+    FITScolumn<FITSform::boolVector> v_bit("V_32BIT", tbit, (int64_t)32, (int64_t)2, "", 1);
 
     // Little-endian layout: low byte first
-    static unsigned char row0[2] = { 0x88, 0x40 }; // 0x4088
-    static unsigned char row1[2] = { 0xF1, 0x88 }; // 0x88F1
-    static unsigned char row2[2] = { 0x00, 0x1A }; // 0x1A00
+    uint32_t row0 = 0x8840FF; uint32_t test0=0; FITSform::boolVector bv0; FITSform::toBoolVector(&bv0, row0); FITSform::fromBoolVector(bv0, &test0); EXPECT_EQ(row0,test0); 
+    uint32_t row1 = 0xF188A2; uint32_t test1=0; FITSform::boolVector bv1; FITSform::toBoolVector(&bv1, row1); FITSform::fromBoolVector(bv1, &test1); EXPECT_EQ(row1,test1); 
+    uint32_t row2 = 0x001A00; uint32_t test2=0; FITSform::boolVector bv2; FITSform::toBoolVector(&bv2, row2); FITSform::fromBoolVector(bv2, &test2); EXPECT_EQ(row2,test2); 
 
-    v_bit.push_back(reinterpret_cast<char*>(row0));
-    v_bit.push_back(reinterpret_cast<char*>(row1));
-    v_bit.push_back(reinterpret_cast<char*>(row2));
+    v_bit.push_back(bv0);
+    v_bit.push_back(bv1);
+    v_bit.push_back(bv2);
 
-    EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<char*> >(v_bit)));
+    EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<FITSform::boolVector> >(v_bit)));
 
-    auto* col_ini = dynamic_cast< FITScolumn<char*>* >(table.getColumn(1).get());
-    ASSERT_NE(col_ini,nullptr);
-
-    auto get16 = [](char* p){
-        // Assemble explicitly to avoid alignment/endianness surprises
-        return uint16_t(uint16_t(uint8_t(p[1])) << 8 | uint16_t(uint8_t(p[0])));
-    };
-
-    EXPECT_EQ(get16(col_ini->values()[0]), 0x4088);
-    EXPECT_EQ(get16(col_ini->values()[1]), 0x88F1);
-    EXPECT_EQ(get16(col_ini->values()[2]), 0x1A00);
-
+    EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
     EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
-
+    
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
+    
     ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
-    int hdutype=0; status=0;
+    
+    int hdutype=0;
+    status=0;
     ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
 
     FITStable readTable(fptr,2);
-    auto* col = dynamic_cast< FITScolumn<char*>* >(readTable.getColumn(1).get());
+
+    auto* col = dynamic_cast< FITScolumn< FITSform::boolVector >* >(readTable.getColumn(1).get());
+
     ASSERT_NE(col,nullptr);
     ASSERT_EQ(col->values().size(),3u);
 
-    EXPECT_EQ(get16(col->values()[0]), 0x4088);
-    EXPECT_EQ(get16(col->values()[1]), 0x88F1);
-    EXPECT_EQ(get16(col->values()[2]), 0x1A00);
+    // Each row: 8 bits packed in 1 byte
+    uint32_t vtest0 = 0;
+    uint32_t vtest1 = 0;
+    uint32_t vtest2 = 0;
 
-    // Bit checks (LSB-first, zero-based)
-    uint16_t v0 = get16(col->values()[0]); // 0x4088 -> bits 14,7,3 set
-    EXPECT_TRUE(v0 & (1u<<14));
-    EXPECT_TRUE(v0 & (1u<<7));
-    EXPECT_TRUE(v0 & (1u<<3));
-    EXPECT_FALSE(v0 & (1u<<0));
+    FITSform::fromBoolVector(col->values()[0], &vtest0);
+    FITSform::fromBoolVector(col->values()[1], &vtest1);
+    FITSform::fromBoolVector(col->values()[2], &vtest2);
 
+    EXPECT_EQ(vtest0, row0);
+    EXPECT_EQ(vtest1, row1);
+    EXPECT_EQ(vtest2, row2);
+}
+
+TEST(FITStable,v_64tbit_ctor)
+{
+    FITStable table; expect_empty_table_header(table);
+    // 16 bits => 2 bytes
+    FITScolumn<FITSform::boolVector> v_bit("V_64BIT", tbit, (int64_t)64, (int64_t)2, "", 1);
+
+    // Little-endian layout: low byte first
+    uint64_t row0 = 0xC8840FF; uint64_t test0=0; FITSform::boolVector bv0; FITSform::toBoolVector(&bv0, row0); FITSform::fromBoolVector(bv0, &test0); EXPECT_EQ(row0,test0); 
+    uint64_t row1 = 0xEF188A2; uint64_t test1=0; FITSform::boolVector bv1; FITSform::toBoolVector(&bv1, row1); FITSform::fromBoolVector(bv1, &test1); EXPECT_EQ(row1,test1); 
+    uint64_t row2 = 0x001A00F; uint64_t test2=0; FITSform::boolVector bv2; FITSform::toBoolVector(&bv2, row2); FITSform::fromBoolVector(bv2, &test2); EXPECT_EQ(row2,test2); 
+
+    v_bit.push_back(bv0);
+    v_bit.push_back(bv1);
+    v_bit.push_back(bv2);
+
+    EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<FITSform::boolVector> >(v_bit)));
+
+    EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
+    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    
+    // Read-back
+    fitsfile* rawFptr=nullptr; int status=0;
+    
+    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    
+    std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
+    
+    int hdutype=0;
     status=0;
-    EXPECT_EQ(fits_close_file(fptr.get(),&status),0);
-    EXPECT_EQ(status,0);
+    ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
+
+    FITStable readTable(fptr,2);
+
+    auto* col = dynamic_cast< FITScolumn< FITSform::boolVector >* >(readTable.getColumn(1).get());
+
+    ASSERT_NE(col,nullptr);
+    ASSERT_EQ(col->values().size(),3u);
+
+    // Each row: 8 bits packed in 1 byte
+    uint64_t vtest0 = 0;
+    uint64_t vtest1 = 0;
+    uint64_t vtest2 = 0;
+
+    FITSform::fromBoolVector(col->values()[0], &vtest0);
+    FITSform::fromBoolVector(col->values()[1], &vtest1);
+    FITSform::fromBoolVector(col->values()[2], &vtest2);
+
+    EXPECT_EQ(vtest0, row0);
+    EXPECT_EQ(vtest1, row1);
+    EXPECT_EQ(vtest2, row2);
 }
 
 TEST(FITStable,all_columns_single_file)
@@ -1024,86 +1099,103 @@ TEST(FITStable,all_columns_single_file)
 
     // --- Scalar columns ---
     {
+        std::cout<<"Inserting COL_SBYTE columns..."<<std::endl;
         FITScolumn<int8_t>    col_sbyte ("COL_SBYTE" , tsbyte   , "", 1);
         col_sbyte.push_back(int8_t(1)); col_sbyte.push_back(int8_t(2)); col_sbyte.push_back(int8_t(3));
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<int8_t> >(col_sbyte)));
     }
     {
+        std::cout<<"Inserting COL_SHORT columns..."<<std::endl;
         FITScolumn<int16_t> col_short("COL_SHORT", tshort, "", 1);
         col_short.push_back(int16_t(4)); col_short.push_back(int16_t(5)); col_short.push_back(int16_t(6));
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<int16_t> >(col_short)));
     }
     {
+        std::cout<<"Inserting COL_USHORT columns..."<<std::endl;
         FITScolumn<uint16_t> col_ushort("COL_USHORT", tushort, "", 1);
         col_ushort.push_back(uint16_t(7)); col_ushort.push_back(uint16_t(8)); col_ushort.push_back(uint16_t(9));
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<uint16_t> >(col_ushort)));
     }
     {
+        std::cout<<"Inserting COL_INT16 columns..."<<std::endl;
         FITScolumn<int32_t> col_int16("COL_INT16", tint, "", 1);
         col_int16.push_back(int32_t(-3)); col_int16.push_back(int32_t(0)); col_int16.push_back(int32_t(3));
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<int32_t> >(col_int16)));
     }
     {
+        std::cout<<"Inserting COL_UINT16 columns..."<<std::endl;
         FITScolumn<uint32_t> col_uint16("COL_UINT16", tuint, "", 1);
         col_uint16.push_back(uint32_t(1)); col_uint16.push_back(uint32_t(2)); col_uint16.push_back(uint32_t(3));
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<uint32_t> >(col_uint16)));
     }
     {
+        std::cout<<"Inserting COL_INT32 columns..."<<std::endl;
         FITScolumn<int32_t> col_int32("COL_INT32", tlong, "", 1);
         col_int32.push_back(int32_t(-11)); col_int32.push_back(int32_t(22)); col_int32.push_back(int32_t(33));
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<int32_t> >(col_int32)));
     }
     {
+        std::cout<<"Inserting COL_UINT32 columns..."<<std::endl;
         FITScolumn<uint32_t> col_uint32("COL_UINT32", tulong, "", 1);
         col_uint32.push_back(uint32_t(1)); col_uint32.push_back(uint32_t(2)); col_uint32.push_back(uint32_t(3));
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<uint32_t> >(col_uint32)));
     }
     {
+        std::cout<<"Inserting COL_INT64 columns..."<<std::endl;
         FITScolumn<int64_t> col_int64("COL_INT64", tlonglong, "", 1);
         col_int64.push_back(int64_t(-9)); col_int64.push_back(int64_t(0)); col_int64.push_back(int64_t(9));
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<int64_t> >(col_int64)));
     }
     {
+        std::cout<<"Inserting COL_UINT64 columns..."<<std::endl;
         FITScolumn<uint64_t> col_uint64("COL_UINT64", tulonglong, "", 1);
         col_uint64.push_back(uint64_t(9)); col_uint64.push_back(uint64_t(10)); col_uint64.push_back(uint64_t(11));
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<uint64_t> >(col_uint64)));
     }
     {
+        std::cout<<"Inserting COL_FLOAT columns..."<<std::endl;
         FITScolumn<float> col_float("COL_FLOAT", tfloat, "", 1);
         col_float.push_back(0.f); col_float.push_back(1.f); col_float.push_back(2.f);
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<float> >(col_float)));
     }
     {
+        std::cout<<"Inserting COL_DOUBLE columns..."<<std::endl;
         FITScolumn<double> col_double("COL_DOUBLE", tdouble, "", 1);
         col_double.push_back(-1.0); col_double.push_back(0.5); col_double.push_back(2.5);
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<double> >(col_double)));
     }
     {
+        std::cout<<"Inserting COL_CPLX columns..."<<std::endl;
         FITScolumn<FITSform::complex> col_cplx("COL_CPLX", tcplx, "", 1);
         col_cplx.push_back(FITSform::complex(1.0f,2.0f)); col_cplx.push_back(FITSform::complex(3.0f,4.0f)); col_cplx.push_back(FITSform::complex(5.0f,6.0f));
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<FITSform::complex> >(col_cplx)));
     }
     {
+        std::cout<<"Inserting COL_DCPLX columns..."<<std::endl;
         FITScolumn<FITSform::dblcomplex> col_dcplx("COL_DCPLX", tdbcplx, "", 1);
         col_dcplx.push_back(FITSform::dblcomplex(1.0,2.0)); col_dcplx.push_back(FITSform::dblcomplex(3.0,4.0)); col_dcplx.push_back(FITSform::dblcomplex(5.0,6.0));
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<FITSform::dblcomplex> >(col_dcplx)));
     }
     {
-        FITScolumn<char*> col_log("COL_LOG", tlogical, "", 1);
-        col_log.push_back((char*)"T"); col_log.push_back((char*)"F"); col_log.push_back((char*)"T");
-        EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<char*> >(col_log)));
+        std::cout<<"Inserting COL_LOG columns..."<<std::endl;
+        FITScolumn<bool> col_log("COL_LOG", tlogical, "", 1);
+        col_log.push_back(true); col_log.push_back(false); col_log.push_back(true);
+        EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<bool> >(col_log)));
     }
     {
-        FITScolumn<char*> col_bit("COL_BIT", tbit, "", 1);
-        col_bit.push_back((char*)0u); col_bit.push_back((char*)1u); col_bit.push_back((char*)0u);
-        EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<char*> >(col_bit)));
+        std::cout<<"Inserting COL_BIT columns..."<<std::endl;
+        FITScolumn<bool> col_bit("COL_BIT", tbit, "", 1);
+        col_bit.push_back(false); col_bit.push_back(true); col_bit.push_back(false);
+        EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<bool> >(col_bit)));
     }
     {
+        std::cout<<"Inserting COL_BYTE columns..."<<std::endl;
         FITScolumn<uint8_t> col_byte("COL_BYTE", tbyte, "", 1);
         col_byte.push_back(uint8_t(0x10)); col_byte.push_back(uint8_t(0x11)); col_byte.push_back(uint8_t(0x12));
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<uint8_t> >(col_byte)));
     }
     {
+        std::cout<<"Inserting COL_STR columns..."<<std::endl;
         FITScolumn<std::string> col_str("COL_STR", tstring, "", 1);
         col_str.push_back(std::string("A")); col_str.push_back(std::string("BC")); col_str.push_back(std::string("DEF"));
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::string> >(col_str)));
@@ -1111,56 +1203,67 @@ TEST(FITStable,all_columns_single_file)
 
     // --- Vector columns ---
     {
+        std::cout<<"Inserting V_SBYTE columns..."<<std::endl;
         FITScolumn<std::vector<int8_t>> v_sbyte("V_SBYTE", tsbyte, "", 1);
         v_sbyte.push_back(std::vector<int8_t>{1,2,3}); v_sbyte.push_back(std::vector<int8_t>{4,5,6}); v_sbyte.push_back(std::vector<int8_t>{7,8,9});
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<int8_t>> >(v_sbyte)));
     }
     {
+        std::cout<<"Inserting V_BYTE columns..."<<std::endl;
         FITScolumn<std::vector<uint8_t>> v_byte("V_BYTE", tbyte, "", 1);
         v_byte.push_back(std::vector<uint8_t>{0x41,0x42,0x43}); v_byte.push_back(std::vector<uint8_t>{0x44,0x45,0x46}); v_byte.push_back(std::vector<uint8_t>{0x47,0x48,0x49});
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<uint8_t>> >(v_byte)));
     }
     {
+        std::cout<<"Inserting V_SHORT columns..."<<std::endl;
         FITScolumn<std::vector<int32_t>> v_int16("V_INT16", tint, "", 1);
         v_int16.push_back(std::vector<int32_t>{-3,0,3}); v_int16.push_back(std::vector<int32_t>{4,5,6}); v_int16.push_back(std::vector<int32_t>{7,8,9});
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<int32_t>> >(v_int16)));
     }
     {
+        std::cout<<"Inserting V_USHORT columns..."<<std::endl;
         FITScolumn<std::vector<uint32_t>> v_uint16("V_UINT16", tuint, "", 1);
         v_uint16.push_back(std::vector<uint32_t>{1,2,3}); v_uint16.push_back(std::vector<uint32_t>{4,5,6}); v_uint16.push_back(std::vector<uint32_t>{7,8,9});
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<uint32_t>> >(v_uint16)));
     }
     {
+        std::cout<<"Inserting V_INT32 columns..."<<std::endl;
         FITScolumn<std::vector<int32_t>> v_int32("V_INT32", tlong, "", 1);
         v_int32.push_back(std::vector<int32_t>{-10,0,10}); v_int32.push_back(std::vector<int32_t>{11,12,13}); v_int32.push_back(std::vector<int32_t>{14,15,16});
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<int32_t>> >(v_int32)));
     }
     {
+        std::cout<<"Inserting V_UINT32 columns..."<<std::endl;
         FITScolumn<std::vector<uint32_t>> v_uint32("V_UINT32", tulong, "", 1);
         v_uint32.push_back(std::vector<uint32_t>{1,2,3}); v_uint32.push_back(std::vector<uint32_t>{4,5,6}); v_uint32.push_back(std::vector<uint32_t>{7,8,9});
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<uint32_t>> >(v_uint32)));
     }
     {
+        std::cout<<"Inserting V_INT64 columns..."<<std::endl;
         FITScolumn<std::vector<int64_t>> v_int64("V_INT64", tlonglong, "", 1);
         v_int64.push_back(std::vector<int64_t>{-9,0,9}); v_int64.push_back(std::vector<int64_t>{10,11,12}); v_int64.push_back(std::vector<int64_t>{13,14,15});
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<int64_t>> >(v_int64)));
     }
     {
+        std::cout<<"Inserting V_UINT64 columns..."<<std::endl;
         FITScolumn<std::vector<uint64_t>> v_uint64("V_UINT64", tulonglong, "", 1);
         v_uint64.push_back(std::vector<uint64_t>{9,10,11}); v_uint64.push_back(std::vector<uint64_t>{12,13,14}); v_uint64.push_back(std::vector<uint64_t>{15,16,17});
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<uint64_t>> >(v_uint64)));
     }
     {
+        std::cout<<"Inserting V_FLOAT columns..."<<std::endl;
         FITScolumn<std::vector<float>> v_float("V_FLOAT", tfloat, "", 1);
         v_float.push_back(std::vector<float>{0.f,1.f,2.f}); v_float.push_back(std::vector<float>{3.f,4.f,5.f}); v_float.push_back(std::vector<float>{6.f,7.f,8.f});
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<float>> >(v_float)));
     }
     {
+        std::cout<<"Inserting V_DOUBLE columns..."<<std::endl;
         FITScolumn<std::vector<double>> v_double("V_DOUBLE", tdouble, "", 1);
         v_double.push_back(std::vector<double>{-1.0,0.5,2.5}); v_double.push_back(std::vector<double>{3.5,4.5,5.5}); v_double.push_back(std::vector<double>{6.5,7.5,8.5});
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<double>> >(v_double)));
     }
     {
+        std::cout<<"Inserting V_CPLX columns..."<<std::endl;
         FITScolumn<std::vector<FITSform::complex>> v_cplx("V_CPLX", tcplx, "", 1);
         v_cplx.push_back(std::vector<FITSform::complex>{ {1.f,2.f},{3.f,4.f},{5.f,6.f} });
         v_cplx.push_back(std::vector<FITSform::complex>{ {7.f,8.f},{9.f,10.f},{11.f,12.f} });
@@ -1168,6 +1271,7 @@ TEST(FITStable,all_columns_single_file)
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<FITSform::complex>> >(v_cplx)));
     }
     {
+        std::cout<<"Inserting V_DCPLX columns..."<<std::endl;
         FITScolumn<std::vector<FITSform::dblcomplex>> v_dcplx("V_DCPLX", tdbcplx, "", 1);
         v_dcplx.push_back(std::vector<FITSform::dblcomplex>{ {1.0,2.0},{3.0,4.0},{5.0,6.0} });
         v_dcplx.push_back(std::vector<FITSform::dblcomplex>{ {7.0,8.0},{9.0,10.0},{11.0,12.0} });
@@ -1175,6 +1279,7 @@ TEST(FITStable,all_columns_single_file)
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<FITSform::dblcomplex>> >(v_dcplx)));
     }
     {
+        std::cout<<"Inserting V_STR columns..."<<std::endl;
         FITScolumn<std::vector<std::string>> v_str("V_STR", tstring, "", 1);
         v_str.push_back(std::vector<std::string>{"A","BC","DEF"});
         v_str.push_back(std::vector<std::string>{"G","HI","JKL"});
@@ -1182,22 +1287,20 @@ TEST(FITStable,all_columns_single_file)
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<std::string>> >(v_str)));
     }
     {
-        FITScolumn<std::vector<char*>> v_log("V_LOG", tlogical, "", 1);
-        v_log.push_back(std::vector<char*>{(char*)"T",(char*)"F",(char*)"T"});
-        v_log.push_back(std::vector<char*>{(char*)"F",(char*)"T",(char*)"F"});
-        v_log.push_back(std::vector<char*>{(char*)"T",(char*)"T",(char*)"F"});
-        EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<char*>> >(v_log)));
+        std::cout<<"Inserting V_LOG columns..."<<std::endl;
+        FITScolumn<FITSform::boolVector> v_log("V_LOG", tlogical, "", 1);
+        v_log.push_back(std::vector<bool>{true,false,true});
+        v_log.push_back(std::vector<bool>{false,true,false});
+        v_log.push_back(std::vector<bool>{true,true,false});
+        EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<FITSform::boolVector> >(v_log)));
     }
     {
-        FITScolumn<char*> v_bit("V_8BIT", tbit, (int64_t) 8, (int64_t) 1, "", 1);
-        static unsigned char row0 = 0; row0 |= 0x88;
-        static unsigned char row1 = 0; row1 |= 0xF1;
-        static unsigned char row2 = 0; row2 |= 0x00;
-
-        v_bit.push_back(reinterpret_cast<char*>(&row0));
-        v_bit.push_back(reinterpret_cast<char*>(&row1));
-        v_bit.push_back(reinterpret_cast<char*>(&row2));
-        EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<char*> >(v_bit)));
+        std::cout<<"Inserting V_3BIT columns..."<<std::endl;
+        FITScolumn<FITSform::boolVector> v_bit("V_3BIT", tbit, (int64_t) 3, (int64_t) 1, "", 1);
+        v_bit.push_back(std::vector<bool>{true,false,true});
+        v_bit.push_back(std::vector<bool>{false,true,false});
+        v_bit.push_back(std::vector<bool>{true,true,false});
+        EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<FITSform::boolVector> >(v_bit)));
     }
 
     EXPECT_EQ(table.nrows(), 3u);
@@ -1261,7 +1364,7 @@ TEST(FITStable, read_all_columns)
     EXPECT_EQ(table.HDU().GetValueForKey("TTYPE29"), "V_DCPLX");
     EXPECT_EQ(table.HDU().GetValueForKey("TTYPE30"), "V_STR");
     EXPECT_EQ(table.HDU().GetValueForKey("TTYPE31"), "V_LOG");
-    EXPECT_EQ(table.HDU().GetValueForKey("TTYPE32"), "V_8BIT");
+    EXPECT_EQ(table.HDU().GetValueForKey("TTYPE32"), "V_3BIT");
 
     // --- Verify TSCALE/TZERO propagation for required unsigned/sbyte columns (if keywords exist) ---
     auto expectScaleZero = [&](int colIndex, double expectScale, double expectZero) {
@@ -1353,12 +1456,11 @@ TEST(FITStable, read_all_columns)
     }
     {
         auto* c9 = dynamic_cast<FITScolumn<uint64_t>*>(table.getColumn(9).get());
-        ASSERT_EQ(c9, nullptr);
-        //ASSERT_NE(c9, nullptr);
-        //EXPECT_EQ(c9->values().size(), 3u);
-        //EXPECT_EQ(c9->values()[0], uint64_t(9));
-        //EXPECT_EQ(c9->values()[1], uint64_t(10));
-        //EXPECT_EQ(c9->values()[2], uint64_t(11));
+        ASSERT_NE(c9, nullptr);
+        EXPECT_EQ(c9->values().size(), 3u);
+        EXPECT_EQ(c9->values()[0], uint64_t(9));
+        EXPECT_EQ(c9->values()[1], uint64_t(10));
+        EXPECT_EQ(c9->values()[2], uint64_t(11));
     }
     {
         auto* c10 = dynamic_cast<FITScolumn<float>*>(table.getColumn(10).get());
@@ -1393,23 +1495,21 @@ TEST(FITStable, read_all_columns)
         EXPECT_DOUBLE_EQ(c13->values()[2].first, 5.0); EXPECT_DOUBLE_EQ(c13->values()[2].second, 6.0);
     }
     {
-        auto* c14 = dynamic_cast<FITScolumn<char*>*>(table.getColumn(14).get());
+        auto* c14 = dynamic_cast<FITScolumn<bool>*>(table.getColumn(14).get());
         ASSERT_NE(c14, nullptr);
         ASSERT_EQ(c14->values().size(), 3u);
-        EXPECT_STREQ(c14->values()[0], "T");
-        EXPECT_STREQ(c14->values()[1], "F");
-        EXPECT_STREQ(c14->values()[2], "T");
+        EXPECT_TRUE (c14->values()[0]);
+        EXPECT_FALSE(c14->values()[1]);
+        EXPECT_TRUE (c14->values()[2]);
     }
     {
-        auto* c15 = dynamic_cast<FITScolumn<char*>*>(table.getColumn(15).get());
+        auto* c15 = dynamic_cast<FITScolumn<bool>*>(table.getColumn(15).get());
         ASSERT_NE(c15, nullptr);
         ASSERT_EQ(c15->values().size(), 3u);
 
-        auto bit0 = [](char* p){ return static_cast<unsigned char>(p[0]) & 0x01; };
-
-        EXPECT_EQ(bit0(c15->values()[0]), 0u);
-        EXPECT_EQ(bit0(c15->values()[1]), 1u);
-        EXPECT_EQ(bit0(c15->values()[2]), 0u);
+        EXPECT_EQ(c15->values()[0], 0u);
+        EXPECT_EQ(c15->values()[1], 1u);
+        EXPECT_EQ(c15->values()[2], 0u);
     }
     {
         auto* c16 = dynamic_cast<FITScolumn<uint8_t>*>(table.getColumn(16).get());
@@ -1487,11 +1587,10 @@ TEST(FITStable, read_all_columns)
     }
     {
         auto* v25 = dynamic_cast<FITScolumn<std::vector<uint64_t>>*>(table.getColumn(25).get());
-        ASSERT_EQ(v25, nullptr);
-        //ASSERT_EQ(v25->values().size(), 3u);
-        //EXPECT_EQ(v25->values()[0], (std::vector<uint64_t>{9,10,11}));
-        //EXPECT_EQ(v25->values()[1], (std::vector<uint64_t>{12,13,14}));
-        //EXPECT_EQ(v25->values()[2], (std::vector<uint64_t>{15,16,17}));
+        ASSERT_EQ(v25->values().size(), 3u);
+        EXPECT_EQ(v25->values()[0], (std::vector<uint64_t>{9,10,11}));
+        EXPECT_EQ(v25->values()[1], (std::vector<uint64_t>{12,13,14}));
+        EXPECT_EQ(v25->values()[2], (std::vector<uint64_t>{15,16,17}));
     }
     {
         auto* v26 = dynamic_cast<FITScolumn<std::vector<float>>*>(table.getColumn(26).get());
@@ -1534,23 +1633,25 @@ TEST(FITStable, read_all_columns)
         EXPECT_EQ(v30->values()[2], (std::vector<std::string>{"M","NO","PQR"}));
     }
     {
-        auto* v31 = dynamic_cast<FITScolumn<std::vector<char*>>*>(table.getColumn(31).get());
+        auto* v31 = dynamic_cast<FITScolumn< std::vector<bool> >*>(table.getColumn(31).get());
         ASSERT_NE(v31, nullptr);
         ASSERT_EQ(v31->values().size(), 3u);
         ASSERT_EQ(v31->values()[0].size(), 3u);
         ASSERT_EQ(v31->values()[1].size(), 3u);
         ASSERT_EQ(v31->values()[2].size(), 3u);
-        EXPECT_STREQ(v31->values()[0][0], "T"); EXPECT_STREQ(v31->values()[0][1], "F"); EXPECT_STREQ(v31->values()[0][2], "T");
-        EXPECT_STREQ(v31->values()[1][0], "F"); EXPECT_STREQ(v31->values()[1][1], "T"); EXPECT_STREQ(v31->values()[1][2], "F");
-        EXPECT_STREQ(v31->values()[2][0], "T"); EXPECT_STREQ(v31->values()[2][1], "T"); EXPECT_STREQ(v31->values()[2][2], "F");
+
+        EXPECT_TRUE (v31->values()[0][0]); EXPECT_FALSE(v31->values()[0][1]); EXPECT_TRUE (v31->values()[0][2]);
+        EXPECT_FALSE(v31->values()[1][0]); EXPECT_TRUE (v31->values()[1][1]); EXPECT_FALSE(v31->values()[1][2]);
+        EXPECT_TRUE (v31->values()[2][0]); EXPECT_TRUE (v31->values()[2][1]); EXPECT_FALSE(v31->values()[2][2]);
     }
     {
-        auto* v32 = dynamic_cast< FITScolumn<char*>* >(table.getColumn(32).get());
+        auto* v32 = dynamic_cast< FITScolumn< std::vector<bool> >*>(table.getColumn(32).get());
         ASSERT_NE(v32, nullptr);
         ASSERT_EQ(v32->values().size(), 3u);
-        EXPECT_TRUE((*(v32->values()[0]))=='\x88') << std::hex << int(*(v32->values()[0])) << std::dec << " Expected 0x88";
-        EXPECT_TRUE((*(v32->values()[1]))=='\xF1') << std::hex << int(*(v32->values()[1])) << std::dec << " Expected 0xF1";
-        EXPECT_TRUE((*(v32->values()[2]))=='\x00') << std::hex << int(*(v32->values()[2])) << std::dec << " Expected 0x00";
+
+        EXPECT_TRUE (v32->values()[0][0]); EXPECT_FALSE(v32->values()[0][1]); EXPECT_TRUE (v32->values()[0][2]);
+        EXPECT_FALSE(v32->values()[1][0]); EXPECT_TRUE (v32->values()[1][1]); EXPECT_FALSE(v32->values()[1][2]);
+        EXPECT_TRUE (v32->values()[2][0]); EXPECT_TRUE (v32->values()[2][1]); EXPECT_FALSE(v32->values()[2][2]);
     }
 
     status = 0;
