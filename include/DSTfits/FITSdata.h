@@ -19,10 +19,11 @@
 #include <typeinfo>
 #include <cxxabi.h>
 #include <string>
+#include <array>
+#include <vector>
 
 namespace DSL
 {
-    
     typedef std::vector<double> pixelCoords;
     typedef std::vector<double> worldCoords;
 
@@ -72,10 +73,10 @@ namespace DSL
          * @enum Possible type for FITS embeded data
          */
         tsbyte     = TSBYTE,
-        tshort     = TSHORT,    // int8_t
-        tushort    = TUSHORT,   // uint8_t
-        tint       = TINT,      // int16_t
-        tuint      = TUINT,     // uint16_t
+        tshort     = TSHORT,    // int16_t
+        tushort    = TUSHORT,   // uint16_t
+        tint       = TINT,      // int32_t
+        tuint      = TUINT,     // uint32_t
         tlong      = TLONG,     // int32_t
         tulong     = TULONG,    // uint32_t
         tlonglong  = TLONGLONG, // int64_t
@@ -105,7 +106,7 @@ namespace DSL
         fLong     = TLONG  ,       //!< int32_t
         fULong    = TULONG  ,      //!< uint32_t
         fLongLong = TLONGLONG,     //!< int64_t
-        fULongLong= TULONGLONG,        //!< uint64_t
+        fULongLong= TULONGLONG,    //!< uint64_t
         fBool     = TLOGICAL,      //!< boolean
         fFloat    = TFLOAT,        //!< floiting poind
         fDouble   = TDOUBLE,       //!< double floiting point
