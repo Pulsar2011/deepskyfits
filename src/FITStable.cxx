@@ -28,6 +28,7 @@
 
 namespace DSL
 {
+    std::recursive_timed_mutex g_cfitsio_mutex;
     
 #pragma region - FITSform class implementation
 

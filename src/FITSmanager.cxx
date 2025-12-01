@@ -618,6 +618,7 @@ namespace DSL
      */
     const std::shared_ptr<FITStable> FITSmanager::GetTableAtIndex(const int& iHDU)
     {      
+        CFITSIOGuard guard;
         return std::shared_ptr<FITStable>(new FITStable(fptr, iHDU));
     }
     
@@ -628,13 +629,14 @@ namespace DSL
      */
     const std::shared_ptr<FITStable> FITSmanager::GetTable(std::string tname)
     {
+        CFITSIOGuard guard;
         return std::shared_ptr<FITStable>(new FITStable(fptr, tname));
     }
     
    void FITSmanager::InsertTable(const std::shared_ptr<FITStable>& table)
     {
         // Creating a table mutates file -> exclusive lock
-        std::unique_lock<std::shared_mutex> lk(fptr_mtx);
+        CFITSIOGuard guard;   
 
         if(!fptr)
         {
@@ -658,7 +660,7 @@ namespace DSL
     void FITSmanager::UpdateTable(const std::shared_ptr<FITStable>& table)
     {
         // Creating a table mutates file -> exclusive lock
-        std::unique_lock<std::shared_mutex> lk(fptr_mtx);
+        CFITSIOGuard guard;   
 
         if(!fptr)
         {

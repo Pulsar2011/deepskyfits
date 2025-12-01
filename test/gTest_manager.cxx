@@ -548,7 +548,12 @@ TYPED_TEST(FITSimgTest, modif_fitsfile)
 
 TEST(FITStable, openTableFromFile)
 {
+#ifdef Darwinx86_64
     FITSmanager fm("build/testdata/rosat_pspc_rdf2_3_im2.fits");
+#else
+    FITSmanager fm("testdata/rosat_pspc_rdf2_3_im2.fits");
+#endif
+
     ASSERT_TRUE(fm.isOpen());
     ASSERT_EQ(fm.NumberOfHeader(), 3);
 
@@ -604,11 +609,25 @@ TEST(FITStable, UpdateTable)
         EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<int8_t> >(col_sbyte)));
     }
 
-    EXPECT_NO_THROW(table.write("build/testdata/test_fitstable.fits", 0, true));
+    {
+        CFITSIOGuard guard;   
+#ifdef Darwinx86_64
+        EXPECT_NO_THROW(table.write("build/testdata/test_fitstable.fits", 0, true));
+#else
+        EXPECT_NO_THROW(table.write("testdata/test_fitstable.fits", 0, true));
+#endif 
+    }
 
+    CFITSIOGuard guard;   
+#ifdef Darwinx86_64
     FITSmanager fm("build/testdata/test_fitstable.fits",false);
+#else
+    FITSmanager fm("testdata/test_fitstable.fits",false);
+#endif
+
     ASSERT_TRUE(fm.isOpen());
     ASSERT_EQ(fm.NumberOfHeader(), 2);
+
 
     std::shared_ptr<FITStable> readTable = fm.GetTableAtIndex(2);
     ASSERT_NE(readTable, nullptr);
@@ -628,7 +647,12 @@ TEST(FITStable, UpdateTable)
     
     ASSERT_EQ(readTable, nullptr);
 
+#ifdef Darwinx86_64
     FITSmanager fm2("build/testdata/test_fitstable.fits");
+#else
+    FITSmanager fm2("testdata/test_fitstable.fits");
+#endif
+
     readTable = fm2.GetTableAtIndex(2);
     ASSERT_NE(readTable, nullptr);
     ASSERT_EQ(readTable->nrows(), 3u);

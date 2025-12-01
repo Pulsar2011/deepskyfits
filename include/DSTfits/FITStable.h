@@ -31,9 +31,19 @@
 #include "FITSexception.h"
 
 #include <fitsio.h>
+#include <mutex>
 
 namespace DSL
 {
+    // Global CFITSIO mutex (serialize all CFITSIO calls)
+    extern std::recursive_timed_mutex g_cfitsio_mutex;
+
+    // RAII guard for user-side locking
+    struct CFITSIOGuard
+    {
+        std::unique_lock<std::recursive_timed_mutex> lk;
+        CFITSIOGuard() : lk(g_cfitsio_mutex) {}
+    };
 
 #if __cplusplus < 201703L
     struct bad_any_cast : std::bad_cast {};
