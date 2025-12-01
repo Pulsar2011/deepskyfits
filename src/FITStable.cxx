@@ -1145,10 +1145,14 @@ namespace DSL
     void FITScolumn< FITSform::boolVector >::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
         if(!fptr)
+        {
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<std::vector<FITSform::boolVector>","write");
+        }
         
-            if(data.empty())
+        if(data.empty())
+        {
             throw FITSexception(NOT_TABLE,"FITScolumn<std::vector<FITSform::boolVector>","write");
+        }
 
         const int64_t nelem = getNelem(); // number of logicals per cell
         int tbl_status = 0;
@@ -1546,7 +1550,7 @@ namespace DSL
         if(ffgncl(fptr.get(), &ncols, &tbl_status))
             throw FITSexception(tbl_status,"FITStable","getNcols");
         
-        for(size_t n = 1; n <= ncols; n++)
+        for(size_t n = 1; n <= static_cast<size_t>(ncols); n++)
         {
             fcolumns.push_back(readColumn(fptr,n,start));
         }

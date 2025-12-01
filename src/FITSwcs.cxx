@@ -290,7 +290,7 @@ namespace DSL
             {
                 return;
             }
-            else if(other.getNumberOfWCS() <= idx)
+            else if(static_cast<size_t>(other.getNumberOfWCS()) <= idx)
             {
                 fwcs_status = WCSERR_BAD_PARAM;
                 throw WCSexception(fwcs_status,"FITSwcs","Copy Constructor","Input FITSwcs object index is out of range");
@@ -370,7 +370,7 @@ namespace DSL
             {
                 return;
             }
-            else if(other.getNumberOfWCS() <= idx)
+            else if(static_cast<size_t>(other.getNumberOfWCS()) <= idx)
             {
                 fwcs_status = WCSERR_BAD_PARAM;
                 throw WCSexception(fwcs_status,"FITSwcs","Copy Constructor","Input FITSwcs object index is out of range");

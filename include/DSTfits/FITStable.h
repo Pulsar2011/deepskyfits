@@ -25,6 +25,7 @@
 #include <functional>
 #include <iomanip> // added for hex formatting
 
+
 #include "FITShdu.h"
 #include "FITSdata.h"
 #include "FITSexception.h"
@@ -33,6 +34,47 @@
 
 namespace DSL
 {
+
+#if __cplusplus < 201703L
+    struct bad_any_cast : std::bad_cast {};
+    class any_type {
+        struct base
+        {
+            virtual ~base(){} virtual base* clone() const = 0;
+        };
+      
+        template<typename U> struct holder : base
+        {
+            U value;
+            explicit holder(U v): value(std::move(v)) {}
+            base* clone() const override { return new holder<U>(value); }
+        };
+        
+        base* ptr;
+        public:
+            any_type():ptr(nullptr){}
+            
+            template<typename U>
+            any_type(U v):ptr(new holder<U>(std::move(v))){}
+            
+            any_type(const any_type& o):ptr(o.ptr?o.ptr->clone():nullptr){}
+            
+            any_type& operator=(any_type o){ std::swap(ptr,o.ptr); return *this; }
+            
+            ~any_type(){ delete ptr; }
+        template<typename U>
+        U& get()
+        {
+            auto h = dynamic_cast<holder<U>*>(ptr);
+            if(!h) throw bad_any_cast();
+            return h->value;
+        }
+    };
+    template<typename U>
+    inline U any_cast_any(const any_type& a){ return const_cast<any_type&>(a).get<U>(); }
+
+#endif
+
     class FITStable;
     class FITSform;
     
@@ -352,11 +394,24 @@ namespace DSL
 #pragma region -- accessor
 
         size_t size() const override { return data.size(); }
+
         void push_back(const std::any& value) override
         {
-            const T v = std::any_cast<T>(value);
-            Update(v);              // update width/repeat metadata
+#if __cplusplus < 201703L
+            const T& v = any_cast_any<T>(value);
+            Update(v);
             data.push_back(v);
+#else
+            if (const T* pv = std::any_cast<T>(&value)) // no by-value pair construction
+            {   
+                Update(*pv);                                // pass by const&
+                data.push_back(*pv);                        // vector::push_back(const T&)
+            }
+            else
+            {
+                throw std::bad_any_cast();
+            }
+#endif
         }
 
         // Read-only accessor for testing

@@ -7,6 +7,12 @@
 
 using namespace DSL;
 
+#ifdef Darwinx86_64
+std::string testurl = "./build/testdata/test_fitstable.fits";
+#else
+std::string testurl = "./testdata/test_fitstable.fits";
+#endif
+
 // Small helper to validate a freshly constructed empty table header.
 static void expect_empty_table_header(const FITStable& table) {
     EXPECT_EQ(table.nrows(), 0);
@@ -29,12 +35,12 @@ TEST(FITStable,default_tsbyte_ctor)
     EXPECT_EQ(table.nrows(), 3u);
     EXPECT_EQ(table.ncols(), 1u);
     table.Dump(std::cout);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
 
     // --- Read-back & value verification (no header keyword checks) ---
     fitsfile* rawFptr = nullptr;
     int status = 0;
-    ASSERT_EQ(fits_open_file(&rawFptr, "./build/testdata/test_fitstable.fits", READONLY, &status), 0);
+    ASSERT_EQ(fits_open_file(&rawFptr, testurl.c_str(), READONLY, &status), 0);
     std::shared_ptr<fitsfile> fptr(rawFptr, [](fitsfile*){}); // manual close
 
     int hdutype = 0;
@@ -61,11 +67,11 @@ TEST(FITStable,col_tshort_ctor)
     col_short.push_back(int16_t(4)); col_short.push_back(int16_t(5)); col_short.push_back(int16_t(6));
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<int16_t> >(col_short)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
@@ -83,11 +89,11 @@ TEST(FITStable,col_tushort_ctor)
     col_ushort.push_back(uint16_t(7)); col_ushort.push_back(uint16_t(8)); col_ushort.push_back(uint16_t(9));
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<uint16_t> >(col_ushort)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
@@ -105,13 +111,13 @@ TEST(FITStable,col_tint_ctor)
     col_int16.push_back(int32_t(-3)); col_int16.push_back(int32_t(0)); col_int16.push_back(int32_t(3));
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<int32_t> >(col_int16)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr;
     int status=0;
     
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
 
     int hdutype=0;
@@ -139,13 +145,13 @@ TEST(FITStable,col_tuint_ctor)
     col_uint16.push_back(uint32_t(1)); col_uint16.push_back(uint32_t(2)); col_uint16.push_back(uint32_t(3));
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<uint32_t> >(col_uint16)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr;
     int status=0;
 
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
 
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0;
@@ -174,11 +180,11 @@ TEST(FITStable,col_tlong_ctor)
     col_int32.push_back(int32_t(-11)); col_int32.push_back(int32_t(22)); col_int32.push_back(int32_t(33));
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<int32_t> >(col_int32)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
@@ -195,11 +201,11 @@ TEST(FITStable,col_tulong_ctor)
     col_uint32.push_back(uint32_t(1)); col_uint32.push_back(uint32_t(2)); col_uint32.push_back(uint32_t(3));
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<uint32_t> >(col_uint32)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
@@ -216,13 +222,13 @@ TEST(FITStable,col_tlonglong_ctor)
     col_int64.push_back(int64_t(-9)); col_int64.push_back(int64_t(0)); col_int64.push_back(int64_t(9));
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<int64_t> >(col_int64)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr;
     int status=0;
     
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0;
     status=0;
@@ -248,11 +254,11 @@ TEST(FITStable,col_tulonglong_ctor)
     col_uint64.push_back(uint64_t(9)); col_uint64.push_back(uint64_t(10)); col_uint64.push_back(uint64_t(11));
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<uint64_t> >(col_uint64)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
@@ -269,11 +275,11 @@ TEST(FITStable,col_tfloat_ctor)
     col_float.push_back(0.f); col_float.push_back(1.f); col_float.push_back(2.f);
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<float> >(col_float)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
@@ -290,11 +296,11 @@ TEST(FITStable,col_tdouble_ctor)
     col_double.push_back(-1.0); col_double.push_back(0.5); col_double.push_back(2.5);
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<double> >(col_double)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
@@ -311,11 +317,11 @@ TEST(FITStable,col_tcplx_ctor)
     col_cplx.push_back(FITSform::complex(1.0f,2.0f)); col_cplx.push_back(FITSform::complex(3.0f,4.0f)); col_cplx.push_back(FITSform::complex(5.0f,6.0f));
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<FITSform::complex> >(col_cplx)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
    
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
@@ -334,11 +340,11 @@ TEST(FITStable,col_tdbcplx_ctor)
     col_dcplx.push_back(FITSform::dblcomplex(1.0,2.0)); col_dcplx.push_back(FITSform::dblcomplex(3.0,4.0)); col_dcplx.push_back(FITSform::dblcomplex(5.0,6.0));
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<FITSform::dblcomplex> >(col_dcplx)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
    
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
@@ -362,11 +368,11 @@ TEST(FITStable,col_tlogical_ctor)
     EXPECT_EQ(table.nrows(), 3u);
     EXPECT_EQ(table.ncols(), 1u);
 
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0;
@@ -398,12 +404,12 @@ TEST(FITStable,col_tbit_ctor)
     EXPECT_EQ(table.nrows(), 3u);
     EXPECT_EQ(table.ncols(), 1u);
 
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr;
     int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0;
     ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
@@ -427,11 +433,11 @@ TEST(FITStable,col_tbyte_ctor)
     col_byte.push_back(uint8_t(0x10)); col_byte.push_back(uint8_t(0x11)); col_byte.push_back(uint8_t(0x12));
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<uint8_t> >(col_byte)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
@@ -450,13 +456,13 @@ TEST(FITStable,col_tstring_ctor)
     EXPECT_EQ(table.nrows(), 4u);
     EXPECT_EQ(table.ncols(), 1u);
 
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr;
     int status=0;
     
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0;
@@ -488,11 +494,11 @@ TEST(FITStable,v_tsbyte_ctor)
     v_sbyte.push_back(std::vector<int8_t>{1,2,3}); v_sbyte.push_back(std::vector<int8_t>{4,5,6}); v_sbyte.push_back(std::vector<int8_t>{7,8,9});
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<int8_t>> >(v_sbyte)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
@@ -511,11 +517,11 @@ TEST(FITStable,v_tbyte_ctor)
     v_byte.push_back(std::vector<uint8_t>{0x41,0x42,0x43}); v_byte.push_back(std::vector<uint8_t>{0x44,0x45,0x46}); v_byte.push_back(std::vector<uint8_t>{0x47,0x48,0x49});
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<uint8_t>> >(v_byte)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
@@ -534,13 +540,13 @@ TEST(FITStable,v_tint_ctor)
     v_int16.push_back(std::vector<int32_t>{-3,0,3}); v_int16.push_back(std::vector<int32_t>{4,5,6}); v_int16.push_back(std::vector<int32_t>{7,8,9});
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<int32_t>> >(v_int16)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr;
     int status=0;
 
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
 
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
 
@@ -573,13 +579,13 @@ TEST(FITStable,v_tuint_ctor)
     EXPECT_EQ(table.nrows(), 3u);
     EXPECT_EQ(table.ncols(), 1u);
     
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr;
     int status=0;
 
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     
@@ -609,11 +615,11 @@ TEST(FITStable,v_tlong_ctor)
     v_int32.push_back(std::vector<int32_t>{-10,0,10}); v_int32.push_back(std::vector<int32_t>{11,12,13}); v_int32.push_back(std::vector<int32_t>{14,15,16});
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<int32_t>> >(v_int32)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
@@ -632,11 +638,11 @@ TEST(FITStable,v_tulong_ctor)
     v_uint32.push_back(std::vector<uint32_t>{1,2,3}); v_uint32.push_back(std::vector<uint32_t>{4,5,6}); v_uint32.push_back(std::vector<uint32_t>{7,8,9});
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<uint32_t>> >(v_uint32)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
@@ -655,11 +661,11 @@ TEST(FITStable,v_tlonglong_ctor)
     v_int64.push_back(std::vector<int64_t>{-9,0,9}); v_int64.push_back(std::vector<int64_t>{10,11,12}); v_int64.push_back(std::vector<int64_t>{13,14,15});
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<int64_t>> >(v_int64)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
@@ -678,11 +684,11 @@ TEST(FITStable,v_tulonglong_ctor)
     v_uint64.push_back(std::vector<uint64_t>{9,10,11}); v_uint64.push_back(std::vector<uint64_t>{12,13,14}); v_uint64.push_back(std::vector<uint64_t>{15,16,17});
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<uint64_t>> >(v_uint64)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
@@ -701,11 +707,11 @@ TEST(FITStable,v_tfloat_ctor)
     v_float.push_back(std::vector<float>{0.f,1.f,2.f}); v_float.push_back(std::vector<float>{3.f,4.f,5.f}); v_float.push_back(std::vector<float>{6.f,7.f,8.f});
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<float>> >(v_float)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
@@ -724,11 +730,11 @@ TEST(FITStable,v_tdouble_ctor)
     v_double.push_back(std::vector<double>{-1.0,0.5,2.5}); v_double.push_back(std::vector<double>{3.5,4.5,5.5}); v_double.push_back(std::vector<double>{6.5,7.5,8.5});
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<double>> >(v_double)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
@@ -749,11 +755,11 @@ TEST(FITStable,v_tcplx_ctor)
     v_cplx.push_back(std::vector<FITSform::complex>{ {13.f,14.f},{15.f,16.f},{17.f,18.f} });
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<FITSform::complex>> >(v_cplx)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
@@ -774,13 +780,13 @@ TEST(FITStable,v_tdbcplx_ctor)
     v_dcplx.push_back(std::vector<FITSform::dblcomplex>{ {13.0,14.0},{15.0,16.0},{17.0,18.0} });
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<FITSform::dblcomplex>> >(v_dcplx)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr;
     int status=0;
 
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     
@@ -813,11 +819,11 @@ TEST(FITStable,v_tstring_ctor)
     v_str.push_back(std::vector<std::string>{"M","NO","PQR"});
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<std::string>> >(v_str)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
@@ -843,13 +849,13 @@ TEST(FITStable,v_tlogical_ctor)
     EXPECT_EQ(table.nrows(), 3u);
     EXPECT_EQ(table.ncols(), 1u);
     
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     
     fitsfile* rawFptr=nullptr; int status=0;
     
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     int hdutype=0;
@@ -901,12 +907,12 @@ TEST(FITStable,v_8tbit_ctor)
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<FITSform::boolVector> >(v_bit)));
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
     
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
     
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     
@@ -953,12 +959,12 @@ TEST(FITStable,v_16tbit_ctor)
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<FITSform::boolVector> >(v_bit)));
 
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
     
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     
@@ -1007,12 +1013,12 @@ TEST(FITStable,v_32tbit_ctor)
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<FITSform::boolVector> >(v_bit)));
 
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
     
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     
@@ -1059,12 +1065,12 @@ TEST(FITStable,v_64tbit_ctor)
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<FITSform::boolVector> >(v_bit)));
 
     EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
     
     // Read-back
     fitsfile* rawFptr=nullptr; int status=0;
     
-    ASSERT_EQ(fits_open_file(&rawFptr,"./build/testdata/test_fitstable.fits",READONLY,&status),0);
+    ASSERT_EQ(fits_open_file(&rawFptr,testurl.c_str(),READONLY,&status),0);
     
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
     
@@ -1306,7 +1312,7 @@ TEST(FITStable,all_columns_single_file)
     EXPECT_EQ(table.nrows(), 3u);
     EXPECT_GT(table.ncols(), 1u);
 
-    EXPECT_NO_THROW(table.write("./build/testdata/test_fitstable.fits", 0, true));
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
 }
 
 TEST(FITStable, read_all_columns)
@@ -1314,7 +1320,7 @@ TEST(FITStable, read_all_columns)
     // Ensure the file exists from previous write tests (all_columns_single_file).
     fitsfile* rawFptr = nullptr;
     int status = 0;
-    EXPECT_EQ(fits_open_file(&rawFptr, "./build/testdata/test_fitstable.fits", READONLY, &status), 0);
+    EXPECT_EQ(fits_open_file(&rawFptr, testurl.c_str(), READONLY, &status), 0);
     EXPECT_EQ(status, 0);
 
     // Wrap in shared_ptr with no-op deleter (manual close below).
