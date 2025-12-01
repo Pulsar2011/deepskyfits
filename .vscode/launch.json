@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
     {
-        "type": "cppdbg",
+        "type": "lldb-dap",
         "request": "launch",
         "name": "gTest_manager (LLDB)",
         "program": "${workspaceRoot}/build/exe/gTest_manager",
@@ -13,6 +13,7 @@
         "env": [],
         "cwd": "${workspaceRoot}",
         "MIMode": "lldb",
+        "sourceLanguages":["C++"],
         "preLaunchTask": "make gtest"
     },
     {

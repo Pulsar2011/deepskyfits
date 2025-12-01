@@ -546,4 +546,103 @@ TYPED_TEST(FITSimgTest, modif_fitsfile)
 
 }
 
+TEST(FITStable, openTableFromFile)
+{
+    FITSmanager fm("build/testdata/rosat_pspc_rdf2_3_im2.fits");
+    ASSERT_TRUE(fm.isOpen());
+    ASSERT_EQ(fm.NumberOfHeader(), 3);
+
+    std::shared_ptr<FITStable> tbl = fm.GetTable("LS2");
+    ASSERT_NE(tbl, nullptr);
+    ASSERT_EQ(tbl->nrows(), 6);
+    ASSERT_EQ(tbl->ncols(), 9);
+
+    FITScolumn<int16_t>* src_nr = dynamic_cast<FITScolumn<int16_t>* >( tbl->getColumn("SRC_NR").get() );
+    FITScolumn<float>* s_like   = dynamic_cast<FITScolumn<float>* >( tbl->getColumn("S_LIKE").get() );
+    ASSERT_EQ(src_nr->size(), s_like->size());
+    ASSERT_EQ(src_nr->size(), static_cast<size_t>(tbl->nrows()));
+
+    for(size_t i=0; i<static_cast<size_t>(tbl->nrows()); i++)
+    {
+        ASSERT_EQ(src_nr->values().at(i), static_cast<int8_t>(i+1));
+    }
+
+    ASSERT_NEAR(s_like->values().at(0),  437, 1e-6);
+    ASSERT_NEAR(s_like->values().at(1),  49, 1e-6);
+    ASSERT_NEAR(s_like->values().at(2),  9, 1e-6);
+    ASSERT_NEAR(s_like->values().at(3),  10, 1e-6);
+    ASSERT_NEAR(s_like->values().at(4),  8, 1e-6);
+    ASSERT_NEAR(s_like->values().at(5),  9, 1e-6);
+
+    std::shared_ptr<FITStable> tbb = fm.GetTableAtIndex(3);
+    ASSERT_NE(tbb, nullptr);
+    ASSERT_EQ(tbb->nrows(), 17);
+    ASSERT_EQ(tbb->ncols(), 9);
+    ASSERT_EQ(tbb->GetName(), "MS2");
+    FITScolumn<int16_t>* brc_nr = dynamic_cast<FITScolumn<int16_t>* > (tbb->getColumn("SRC_NR").get());
+
+    for(size_t i=0; i<static_cast<size_t>(tbb->nrows()); i++)
+    {
+        ASSERT_EQ(brc_nr->values().at(i), static_cast<int8_t>(i+1));
+    }
+
+    tbb.reset();
+    tbl.reset();
+    fm.Close();
+}
+
+TEST(FITStable, UpdateTable)
+{
+    FITStable table;
+    table.setName("UNIT_TEST_TABLE");
+
+    // --- Scalar columns ---
+    {
+        std::cout<<"Inserting COL_SBYTE columns..."<<std::endl;
+        FITScolumn<int8_t>    col_sbyte ("COL_SBYTE" , tsbyte   , "", 1);
+        col_sbyte.push_back(int8_t(1)); col_sbyte.push_back(int8_t(2)); col_sbyte.push_back(int8_t(3));
+        EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<int8_t> >(col_sbyte)));
+    }
+
+    EXPECT_NO_THROW(table.write("build/testdata/test_fitstable.fits", 0, true));
+
+    FITSmanager fm("build/testdata/test_fitstable.fits",false);
+    ASSERT_TRUE(fm.isOpen());
+    ASSERT_EQ(fm.NumberOfHeader(), 2);
+
+    std::shared_ptr<FITStable> readTable = fm.GetTableAtIndex(2);
+    ASSERT_NE(readTable, nullptr);
+    ASSERT_EQ(readTable->nrows(), 3u);
+    ASSERT_EQ(readTable->ncols(), 1u);
+
+    {
+        std::cout<<"Inserting COL_UINT64 columns..."<<std::endl;
+        FITScolumn<uint64_t> col_uint64("COL_UINT64", tulonglong, "", 1);
+        col_uint64.push_back(uint64_t(9)); col_uint64.push_back(uint64_t(10)); col_uint64.push_back(uint64_t(11));
+        EXPECT_NO_THROW(readTable->InsertColumn(std::make_shared< FITScolumn<uint64_t> >(col_uint64)));
+    }
+
+    fm.UpdateTable(readTable);
+    fm.Close();
+    readTable.reset();
+    
+    ASSERT_EQ(readTable, nullptr);
+
+    FITSmanager fm2("build/testdata/test_fitstable.fits");
+    readTable = fm2.GetTableAtIndex(2);
+    ASSERT_NE(readTable, nullptr);
+    ASSERT_EQ(readTable->nrows(), 3u);
+    ASSERT_EQ(readTable->ncols(), 2u);
+
+    auto* col_uint64 = dynamic_cast<FITScolumn<uint64_t>*>(readTable->getColumn("COL_UINT64").get());
+    ASSERT_NE(col_uint64, nullptr);
+    ASSERT_EQ(col_uint64->values().size(), 3u);
+    EXPECT_EQ(col_uint64->values()[0], uint64_t(9));
+    EXPECT_EQ(col_uint64->values()[1], uint64_t(10));
+    EXPECT_EQ(col_uint64->values()[2], uint64_t(11));
+    
+    fm2.Close();
+
+}
+
 #pragma endregion
