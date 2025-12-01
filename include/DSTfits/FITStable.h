@@ -500,6 +500,7 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
 #pragma endregion
 #pragma region -- ctor/dtor
         FITStable();
+        FITStable(const std::string&);
         FITStable(const std::shared_ptr<fitsfile>&, const int&);
         FITStable(const std::shared_ptr<fitsfile>&, const std::string&);
         
@@ -532,11 +533,14 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
 #pragma region -- Accessor
         inline const FITShdu& HDU() const {return hdu;}
         inline       FITShdu& HDU() {return hdu;}
-#pragma endregion
+        inline const ttype getTableType() const {return ftbl_type;}
         const std::unique_ptr<FITSform>& getColumn(const std::string& cname) const;
         const std::unique_ptr<FITSform>& getColumn(const size_t& cindex) const;
+#pragma endregion        
 
-
+#pragma region -- Modifier
+        inline void setName(const std::string& tname) {hdu.ValueForKey("EXTNAME", tname, fChar);}
+#pragma endregion
 #pragma region -- Inserting/Updating data to column
 
 #pragma region 1- Inseting new column

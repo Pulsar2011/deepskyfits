@@ -1383,6 +1383,15 @@ namespace DSL
         hdu.ValueForKey("BITPIX",(uint16_t) 8,"Number of bits per data pixel");
         hdu.ValueForKey("NAXIS",(uint16_t) 2,"Number of data axes");
     }
+
+    /**
+     @brief Create empty table with extention name
+     @details Construct an empty DSL::FITStable instance.
+     */
+    FITStable::FITStable(const std::string& name):FITStable()
+    {
+        hdu.ValueForKey("EXTNAME",name,fChar);
+    }
     
     /**
      @brief Constructor
@@ -1415,7 +1424,7 @@ namespace DSL
         // Move to the desired HDU if it isn't the current HDU
         if(fhdu_num != iHDU)
         {
-            if(fits_movabs_hdu(fits.get(), fhdu_num, &hdu_type, &tbl_status))
+            if(fits_movabs_hdu(fits.get(), iHDU, &hdu_type, &tbl_status))
                 throw FITSexception(tbl_status, "FITStable","ctor ["+std::to_string(__LINE__)+"]");
         }
         else
@@ -1454,6 +1463,11 @@ namespace DSL
         FITShdu tmp(fits);
         hdu.swap(tmp);
 
+        if( !hdu.Exists("EXTNAME") || hdu.GetValueForKey("EXTNAME") == "NO NAME" )
+        {
+            hdu.ValueForKey("HDUBLKNO",static_cast<uint64_t>(iHDU));
+        }
+
         load(fits,1);
     }
     
@@ -1479,11 +1493,17 @@ namespace DSL
             throw FITSexception(tbl_status,"FITStable","ctor","Input fitsfile pointer is null.");
         }
 
-        int hdu_type = ANY_HDU;
+        int hdu_type = ASCII_TBL;
 
         //Move to desired HDU block
         if(fits_movnam_hdu(fits.get(), hdu_type, const_cast<char*>(extname.c_str()), 0, &tbl_status))
-            throw FITSexception(tbl_status, "FITStable","ctor");
+        {
+            tbl_status = 0;
+            hdu_type = BINARY_TBL;
+            if(fits_movnam_hdu(fits.get(), hdu_type, const_cast<char*>(extname.c_str()), 0, &tbl_status))
+                throw FITSexception(tbl_status, "FITStable","ctor");
+
+        }
         
         ttype* tt = const_cast<ttype*>(&ftbl_type);
         
@@ -1502,8 +1522,8 @@ namespace DSL
         }
         
         //Check the HDU block i indeed a FITS table and register either it is a binary or an ASCII table
-        if(ftbl_type != ttype::tascii &&
-           ftbl_type != ttype::tbinary)
+        if(*tt != ttype::tascii &&
+           *tt != ttype::tbinary)
         {
             tbl_status = NOT_TABLE;
             throw FITSexception(tbl_status,"FITStable","ctor","Current HDU isn't a BINARY nor a ASCII FITS table.");
@@ -2186,18 +2206,25 @@ namespace DSL
                                 : const_cast<char*>(unit_store[static_cast<size_t>(i)].c_str()));
         }
 
+        int hdu_num=0;
         //1- Move to the corret HDU if it exist in the corresponding FITS file. Create new table otherwize
-        if(hdu.Exists("EXTNAME"))
+        if(hdu.Exists("EXTNAME") && hdu.GetValueForKey("EXTNAME") != "NO NAME")
         {
             char extname[81];
             std::strncpy(extname, hdu.GetValueForKey("EXTNAME").c_str(), 80);
             extname[80] = '\0';
             try
             {
-                fits_movnam_hdu(fptr.get(), ANY_HDU, extname, 0, &tbl_status);
+                ffmnhd(fptr.get(), ANY_HDU, extname, 0, &tbl_status);
+
+                if(tbl_status)
+                    throw FITSexception(tbl_status,"FITStable","writeArray");
+
+                fits_get_hdu_num(fptr.get(), &hdu_num);
             }
             catch(...)
             {
+                tbl_status = 0; //Reset status
                 fits_create_tbl(fptr.get(),
                                 (ftbl_type == tbinary)?BINARY_TBL:ASCII_TBL,
                                 (LONGLONG) 0,
@@ -2207,6 +2234,9 @@ namespace DSL
                                 tunit_arr.data(),
                                 extname,
                                 &tbl_status);
+                
+                if(tbl_status)
+                    throw FITSexception(tbl_status,"FITStable","writeArray");
             }
         }
         else
@@ -2220,6 +2250,9 @@ namespace DSL
                             tunit_arr.data(),
                             NULL,
                             &tbl_status);
+                        
+            if(tbl_status)
+                throw FITSexception(tbl_status,"FITStable","writeArray");
         }
 
         int64_t first_row = (start <= 0) ? 1 : start;

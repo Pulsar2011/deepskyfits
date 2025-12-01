@@ -631,37 +631,96 @@ namespace DSL
         return std::shared_ptr<FITStable>(new FITStable(fptr, tname));
     }
     
-    const std::shared_ptr<FITStable> FITSmanager::CreateTable(std::string tname, const ttype& tt)
+   void FITSmanager::InsertTable(const std::shared_ptr<FITStable>& table)
     {
         // Creating a table mutates file -> exclusive lock
         std::unique_lock<std::shared_mutex> lk(fptr_mtx);
 
-        std::vector<char*> ttype_vec(1), tform_vec(1), tunit_vec(1);
-        std::string ttype_str = "TFLOAT";
-        std::string tform_str = "COL0";
-        std::string tunit_str = "ARB";
-        ttype_vec[0] = const_cast<char*>(ttype_str.c_str());
-        tform_vec[0] = const_cast<char*>(tform_str.c_str());
-        tunit_vec[0] = const_cast<char*>(tunit_str.c_str());
-         
         if(!fptr)
         {
             fits_status = SHARED_NULPTR;
-            throw FITSexception(fits_status,"FITSmanager","CreateTable","CAN'T CREATE HEADER FROM NULL POINTER");
-        }
-        
-        if(ffcrtb(fptr.get(), static_cast<int>(tt), 0, 1, ttype_vec.data(), tform_vec.data(), tunit_vec.data(), const_cast<char*>(tname.c_str()), &fits_status))
-        {
-            throw FITSexception(fits_status,"FITSmanager","CreateTable");
+            throw FITSexception(fits_status,"FITSmanager","CreateTable","CAN'T CREATE TABLE : NULL FILEPTR");
         }
 
-        if(ffdcol(fptr.get(), 1, &fits_status))
+        // Check either the table already exists:
+        std::shared_ptr<FITStable> existing_table = GetTable(table->GetName());
+        if(existing_table != nullptr)
         {
-            throw FITSexception(fits_status,"FITSmanager","CreateTable");
+            fits_status = WRITE_ERROR;
+            throw FITSexception(fits_status,"FITSmanager","InsertTable","TABLE "+table->GetName()+" ALREADY EXISTS");
         }
-     
+
+        // Move to the end of the file to append the new table
+        MoveToHDU(num_hdu);
+        table->write(fptr,0);
+    }
+
+    void FITSmanager::UpdateTable(const std::shared_ptr<FITStable>& table)
+    {
+        // Creating a table mutates file -> exclusive lock
+        std::unique_lock<std::shared_mutex> lk(fptr_mtx);
+
+        if(!fptr)
+        {
+            fits_status = SHARED_NULPTR;
+            throw FITSexception(fits_status,"FITSmanager","UpdateTable","CAN'T CREATE TABLE : NULL FILEPTR");
+        }
+
+        std::string tname = table->GetName();
+        int hdublck = 0;
+        ttype hdutype = table->getTableType();
+
+        int hdutype_int = 0;
         
-        return GetTable(tname) ;
+        if(hdutype == BINARY_TBL)
+            hdutype_int = BINARY_TBL;
+        else if(hdutype == ASCII_TBL)
+            hdutype_int = ASCII_TBL;
+
+        if(hdutype != BINARY_TBL && hdutype != ASCII_TBL)
+        {
+            fits_status = NOT_ATABLE;
+            throw FITSexception(fits_status,"FITSmanager","UpdateTable","TABLE "+tname+" TYPE IS INVALID");
+        }
+
+        if(tname != "" && tname != "NO NAME")
+        {
+            fits_movnam_hdu(fptr.get(), hdutype_int, (char*) tname.c_str(), 0, &fits_status);
+            if(fits_status)
+                throw FITSexception(fits_status,"FITSmanager","UpdateTable","TABLE "+tname+" NOT FOUND BY NAME");
+
+            fits_get_hdu_num(fptr.get(), &hdublck);
+        
+        }
+        else if(table->HDU().Exists("HDUBLKNO"))
+        {
+            hdublck = static_cast<int>(table->HDU().GetUInt16ValueForKey("HDUBLKNO"));
+            fits_movabs_hdu(fptr.get(), hdublck, &hdutype_int, &fits_status);
+        }
+        else
+        {
+            throw std::invalid_argument("\033[31m[FITSmanager::UpdateTable]\033[0m table "+tname+" unidentified.");
+        }
+
+        if(fits_status || (hdutype != BINARY_TBL && hdutype != ASCII_TBL))
+        {
+            std::stringstream ss;
+            ss<<"TABLE "+tname+" HDU BLOCK #"+std::to_string(hdublck)+" NOT FOUND";
+            throw FITSexception(fits_status,"FITSmanager","UpdateTable",ss.str());
+        }
+
+        std::cerr<<"\033[31m[FITSmanager::UpdateTable]\033[0m table "<<tname<<"[\033[31m"<<hdublck<<"\033[0m] will be deleted and replaced with new table."<<std::endl;
+        fits_delete_hdu(fptr.get(), &hdutype_int, &fits_status);
+        
+        if(fits_status)
+        {
+            std::stringstream ss;
+            ss<<"TABLE "+tname+" HDU BLOCK #"+std::to_string(hdublck)+" CANNOT BE DELETED";
+            throw FITSexception(fits_status,"FITSmanager","UpdateTable",ss.str());
+        }
+
+        // Move to the end of the file to append the new table
+        table->write(fptr,0);
     }
     
 #pragma endregion
@@ -690,7 +749,7 @@ namespace DSL
               <<std::endl
               <<"HEADER #"<<hdu_index<<" doesn't exist"<<"\033[0m"<<std::endl;
             
-            fits_status = BAD_HDU_NUM;
+            fits_status = NOT_ATABLE;
             
             throw FITSexception(fits_status,"FITSmanager","MoveToHDU",ss.str());
         }

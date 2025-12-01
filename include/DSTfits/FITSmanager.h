@@ -105,7 +105,9 @@ namespace DSL
 #pragma region * Accessing FITS table
         const std::shared_ptr<FITStable> GetTableAtIndex(const int&);
         const std::shared_ptr<FITStable> GetTable(std::string);
-        const std::shared_ptr<FITStable> CreateTable(std::string, const ttype&);
+
+        void InsertTable(const std::shared_ptr<FITStable>& table);
+        void UpdateTable(const std::shared_ptr<FITStable>& table);
         
 #pragma endregion
 #pragma region * Accessing file block
