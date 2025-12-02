@@ -25,6 +25,11 @@
 #include <functional>
 #include <iomanip>
 #include <typeindex> 
+#include <numeric>
+#include <algorithm>
+#include <iterator>
+#include <cstdint>
+#include <type_traits>
 
 
 #include "FITShdu.h"
@@ -88,6 +93,18 @@ namespace DSL
 
     class FITStable;
     class FITSform;
+    class RowSet;
+
+    template<typename T>
+    class RowSetBuilder;
+
+    template<typename T>
+    class ColumnView;
+    
+    class ColumnHandle;
+
+    template<typename T>
+    class ColumnFilterExpr;
 
     namespace TForm
     {
@@ -393,6 +410,7 @@ namespace DSL
         virtual size_t size() const =0;
         virtual void push_back(const std::any& value) = 0;
         virtual std::unique_ptr<FITSform> clone() const = 0; // add
+        virtual void sortOn(const std::vector<size_t>& order) = 0;
 
 #pragma endregion
 
@@ -505,6 +523,27 @@ namespace DSL
 #endif
         }
 
+        void sortOn(const std::vector<size_t>& order) override
+        {
+            auto& data = this->values<T>();
+            if(order.size() != data.size())
+            {
+                if(order.empty() && data.empty())
+                    return;
+                throw std::logic_error("FITScolumn::reorderRows size mismatch");
+            }
+
+            std::vector<T> reordered(order.size());
+            for(size_t newPos = 0; newPos < order.size(); ++newPos)
+            {
+                const size_t src = order[newPos];
+                if(src >= data.size())
+                    throw std::logic_error("FITScolumn::reorderRows invalid index");
+                reordered[newPos] = std::move(data[src]);
+            }
+            data = std::move(reordered);
+        }
+
         // Read-only accessor for testing
         //inline const col_map& values() const { return data; }
         
@@ -564,6 +603,9 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
 
     protected:
         columns_list fcolumns;
+
+        template<typename T>
+        ColumnFilterExpr<T> operator()(const std::string& columnName);
 
     private:
 #pragma endregion
@@ -625,8 +667,27 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         inline const FITShdu& HDU() const {return hdu;}
         inline       FITShdu& HDU() {return hdu;}
         inline const ttype getTableType() const {return ftbl_type;}
+        
         const std::unique_ptr<FITSform>& getColumn(const std::string& cname) const;
         const std::unique_ptr<FITSform>& getColumn(const size_t& cindex) const;
+
+        template<typename T>
+        RowSetBuilder<T> select(const std::string& columnName);
+
+        template<typename T>
+        ColumnView<T> column(const std::string& columnName);
+
+        ColumnHandle operator[](const std::string& columnName);
+
+        template<typename T>
+        ColumnFilterExpr<T> filter(const std::string& columnName)
+        {
+            (void)getColumn(columnName);      // ensure it exists
+            return ColumnFilterExpr<T>(*this, columnName);
+        }
+
+        void reorderRows(const std::vector<size_t>& order);
+
 #pragma endregion        
 
 #pragma region -- Modifier
@@ -1535,6 +1596,516 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         }
     }
     
+    #pragma region - RowSet / ColumnView helpers
+    namespace detail
+    {
+        template<typename T> struct is_std_vector : std::false_type {};
+        
+        template<typename U, typename Alloc>
+        struct is_std_vector<std::vector<U,Alloc>> : std::true_type {};
+    }
+
+    class RowSet
+    {
+        std::vector<size_t> indices_;
+        public:
+            RowSet() = default;
+            explicit RowSet(std::vector<size_t> rows)
+                : indices_(std::move(rows))
+            {
+                std::sort(indices_.begin(), indices_.end());
+                indices_.erase(std::unique(indices_.begin(), indices_.end()), indices_.end());
+            }
+
+            size_t size()  const { return indices_.size(); }
+            bool   empty() const { return indices_.empty(); }
+            const std::vector<size_t>& indices() const { return indices_; }
+
+            RowSet intersected(const RowSet& other) const
+            {
+                std::vector<size_t> out;
+                out.reserve(std::min(indices_.size(), other.indices_.size()));
+                std::set_intersection(indices_.begin(), indices_.end(),
+                                      other.indices_.begin(), other.indices_.end(),
+                                      std::back_inserter(out));
+                return RowSet(std::move(out));
+            }
+
+            RowSet united(const RowSet& other) const
+            {
+                std::vector<size_t> out;
+                out.reserve(indices_.size() + other.indices_.size());
+                std::set_union(indices_.begin(), indices_.end(),
+                               other.indices_.begin(), other.indices_.end(),
+                               std::back_inserter(out));
+                return RowSet(std::move(out));
+            }
+
+            RowSet subtracted(const RowSet& other) const
+            {
+                std::vector<size_t> out;
+                out.reserve(indices_.size());
+                std::set_difference(indices_.begin(), indices_.end(),
+                                    other.indices_.begin(), other.indices_.end(),
+                                    std::back_inserter(out));
+                return RowSet(std::move(out));
+            }
+
+            template<typename Func>
+            void forEach(Func&& fn) const
+            {
+                for(size_t idx : indices_) fn(idx);
+            }
+    };
+
+    // Logical combinators for RowSet to enable expressions with && and ||
+    inline RowSet operator&&(const RowSet& lhs, const RowSet& rhs)
+    {
+        return lhs.intersected(rhs);
+    }
+    
+    inline RowSet operator||(const RowSet& lhs, const RowSet& rhs)
+    {
+        return lhs.united(rhs);
+    }
+
+    template<typename T>
+    class ColumnFilterExpr
+    {
+        FITStable& tbl_;
+        std::string column_;
+
+        template<typename Fn>
+        RowSet buildWith(Fn&& mutator)
+        {
+            auto& form = *tbl_.getColumn(column_);
+            RowSetBuilder<T> builder(form);
+            mutator(builder);
+            return builder.build();
+        }
+
+    public:
+        ColumnFilterExpr(FITStable& tbl, std::string column)
+            : tbl_(tbl), column_(std::move(column)) {}
+
+        RowSet operator==(const T& value) { return buildWith([&](auto& b){ b.eq(value); }); }
+        RowSet operator!=(const T& value) { return buildWith([&](auto& b){ b.ne(value); }); }
+        RowSet operator< (const T& value) { return buildWith([&](auto& b){ b.lt(value); }); }
+        RowSet operator<=(const T& value) { return buildWith([&](auto& b){ b.le(value); }); }
+        RowSet operator> (const T& value) { return buildWith([&](auto& b){ b.gt(value); }); }
+        RowSet operator>=(const T& value) { return buildWith([&](auto& b){ b.ge(value); }); }
+
+        RowSet between(const T& low, const T& high)
+        {
+            return buildWith([&](auto& b){ b.between(low, high); });
+        }
+    };
+
+    template<typename T>
+    class RowSetBuilder
+    {
+            FITSform* column_;
+            std::vector<T>* values_;
+            std::vector<size_t> indices_;
+
+            void ensureScalar()
+            {
+                static_assert(!detail::is_std_vector<T>::value,
+                              "RowSetBuilder does not support vector payload columns");
+                if(column_->getNelem() > 1)
+                    throw std::logic_error("RowSetBuilder: repeated/vector columns are not supported");
+            }
+
+            template<typename Predicate>
+            RowSetBuilder& filter(Predicate&& pred)
+            {
+                auto* vals = values_;
+                auto newEnd = std::remove_if(indices_.begin(), indices_.end(),
+                    [&](size_t idx){ return !pred((*vals)[idx], idx); });
+                indices_.erase(newEnd, indices_.end());
+                return *this;
+            }
+
+        public:
+            explicit RowSetBuilder(FITSform& column)
+                : column_(&column)
+            {
+                auto& vec = column.values<T>(); // throws if wrong scalar type
+                values_ = &vec;
+                ensureScalar();
+                indices_.resize(vec.size());
+                std::iota(indices_.begin(), indices_.end(), 0);
+            }
+
+            RowSetBuilder& eq(const T& value) { return filter([&](const T& v, size_t){ return v == value; }); }
+            RowSetBuilder& ne(const T& value) { return filter([&](const T& v, size_t){ return v != value; }); }
+            RowSetBuilder& lt(const T& value) { return filter([&](const T& v, size_t){ return v <  value; }); }
+            RowSetBuilder& le(const T& value) { return filter([&](const T& v, size_t){ return v <= value; }); }
+            RowSetBuilder& gt(const T& value) { return filter([&](const T& v, size_t){ return v >  value; }); }
+            RowSetBuilder& ge(const T& value) { return filter([&](const T& v, size_t){ return v >= value; }); }
+
+            RowSetBuilder& between(const T& low, const T& high)
+            {
+                return filter([&](const T& v, size_t){ return v >= low && v <= high; });
+            }
+
+            template<typename Predicate>
+            RowSetBuilder& custom(Predicate&& pred)
+            {
+                // Support both signatures:
+                // - bool(const T&, size_t)
+                // - bool(const T&)
+                if constexpr (std::is_invocable_r_v<bool, Predicate, const T&, size_t>)
+                {
+                    return filter(std::forward<Predicate>(pred));
+                }
+                else if constexpr (std::is_invocable_r_v<bool, Predicate, const T&>)
+                {
+                    return filter([&](const T& v, size_t){ return pred(v); });
+                }
+                else
+                {
+                    static_assert(std::is_invocable_v<Predicate, const T&> || std::is_invocable_v<Predicate, const T&, size_t>,
+                                  "Predicate must be callable as bool(const T&) or bool(const T&, size_t)");
+                    return *this; 
+                }
+            }
+
+            RowSet build() const { return RowSet(indices_); }
+            operator RowSet() const { return build(); }
+    };
+
+    template<typename T>
+    class ColumnSelection
+    {
+        ColumnView<T> view_;
+    public:
+        ColumnSelection(ColumnView<T>&& view, const RowSet& rows)
+            : view_(std::move(view))
+        {
+            view_.on(rows);
+        }
+
+        ColumnSelection& add(const T& v) { view_.add(v); return *this; }
+        ColumnSelection& sub(const T& v) { view_.sub(v); return *this; }
+        ColumnSelection& mul(const T& v) { view_.mul(v); return *this; }
+        ColumnSelection& div(const T& v) { view_.div(v); return *this; }
+        ColumnSelection& set(const T& v) { view_.set(v); return *this; }
+
+        ColumnSelection& operator+=(const T& v) { return add(v); }
+        ColumnSelection& operator-=(const T& v) { return sub(v); }
+        ColumnSelection& operator*=(const T& v) { return mul(v); }
+        ColumnSelection& operator/=(const T& v) { return div(v); }
+    };
+
+    template<typename T>
+    class ColumnView
+    {
+        FITStable* owner_;
+        FITSform* column_;
+        std::vector<T>* values_;
+        std::vector<size_t> selection_;
+        bool hasSelection_ = false;
+
+        void ensureScalar()
+        {
+            static_assert(!detail::is_std_vector<T>::value,
+                          "ColumnView does not support vector payload columns");
+            if(column_->getNelem() > 1)
+                throw std::logic_error("ColumnView: repeated/vector columns are not supported");
+        }
+
+        void ensureOwner() const
+        {
+            if(!owner_)
+                throw std::logic_error("ColumnView requires owning FITStable");
+        }
+
+        template<typename Func>
+        ColumnView& mutate(Func&& fn)
+        {
+            auto& vec = *values_;
+            if(hasSelection_)
+            {
+                for(size_t idx : selection_)
+                    fn(vec[idx], idx);
+            }
+            else
+            {
+                for(size_t idx = 0; idx < vec.size(); ++idx)
+                    fn(vec[idx], idx);
+            }
+            return *this;
+        }
+
+        template<typename Comparator>
+        ColumnView& sortWithComparator(Comparator cmp)
+        {
+            ensureOwner();
+            auto& vec = *values_;
+            if(vec.empty())
+            {
+                clearSelection();
+                return *this;
+            }
+
+            std::vector<size_t> order(vec.size());
+            std::iota(order.begin(), order.end(), 0);
+            std::stable_sort(order.begin(), order.end(),
+                             [&](size_t lhs, size_t rhs)
+                             {
+                                 const T& lv = vec[lhs];
+                                 const T& rv = vec[rhs];
+                                 if(cmp(lv, rv)) return true;
+                                 if(cmp(rv, lv)) return false;
+                                 return lhs < rhs;
+                             });
+
+            owner_->reorderRows(order);
+            clearSelection();
+            values_ = &column_->values<T>();
+            return *this;
+        }
+
+    public:
+        explicit ColumnView(FITStable& owner, FITSform& column)
+            : owner_(&owner),
+              column_(&column),
+              values_(&column.values<T>())
+        {
+            ensureScalar();
+        }
+
+        ColumnView& on(const RowSet& rows)
+        {
+            selection_ = rows.indices();
+            hasSelection_ = true;
+            return *this;
+        }
+
+        ColumnView& clearSelection()
+        {
+            selection_.clear();
+            hasSelection_ = false;
+            return *this;
+        }
+
+        ColumnView& add(const T& value)
+        {
+            return mutate([&](T& cell, size_t){ cell += value; });
+        }
+
+        ColumnView& sub(const T& value)
+        {
+            return mutate([&](T& cell, size_t){ cell -= value; });
+        }
+
+        ColumnView& mul(const T& value)
+        {
+            return mutate([&](T& cell, size_t){ cell *= value; });
+        }
+
+        ColumnView& div(const T& value)
+        {
+            return mutate([&](T& cell, size_t){ cell /= value; });
+        }
+
+        ColumnView& set(const T& value)
+        {
+            return mutate([&](T& cell, size_t){ cell = value; });
+        }
+
+        template<typename Func>
+        ColumnView& apply(Func&& fn)
+        {
+            return mutate(std::forward<Func>(fn));
+        }
+
+        ColumnView& sortAscending()
+        {
+            return sortWithComparator(std::less<T>());
+        }
+
+        ColumnView& sortDescending()
+        {
+            return sortWithComparator(std::greater<T>());
+        }
+
+        const std::vector<T>& data() const { return *values_; }
+
+        ColumnSelection<T> operator[](const RowSet& rows) &&
+        {
+            ColumnView<T> tmp(std::move(*this));
+            tmp.on(rows);
+            return ColumnSelection<T>(std::move(tmp), rows);
+        }
+
+        ColumnSelection<T> operator[](const RowSet& rows) const &
+        {
+            ColumnView<T> tmp(*this);
+            tmp.on(rows);
+            return ColumnSelection<T>(std::move(tmp), rows);
+        }
+    };
+
+    class ColumnHandle
+    {
+            FITStable& tbl_;
+            std::string target_;
+
+        public:
+            ColumnHandle(FITStable& tbl, std::string name)
+                : tbl_(tbl), target_(std::move(name)) {}
+
+            template<typename TargetT>
+            ColumnView<TargetT> all()
+            {
+                auto& form = *tbl_.getColumn(target_);
+                return ColumnView<TargetT>(tbl_, form);
+            }
+
+            template<typename TargetT>
+            ColumnView<TargetT> on(const RowSet& rows)
+            {
+                auto view = all<TargetT>();
+                view.on(rows);
+                return view;
+            }
+
+            template<typename FilterT>
+            class WhereChain
+            {
+                ColumnHandle& owner_;
+                RowSetBuilder<FilterT> builder_;
+
+                RowSet rows() const { return builder_.build(); }
+
+            public:
+                WhereChain(ColumnHandle& owner, RowSetBuilder<FilterT>&& builder)
+                    : owner_(owner), builder_(std::move(builder)) {}
+
+                WhereChain& eq(const FilterT& value) { builder_.eq(value); return *this; }
+                WhereChain& ne(const FilterT& value) { builder_.ne(value); return *this; }
+                WhereChain& lt(const FilterT& value) { builder_.lt(value); return *this; }
+                WhereChain& le(const FilterT& value) { builder_.le(value); return *this; }
+                WhereChain& gt(const FilterT& value) { builder_.gt(value); return *this; }
+                WhereChain& ge(const FilterT& value) { builder_.ge(value); return *this; }
+                WhereChain& between(const FilterT& low, const FilterT& high) { builder_.between(low, high); return *this; }
+
+                template<typename Predicate>
+                WhereChain& custom(Predicate&& pred)
+                {
+                    builder_.custom(std::forward<Predicate>(pred));
+                    return *this;
+                }
+
+                template<typename TargetT>
+                WhereChain& add(const TargetT& value)
+                {
+                    owner_.all<TargetT>().on(rows()).add(value);
+                    return *this;
+                }
+
+                template<typename TargetT>
+                WhereChain& sub(const TargetT& value)
+                {
+                    owner_.all<TargetT>().on(rows()).sub(value);
+                    return *this;
+                }
+
+                template<typename TargetT>
+                WhereChain& mul(const TargetT& value)
+                {
+                    owner_.all<TargetT>().on(rows()).mul(value);
+                    return *this;
+                }
+
+                template<typename TargetT>
+                WhereChain& div(const TargetT& value)
+                {
+                    owner_.all<TargetT>().on(rows()).div(value);
+                    return *this;
+                }
+
+                template<typename TargetT>
+                WhereChain& set(const TargetT& value)
+                {
+                    owner_.all<TargetT>().on(rows()).set(value);
+                    return *this;
+                }
+
+                template<typename TargetT, typename Func>
+                WhereChain& apply(Func&& fn)
+                {
+                    owner_.all<TargetT>().on(rows()).apply(std::forward<Func>(fn));
+                    return *this;
+                }
+
+                RowSet toRowSet() const { return rows(); }
+            };
+
+            template<typename FilterT>
+            WhereChain<FilterT> where(const std::string& filterColumn)
+            {
+                auto& form = *tbl_.getColumn(filterColumn);
+                return WhereChain<FilterT>(*this, RowSetBuilder<FilterT>(form));
+            }
+    };
+
+    template<typename T>
+    RowSetBuilder<T> FITStable::select(const std::string& columnName)
+    {
+        auto& form = *getColumn(columnName);
+        return RowSetBuilder<T>(form);
+    }
+
+    template<typename T>
+    ColumnView<T> FITStable::column(const std::string& columnName)
+    {
+        auto& form = *getColumn(columnName);
+        return ColumnView<T>(*this, form);
+    }
+
+    inline ColumnHandle FITStable::operator[](const std::string& columnName)
+    {
+        return ColumnHandle(*this, columnName);
+    }
+
+    inline void FITStable::reorderRows(const std::vector<size_t>& order)
+    {
+        if(fcolumns.empty())
+            return;
+
+        const size_t expected = fcolumns.front()->size();
+        if(order.size() != expected)
+            throw std::logic_error("FITStable::reorderRows permutation size mismatch");
+
+        std::vector<uint8_t> seen(expected, 0);
+        for(size_t idx : order)
+        {
+            if(idx >= expected)
+                throw std::logic_error("FITStable::reorderRows permutation index out of range");
+            if(seen[idx])
+                throw std::logic_error("FITStable::reorderRows permutation contains duplicates");
+            seen[idx] = 1;
+        }
+
+        for(auto& col : fcolumns)
+        {
+            if(col->size() != expected)
+                throw std::logic_error("FITStable::reorderRows column size mismatch");
+            col->sortOn(order);
+        }
+        nrows_cache = expected;
+    }
+
+    template<typename T>
+    ColumnFilterExpr<T> FITStable::operator()(const std::string& columnName)
+    {
+        // Ensures column exists (throws if not)
+        (void)getColumn(columnName);
+        return ColumnFilterExpr<T>(*this, columnName);
+    }
+#pragma endregion
 }
 #endif
-
