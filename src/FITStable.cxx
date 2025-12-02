@@ -588,6 +588,7 @@ namespace DSL
     template< >
     void FITScolumn< uint32_t >::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<uint32_t>();
         if(fptr == nullptr)
         {
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<T>","write");
@@ -619,6 +620,7 @@ namespace DSL
     template< >
     void FITScolumn< FITSform::complex >::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<FITSform::complex>();
         if(fptr == nullptr)
         {
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<complex>","write");
@@ -650,6 +652,7 @@ namespace DSL
     template< >
     void FITScolumn<FITSform::dblcomplex>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<FITSform::dblcomplex>();
         if(fptr == nullptr)
         {
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<dblcomplex>","write");
@@ -681,6 +684,7 @@ namespace DSL
     template< >
     void FITScolumn<std::string>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<std::string>();
         if(fptr == nullptr)
         {
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<std::string>","write");
@@ -712,6 +716,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::int8Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<FITSform::int8Vector>();
         if(!fptr)
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<int8Vector>","write");
         
@@ -742,6 +747,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::uint8Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<FITSform::uint8Vector>();
         if(!fptr)
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<uint8Vector>","write");
 
@@ -772,18 +778,31 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::int16Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<int16Vector>","write");
-        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<int16Vector>","write");
+        const auto& data = this->values<FITSform::int16Vector>();
+        if(!fptr)
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<int16Vector>","write");
+
+        if(data.empty())
+            throw FITSexception(NOT_TABLE,"FITScolumn<int16Vector>","write");
+
         const int64_t nelem = getNelem();
         int16_t* buffer = new int16_t[nelem];
         int tbl_status = 0;
         size_t row=0;
+
         for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
         {
-            if(row < static_cast<size_t>(first_row-1)) continue;
-            for(int64_t i=0;i<nelem;++i) buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : int16_t(0);
+            if(row < static_cast<size_t>(first_row-1))
+                continue;
+            
+            for(int64_t i=0;i<nelem;++i)
+                buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : int16_t(0);
+
             if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
-            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<int16Vector>","write"); }
+            {
+                delete [] buffer;
+                throw FITSexception(tbl_status,"FITScolumn<int16Vector>","write");
+            }
         }
         delete [] buffer;
     }
@@ -791,19 +810,30 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::uint16Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<uint16Vector>","write");
-        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<uint16Vector>","write");
-        const int64_t nelem = getNelem();
+        const auto& data = this->values<FITSform::uint16Vector>();
+        if(!fptr)
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<uint16Vector>","write");
+
+        if(data.empty())
+            throw FITSexception(NOT_TABLE,"FITScolumn<uint16Vector>","write");
+        
+            const int64_t nelem = getNelem();
         uint16_t* buffer = new uint16_t[nelem];
         int tbl_status = 0;
         size_t row=0;
         const int cfitsType = static_cast<int>(getType());// getCFITSIOStorageType(); // maps tuint/tulong -> tlong
+        
         for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
         {
-            if(row < static_cast<size_t>(first_row-1)) continue;
+            if(row < static_cast<size_t>(first_row-1))
+                continue;
+
             for(int64_t i=0;i<nelem;++i) buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : uint16_t(0);
             if(ffpcl(fptr.get(), cfitsType, static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
-            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<uint16Vector>","write"); }
+            {
+                delete [] buffer;
+                throw FITSexception(tbl_status,"FITScolumn<uint16Vector>","write");
+            }
         }
         delete [] buffer;
     }
@@ -811,8 +841,14 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::int32Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<int32Vector>","write");
-        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<int32Vector>","write");
+        const auto& data = this->values<FITSform::int32Vector>();
+
+        if(!fptr)
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<int32Vector>","write");
+        
+        if(data.empty())
+            throw FITSexception(NOT_TABLE,"FITScolumn<int32Vector>","write");
+        
         const int64_t nelem = getNelem();
 
         int tbl_status = 0;
@@ -863,8 +899,13 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::uint32Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<uint32Vector>","write");
-        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<uint32Vector>","write");
+        const auto& data = this->values<FITSform::uint32Vector>();
+
+        if(!fptr)
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<uint32Vector>","write");
+        if(data.empty())
+            throw FITSexception(NOT_TABLE,"FITScolumn<uint32Vector>","write");
+
         const int64_t nelem = getNelem();
 
         int tbl_status = 0;
@@ -916,18 +957,31 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::int64Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<int64Vector>","write");
-        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<int64Vector>","write");
+        const auto& data = this->values<FITSform::int64Vector>();
+        if(!fptr)
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<int64Vector>","write");
+
+        if(data.empty())
+            throw FITSexception(NOT_TABLE,"FITScolumn<int64Vector>","write");
+
         const int64_t nelem = getNelem();
         int64_t* buffer = new int64_t[nelem];
         int tbl_status = 0;
         size_t row=0;
+
         for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
         {
-            if(row < static_cast<size_t>(first_row-1)) continue;
-            for(int64_t i=0;i<nelem;++i) buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : int64_t(0);
+            if(row < static_cast<size_t>(first_row-1))
+                continue;
+
+            for(int64_t i=0;i<nelem;++i)
+                buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : int64_t(0);
+
             if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
-            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<int64Vector>","write"); }
+            {
+                delete [] buffer;
+                throw FITSexception(tbl_status,"FITScolumn<int64Vector>","write");
+            }
         }
         delete [] buffer;
     }
@@ -935,15 +989,22 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::uint64Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<uint64Vector>","write");
-        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<uint64Vector>","write");
+        const auto& data = this->values<FITSform::uint64Vector>();
+
+        if(!fptr)
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<uint64Vector>","write");
+
+        if(data.empty())
+            throw FITSexception(NOT_TABLE,"FITScolumn<uint64Vector>","write");
+
         const int64_t nelem = getNelem();
         uint64_t* buffer = new uint64_t[nelem];
         int tbl_status = 0;
         size_t row=0;
         for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
         {
-            if(row < static_cast<size_t>(first_row-1)) continue;
+            if(row < static_cast<size_t>(first_row-1))
+                continue;
             for(int64_t i=0;i<nelem;++i) buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : uint64_t(0);
             if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
             { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<uint64Vector>","write"); }
@@ -954,18 +1015,32 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::floatVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<floatVector>","write");
-        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<floatVector>","write");
+        const auto& data = this->values<FITSform::floatVector>();
+        
+        if(!fptr)
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<floatVector>","write");
+
+        if(data.empty())
+            throw FITSexception(NOT_TABLE,"FITScolumn<floatVector>","write");
+
         const int64_t nelem = getNelem();
         float* buffer = new float[nelem];
         int tbl_status = 0;
         size_t row=0;
+
         for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
         {
-            if(row < static_cast<size_t>(first_row-1)) continue;
-            for(int64_t i=0;i<nelem;++i) buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : std::numeric_limits<float>::quiet_NaN();
+            if(row < static_cast<size_t>(first_row-1))
+                continue;
+
+            for(int64_t i=0;i<nelem;++i)
+                buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : std::numeric_limits<float>::quiet_NaN();
+
             if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
-            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<floatVector>","write"); }
+            {
+                delete [] buffer;
+                throw FITSexception(tbl_status,"FITScolumn<floatVector>","write");
+            }
         }
         delete [] buffer;
     }
@@ -973,18 +1048,32 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::doubleVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<doubleVector>","write");
-        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<doubleVector>","write");
+        const auto& data = this->values<FITSform::doubleVector>();
+
+        if(!fptr)
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<doubleVector>","write");
+        
+        if(data.empty())
+            throw FITSexception(NOT_TABLE,"FITScolumn<doubleVector>","write");
+    
         const int64_t nelem = getNelem();
         double* buffer = new double[nelem];
         int tbl_status = 0;
         size_t row=0;
+
         for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
         {
-            if(row < static_cast<size_t>(first_row-1)) continue;
-            for(int64_t i=0;i<nelem;++i) buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : std::numeric_limits<double>::quiet_NaN();
+            if(row < static_cast<size_t>(first_row-1))
+                continue;
+
+            for(int64_t i=0;i<nelem;++i)
+                buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : std::numeric_limits<double>::quiet_NaN();
+
             if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
-            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<doubleVector>","write"); }
+            {
+                delete [] buffer;
+                throw FITSexception(tbl_status,"FITScolumn<doubleVector>","write");
+            }
         }
         delete [] buffer;
     }
@@ -992,6 +1081,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::complexVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<FITSform::complexVector>();
         if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<complexVector>","write");
         if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<complexVector>","write");
         const int64_t nelem = getNelem();
@@ -1025,12 +1115,19 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::dblcomplexVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<dblcomplexVector>","write");
-        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<dblcomplexVector>","write");
+        const auto& data = this->values<FITSform::dblcomplexVector>();
+
+        if(!fptr)
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<dblcomplexVector>","write");
+
+        if(data.empty())
+            throw FITSexception(NOT_TABLE,"FITScolumn<dblcomplexVector>","write");
+
         const int64_t nelem = getNelem();
         double* buffer = new double[nelem*2];
         int tbl_status = 0;
         size_t row=0;
+
         for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
         {
             if(row < static_cast<size_t>(first_row-1)) continue;
@@ -1050,7 +1147,10 @@ namespace DSL
                 pos+=2;
             }
             if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
-            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<dblcomplexVector>","write"); }
+            {
+                delete [] buffer;
+                throw FITSexception(tbl_status,"FITScolumn<dblcomplexVector>","write");
+            }
         }
         delete [] buffer;
     }
@@ -1058,6 +1158,8 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::stringVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<FITSform::stringVector>();
+
         if(fptr == nullptr)
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<stringVector>","write");
         if(data.size() < 1)
@@ -1088,6 +1190,8 @@ namespace DSL
     template<>
     void FITScolumn<bool>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<bool>();
+
         if(!fptr)
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<char*>","write");
         if(data.size() < 1)
@@ -1145,6 +1249,8 @@ namespace DSL
     template<>
     void FITScolumn< FITSform::boolVector >::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<FITSform::boolVector>();
+
         if(!fptr)
         {
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<std::vector<FITSform::boolVector>","write");

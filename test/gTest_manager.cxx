@@ -569,15 +569,15 @@ TEST(FITStable, openTableFromFile)
 
     for(size_t i=0; i<static_cast<size_t>(tbl->nrows()); i++)
     {
-        ASSERT_EQ(src_nr->values().at(i), static_cast<int8_t>(i+1));
+        ASSERT_EQ(src_nr->values<int16_t>().at(i), static_cast<int8_t>(i+1));
     }
 
-    ASSERT_NEAR(s_like->values().at(0),  437, 1e-6);
-    ASSERT_NEAR(s_like->values().at(1),  49, 1e-6);
-    ASSERT_NEAR(s_like->values().at(2),  9, 1e-6);
-    ASSERT_NEAR(s_like->values().at(3),  10, 1e-6);
-    ASSERT_NEAR(s_like->values().at(4),  8, 1e-6);
-    ASSERT_NEAR(s_like->values().at(5),  9, 1e-6);
+    ASSERT_NEAR(s_like->values<float>().at(0),  437, 1e-6);
+    ASSERT_NEAR(s_like->values<float>().at(1),  49, 1e-6);
+    ASSERT_NEAR(s_like->values<float>().at(2),  9, 1e-6);
+    ASSERT_NEAR(s_like->values<float>().at(3),  10, 1e-6);
+    ASSERT_NEAR(s_like->values<float>().at(4),  8, 1e-6);
+    ASSERT_NEAR(s_like->values<float>().at(5),  9, 1e-6);
 
     std::shared_ptr<FITStable> tbb = fm.GetTableAtIndex(3);
     ASSERT_NE(tbb, nullptr);
@@ -588,7 +588,7 @@ TEST(FITStable, openTableFromFile)
 
     for(size_t i=0; i<static_cast<size_t>(tbb->nrows()); i++)
     {
-        ASSERT_EQ(brc_nr->values().at(i), static_cast<int8_t>(i+1));
+        ASSERT_EQ(brc_nr->values<int16_t>().at(i), static_cast<int8_t>(i+1));
     }
 
     tbb.reset();
@@ -660,10 +660,10 @@ TEST(FITStable, UpdateTable)
 
     auto* col_uint64 = dynamic_cast<FITScolumn<uint64_t>*>(readTable->getColumn("COL_UINT64").get());
     ASSERT_NE(col_uint64, nullptr);
-    ASSERT_EQ(col_uint64->values().size(), 3u);
-    EXPECT_EQ(col_uint64->values()[0], uint64_t(9));
-    EXPECT_EQ(col_uint64->values()[1], uint64_t(10));
-    EXPECT_EQ(col_uint64->values()[2], uint64_t(11));
+    ASSERT_EQ(col_uint64->values<uint64_t>().size(), 3u);
+    EXPECT_EQ(col_uint64->values<uint64_t>()[0], uint64_t(9));
+    EXPECT_EQ(col_uint64->values<uint64_t>()[1], uint64_t(10));
+    EXPECT_EQ(col_uint64->values<uint64_t>()[2], uint64_t(11));
     
     fm2.Close();
 

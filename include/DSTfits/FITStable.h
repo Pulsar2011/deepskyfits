@@ -23,7 +23,8 @@
 #include <limits>
 #include <stdexcept>
 #include <functional>
-#include <iomanip> // added for hex formatting
+#include <iomanip>
+#include <typeindex> 
 
 
 #include "FITShdu.h"
@@ -87,6 +88,35 @@ namespace DSL
 
     class FITStable;
     class FITSform;
+
+    namespace TForm
+    {
+        template<typename T>
+        struct columnData;
+
+        struct columnDataBase
+        {
+            virtual ~columnDataBase() = default;
+            virtual size_t size() const = 0;
+            virtual std::type_index type() const = 0;
+        };
+
+        template<typename T>
+        struct columnData : columnDataBase
+        {
+            std::vector<T> arr;
+            columnData() = default;
+            columnData(size_t n) : arr(static_cast<std::size_t>(n)) {}
+            columnData(const std::vector<T>& v) : arr(v) {}
+
+            size_t size() const override { return arr.size(); }
+            std::type_index type() const override { return std::type_index(typeid(T)); }
+            std::vector<T>&       ref()       { return arr; }
+            const std::vector<T>& ref() const { return arr; }
+        };
+    }
+
+    using namespace TForm;
     
 #pragma region - FITSform class definition
     class FITSform
@@ -113,7 +143,37 @@ namespace DSL
 
         size_t fpos;
 
+        std::unique_ptr<columnDataBase> fdata;
+
+        template<typename T>
+        columnData<T>* storage()
+        {
+            return (fdata && fdata->type() == std::type_index(typeid(T)))
+                   ? static_cast<columnData<T>*>(fdata.get()) : nullptr;
+        }
+
+        template<typename T>
+        const columnData<T>* storage() const
+        {
+            return (fdata && fdata->type() == std::type_index(typeid(T)))
+                   ? static_cast<const columnData<T>*>(fdata.get()) : nullptr;
+        }
+
     protected:
+        
+        template<typename T>
+        void allocateStorageIfNeeded()
+        {
+            if(storage<T>()) return;
+            fdata = std::make_unique< columnData<T> >();
+        }
+
+        template<typename T>
+        void allocateStorageWithSize(size_t n)
+        {
+            fdata = std::make_unique< columnData<T> >(n);
+        }
+
 #pragma endregion
 #pragma region -- protected member function
         inline FITSform():fname(),ftype(dtype::tnone),funit(),fscale(1),fzero(0),frepeat(1),fwidth(0),fpos(0) {};
@@ -308,6 +368,24 @@ namespace DSL
             }
         }
 
+        template<typename T>
+        const std::vector<T>& values() const
+        {
+            static const std::vector<T> empty;
+            const auto* s = storage<T>();
+            if(!s) return empty;
+            return s->ref();
+        }
+
+        template<typename T>
+        std::vector<T>& values()
+        {
+            auto* s = storage<T>();
+            if(!s)
+                throw std::bad_cast();
+            return s->ref();
+        }
+
 #pragma endregion
 
 #pragma region -- pur virtual function
@@ -344,7 +422,7 @@ namespace DSL
          **/
     protected:
         typedef std::vector<T> col_map;
-        col_map data;
+        //col_map fdata;
 
     private:
 
@@ -403,19 +481,22 @@ namespace DSL
 #pragma endregion
 #pragma region -- accessor
 
-        size_t size() const override { return data.size(); }
+        size_t size() const override { return this->values<T>().size(); }
+
 
         void push_back(const std::any& value) override
         {
 #if __cplusplus < 201703L
             const T& v = any_cast_any<T>(value);
             Update(v);
-            data.push_back(v);
+            allocateStorageIfNeeded<T>();
+            FITSform::values<T>().push_back(v);
 #else
-            if (const T* pv = std::any_cast<T>(&value)) // no by-value pair construction
-            {   
-                Update(*pv);                                // pass by const&
-                data.push_back(*pv);                        // vector::push_back(const T&)
+            if (const T* pv = std::any_cast<T>(&value))
+            {
+                Update(*pv);
+                allocateStorageIfNeeded<T>();
+                FITSform::values<T>().push_back(*pv);
             }
             else
             {
@@ -425,7 +506,7 @@ namespace DSL
         }
 
         // Read-only accessor for testing
-        inline const col_map& values() const { return data; }
+        //inline const col_map& values() const { return data; }
         
 #pragma endregion
 #pragma region -- diagnoze
@@ -1043,6 +1124,7 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
     template< typename T >
     void FITScolumn<T>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<T>();
         if(fptr == nullptr)
         {
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<T>","write");
@@ -1079,8 +1161,9 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
      @note Empty constructor is made private because \c this->fname and \c this->ftype are required.
      */
     template< typename T >
-    FITScolumn<T>::FITScolumn():FITSform(),data()
+    FITScolumn<T>::FITScolumn():FITSform()
     {
+        allocateStorageIfNeeded<T>();
     }
     
     /**
@@ -1089,24 +1172,22 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
      @param type FITS column type
      */
     template< typename T >
-    FITScolumn<T>::FITScolumn(const std::string& name , const dtype& type, const std::string unit, const size_t pos):FITSform(pos,name,type,unit),data()
+    FITScolumn<T>::FITScolumn(const std::string& name , const dtype& type, const std::string unit, const size_t pos):FITSform(pos,name,type,unit)
     {
-        
+        allocateStorageIfNeeded<T>();
     }
 
     template< typename T >
-    FITScolumn<T>::FITScolumn(const std::string& name, const dtype& type, const int64_t& r, const int64_t& w, const std::string unit, const size_t pos):FITSform(pos,name,type,r,w,unit),data()
+    FITScolumn<T>::FITScolumn(const std::string& name, const dtype& type, const int64_t& r, const int64_t& w, const std::string unit, const size_t pos):FITSform(pos,name,type,r,w,unit)
     {
-
+        allocateStorageIfNeeded<T>();
     }
     
     template< typename T >
-    FITScolumn<T>::FITScolumn(const std::string& name, const dtype& type, const int64_t& r, const int64_t& w, const double& s, const double& z, const std::string unit, const size_t pos):FITSform(pos,name,type,r,w,s,z,unit),data()
+    FITScolumn<T>::FITScolumn(const std::string& name, const dtype& type, const int64_t& r, const int64_t& w, const double& s, const double& z, const std::string unit, const size_t pos):FITSform(pos,name,type,r,w,s,z,unit)
     {
-
+        allocateStorageIfNeeded<T>();
     }
-    
-    
     
     /**
      Constructor
@@ -1119,9 +1200,9 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
      @param pos Column position in the FITStable
      */
     template< typename T >
-    FITScolumn<T>::FITScolumn(const std::string& name, const dtype& type, const double& scale, const double& zero, const std::string unit, const size_t pos):FITSform(pos,name,type,scale,zero,unit),data()
+    FITScolumn<T>::FITScolumn(const std::string& name, const dtype& type, const double& scale, const double& zero, const std::string unit, const size_t pos):FITSform(pos,name,type,scale,zero,unit)
     {
-        
+        allocateStorageIfNeeded<T>();
     }
     
     /**
@@ -1129,16 +1210,19 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
      @param col FITS column to be copyed to this
      */
     template< typename T >
-    FITScolumn<T>::FITScolumn(const FITScolumn<T>& col):FITSform(col),data(col.data)
+    FITScolumn<T>::FITScolumn(const FITScolumn<T>& col):FITSform(col)
     {
-        
+         const auto* s = col.storage<T>();
+         if(s)
+         {
+             allocateStorageWithSize<T>( s->ref().size() );
+             this->values<T>() = s->ref();
+         }
     }
     
     template< typename T >
     FITScolumn<T>::~FITScolumn()
-    {
-        data.clear();
-    }
+    {}
 #pragma endregion
 
     template< typename T >
@@ -1244,6 +1328,7 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
     void FITScolumn<T>::Dump( std::ostream& fout) const
     {
         FITSform::Dump(fout);
+        const auto& data = this->values<T>();
         size_t n=0;
         for(typename col_map::const_iterator it = data.cbegin(); it != data.cend(); it++)
         {
@@ -1260,6 +1345,7 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
     inline void DSL::FITScolumn<int8_t>::Dump(std::ostream& fout) const
     {
         FITSform::Dump(fout);
+        const auto& data = this->values<int8_t>();
         size_t n = 0;
         for(const auto& v : data)
         {
@@ -1287,6 +1373,7 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
     inline void DSL::FITScolumn<uint8_t>::Dump(std::ostream& fout) const
     {
         FITSform::Dump(fout);
+        const auto& data = this->values<uint8_t>();
         size_t n = 0;
         for(const auto& v : data)
         {
@@ -1314,7 +1401,9 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
     inline void DSL::FITScolumn< std::vector<uint8_t> >::Dump(std::ostream& fout) const
     {
         FITSform::Dump(fout);
+        const auto& data = this->values< std::vector<uint8_t> >();
         size_t row = 0;
+
         for(const auto& vec : data)
         {
             fout<<"\033[32m   |       \033[31m[\033[0m"<<row<<"\033[31m]\033[0m   size="<<vec.size();
@@ -1365,6 +1454,7 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
     inline void DSL::FITScolumn< std::vector<int8_t> >::Dump(std::ostream& fout) const
     {
         FITSform::Dump(fout);
+        const auto& data = this->values< std::vector<int8_t> >();
         size_t row = 0;
         for(const auto& vec : data)
         {
