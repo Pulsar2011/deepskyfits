@@ -645,7 +645,17 @@ namespace DSL
         }
 
         // Check either the table already exists:
-        std::shared_ptr<FITStable> existing_table = GetTable(table->GetName());
+        std::shared_ptr<FITStable> existing_table = nullptr;
+        
+        try
+        {
+            existing_table = GetTable(table->GetName());
+        }
+        catch(const std::exception& e)
+        {
+            existing_table = nullptr;
+        }
+        
         if(existing_table != nullptr)
         {
             fits_status = WRITE_ERROR;
