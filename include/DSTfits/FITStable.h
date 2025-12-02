@@ -41,10 +41,13 @@
 
 namespace DSL
 {
-    // Global CFITSIO mutex (serialize all CFITSIO calls)
+    /** @brief Global CFITSIO mutex (serialize all CFITSIO calls across threads). */
     extern std::recursive_timed_mutex g_cfitsio_mutex;
 
-    // RAII guard for user-side locking
+    /**
+     * @brief RAII guard for global CFITSIO critical section.
+     * @details Locks the global recursive mutex for the lifetime of the guard.
+     */
     struct CFITSIOGuard
     {
         std::unique_lock<std::recursive_timed_mutex> lk;
@@ -52,7 +55,15 @@ namespace DSL
     };
 
 #if __cplusplus < 201703L
+    /**
+     * @brief Fallback replacement for std::bad_any_cast on pre-C++17 compilers.
+     */
     struct bad_any_cast : std::bad_cast {};
+
+    /**
+     * @brief Lightweight std::any-like container for pre-C++17.
+     * @details Stores a heap-allocated type-erased holder with cloning support.
+     */
     class any_type {
         struct base
         {
@@ -86,6 +97,13 @@ namespace DSL
             return h->value;
         }
     };
+    /**
+     * @brief Helper to extract a value from any_type (pre-C++17 helper).
+     * @tparam U Value type.
+     * @param a Source any_type.
+     * @return Extracted value of type U.
+     * @throws bad_any_cast if type mismatches.
+     */
     template<typename U>
     inline U any_cast_any(const any_type& a){ return const_cast<any_type&>(a).get<U>(); }
 
@@ -118,6 +136,10 @@ namespace DSL
             virtual std::type_index type() const = 0;
         };
 
+        /**
+         * @brief Typed storage for a column's in-memory data.
+         * @tparam T scalar or vector payload type held by a column.
+         */
         template<typename T>
         struct columnData : columnDataBase
         {
@@ -136,16 +158,16 @@ namespace DSL
     using namespace TForm;
     
 #pragma region - FITSform class definition
+    /**
+     * @class FITSform
+     * @brief FITS table's column descriptor and storage proxy.
+     * @author GILLARD William
+     * @details
+     *  Encapsulates column metadata (name, dtype, units, repeats, width, scale/zero)
+     *  and provides typed access to the in-memory data buffer through values<T>().
+     */
     class FITSform
     {
-        /**
-         * @class FITSform  FITStable.h "fitsExtractor/FITStable.h"
-         * @author GILLARD William
-         * @date 08/08/2017
-         * @brief FITS table's column descriptor
-         * @details Helper class that allow easy access to the name, type, unit of FITS ASCII and BINARY columns.
-         **/
-        
     private:
 #pragma region -- private member
         const std::string fname;
@@ -198,6 +220,9 @@ namespace DSL
         inline void setNelem(const int64_t& n) {frepeat = n;}
         inline void setWidth(const int64_t& w) {fwidth  = w;}
 
+        /**
+         * @brief Initialize scale/zero defaults for pseudo-unsigned types.
+         */
         void initWithType()
         {
             switch(ftype)
@@ -371,8 +396,13 @@ namespace DSL
         inline const int64_t&    getNelem()  const {return frepeat;}
         inline const int64_t&    getWidth()  const {return fwidth;}
 
-        // CFITSIO storage type to use when writing table cells.
-        // Unsigned types are stored using signed equivalents with BZERO/BSCALE set by getTTYPE().
+        /**
+         * @brief CFITSIO storage code to use when writing this column.
+         * @details
+         *  Maps pseudo-unsigned dtypes to signed storage types and relies on
+         *  BSCALE/BZERO reported by getTTYPE() to preserve values.
+         * @return CFITSIO TFORM code (as dtype) that matches the storage.
+         */
         inline int getCFITSIOStorageType() const
         {
             switch(ftype)
@@ -385,6 +415,11 @@ namespace DSL
             }
         }
 
+        /**
+         * @brief Typed const access to column's in-memory values.
+         * @tparam T Expected payload type for this column.
+         * @return Reference to a const vector of values; empty if storage type differs.
+         */
         template<typename T>
         const std::vector<T>& values() const
         {
@@ -407,7 +442,16 @@ namespace DSL
 
 #pragma region -- pur virtual function
 
+        /**
+         * @brief Number of rows (cells) stored in this column.
+         */
         virtual size_t size() const =0;
+
+        /**
+         * @brief Append one value to this column (type-erased).
+         * @param value std::any wrapping a T value.
+         * @throws std::bad_any_cast if value type mismatches.
+         */
         virtual void push_back(const std::any& value) = 0;
         virtual std::unique_ptr<FITSform> clone() const = 0; // add
         virtual void sortOn(const std::vector<size_t>& order) = 0;
@@ -420,14 +464,31 @@ namespace DSL
         
 #pragma endregion
 #pragma region -- Saving & printing
+        /**
+         * @brief Emit a formatted description of this column to a stream.
+         */
         virtual void Dump( std::ostream& ) const;
+
+        /**
+         * @brief Write this column's data to an opened CFITSIO table.
+         * @param fptr Shared pointer to CFITSIO handle.
+         * @param first_row 1-based first row to write.
+         * @throws FITSexception on CFITSIO error or invalid state.
+         */
         virtual void write(const std::shared_ptr<fitsfile>&, const int64_t&)=0;
 #pragma endregion
     };
 #pragma endregion
 
 #pragma region - FITScolumn class definition
-    
+    /**
+     * @class FITScolumn
+     * @brief Typed column container for FITS table data.
+     * @details
+     *  Specializes FITSform with typed in-memory storage and helpers to update
+     *  TFORM-related metadata (repeat, width) when values are appended.
+     * @tparam T Scalar payload or std::vector<scalar> payload type.
+     */
     template<typename T>
     class FITScolumn: public FITSform
     {
@@ -499,9 +560,17 @@ namespace DSL
 #pragma endregion
 #pragma region -- accessor
 
+        /**
+         * @brief Number of rows (cells) stored in this column.
+         */
         size_t size() const override { return this->values<T>().size(); }
 
 
+        /**
+         * @brief Append one value to this column (type-erased).
+         * @param value std::any wrapping a T value.
+         * @throws std::bad_any_cast if value type mismatches.
+         */
         void push_back(const std::any& value) override
         {
 #if __cplusplus < 201703L
@@ -523,6 +592,11 @@ namespace DSL
 #endif
         }
 
+        /**
+         * @brief Reorder the rows according to a permutation.
+         * @param order New-to-old index mapping; order.size() must equal size().
+         * @throws std::logic_error on mismatch or invalid indices.
+         */
         void sortOn(const std::vector<size_t>& order) override
         {
             auto& data = this->values<T>();
@@ -549,14 +623,27 @@ namespace DSL
         
 #pragma endregion
 #pragma region -- diagnoze
+        /**
+         * @brief Print column descriptor and a preview of data to the stream.
+         */
         virtual void Dump( std::ostream& ) const override;
-        
+
+        /**
+         * @brief Polymorphic clone.
+         * @return Newly allocated FITScolumn<T> copy.
+         */
         std::unique_ptr<FITSform> clone() const override
         {
             return std::unique_ptr<FITSform>( new FITScolumn<T>(*this) );
         }
 #pragma endregion
 #pragma region -- Saving
+        /**
+         * @brief Write column data to CFITSIO (generic scalar version).
+         * @param fptr Shared pointer to CFITSIO handle.
+         * @param first_row 1-based first row to write.
+         * @throws FITSexception on CFITSIO error or invalid state.
+         */
         virtual void write(const std::shared_ptr<fitsfile>&, const int64_t&) override;
 #pragma endregion
     };
@@ -586,17 +673,16 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
     
 #pragma endregion
 #pragma region - FITStable class definition
+    /**
+     * @class FITStable
+     * @brief Abstraction over a FITS ASCII/BINARY table HDU.
+     * @author GI::ARD William
+     * @details
+     *  Wraps CFITSIO HDU navigation, column discovery/loading, typed access,
+     *  in-memory mutation, and writing back to a (new or existing) table HDU.
+     */
     class FITStable
     {
-        /**
-         * @class DSL::FITStable FITStable.h "fitsExtractor/FITStable.h"
-         * @author GILLARD William
-         * @version 1.0
-         * @date 07/08/2017
-         * @brief Helper class to work with FITS ASCII and BINARY tables.
-         * @details This class provide foreground method to read and write FITS ASCII and BINARY tables. The FITStable class point toward the HDU block containing the requested tables and it is the reponsibility of the User to deleted and close the fits file that contains the ASCII and/or BINARY table.
-         **/
-
     public:
         typedef std::vector< std::unique_ptr<FITSform> > columns_list;
         typedef std::vector< std::vector<std::string> > clist;
@@ -649,17 +735,40 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         
 #pragma endregion
 #pragma region -- Properties
+        /**
+         * @brief Number of rows (max over columns).
+         * @return Row count.
+         */
         size_t nrows() const;
-        size_t ncols() const;
-        
-        const clist    listColumns();
-        //const FITSform columnProperties(const std::string&);
-        //const FITSform columnProperties(const size_t&);
 
         /**
-            @brief Retrive the name of the table extension
-            @return The extension name of \c this table or an empty string if the EXTNAME keyword wasn't found into the HDU.
-        */
+         * @brief Number of columns.
+         */
+        size_t ncols() const;
+
+        /**
+         * @brief List column metadata as {name, TFORM, unit} triples.
+         */
+        const clist    listColumns();
+
+        /**
+         * @brief Access column descriptor by name.
+         * @param cname Column name.
+         * @throws std::out_of_range if not found.
+         */
+        const std::unique_ptr<FITSform>& getColumn(const std::string& cname) const;
+
+        /**
+         * @brief Access column descriptor by 1-based position.
+         * @param cindex Column position (TFIELD index).
+         * @throws std::out_of_range if not found.
+         */
+        const std::unique_ptr<FITSform>& getColumn(const size_t& cindex) const;
+
+        /**
+         * @brief Retrive the name of the table extension
+         * @return The extension name of \c this table or an empty string if the EXTNAME keyword wasn't found into the HDU.
+         */
         inline const std::string GetName() const {if(hdu.Exists("EXTNAME")) return hdu.GetValueForKey("EXTNAME"); else return std::string("NO NAME");}       //!< Get the name of the image      
 
 #pragma endregion
@@ -668,17 +777,42 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         inline       FITShdu& HDU() {return hdu;}
         inline const ttype getTableType() const {return ftbl_type;}
         
-        const std::unique_ptr<FITSform>& getColumn(const std::string& cname) const;
-        const std::unique_ptr<FITSform>& getColumn(const size_t& cindex) const;
-
+         /**
+         * @brief Begin a row set selection on a given column.
+         * @tparam T Payload type of the column.
+         * @param columnName Column name.
+         * @return RowSetBuilder<T> to build a row set selection.
+         * @throws std::out_of_range if column not found.
+         */
         template<typename T>
         RowSetBuilder<T> select(const std::string& columnName);
 
+        /**
+         * @brief Access a column's data as a ColumnView<T>.
+         * @tparam T Payload type of the column.
+         * @param columnName Column name.
+         * @return ColumnView<T> for typed access.
+         * @throws std::out_of_range if column not found.
+         * @throws std::bad_cast if column type mismatches T.
+         */
         template<typename T>
         ColumnView<T> column(const std::string& columnName);
 
+        /**
+         * @brief Access a column's data through a ColumnHandle.
+         * @param columnName Column name.
+         * @return ColumnHandle for type-erased access.
+         * @throws std::out_of_range if column not found.
+         */
         ColumnHandle operator[](const std::string& columnName);
 
+        /**
+         * @brief Begin a filter expression on a given column.
+         * @tparam T Payload type of the column.
+         * @param columnName Column name.
+         * @return ColumnFilterExpr<T> to build a filter expression.
+         * @throws std::out_of_range if column not found.
+         */
         template<typename T>
         ColumnFilterExpr<T> filter(const std::string& columnName)
         {
@@ -686,6 +820,11 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
             return ColumnFilterExpr<T>(*this, columnName);
         }
 
+        /**
+         * @brief Apply a global permutation to reorder all columns consistently.
+         * @param order New-to-old index mapping; must be a permutation of [0..n-1].
+         * @throws std::logic_error on size mismatch, duplicates, or out-of-range.
+         */
         void reorderRows(const std::vector<size_t>& order);
 
 #pragma endregion        
@@ -697,7 +836,20 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
 
 #pragma region 1- Inseting new column
         
+        /**
+         * @brief Append a new empty column with a given dtype and TUNIT.
+         * @param cname Column name.
+         * @param type dtype to append.
+         * @param tunit Unit string.
+         * @throws FITSexception on unsupported dtype.
+         */
         void InsertColumn(const std::string& cname, const dtype& type, const std::string& tunit);
+
+        /**
+         * @brief Append a populated column; validates row count consistency.
+         * @param col New column to append.
+         * @throws FITSexception on dimension mismatch.
+         */
         void InsertColumn( std::shared_ptr<FITSform> col );
         
 #pragma endregion
@@ -713,7 +865,20 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
 #pragma endregion
 
 #pragma region -- Saving to file
+        /**
+         * @brief Write the in-memory table to a CFITSIO handle, creating or moving to the HDU.
+         * @param fptr Shared pointer to an opened fitsfile.
+         * @param start 1-based first row where data will be written (append if start==nrows+1).
+         * @throws FITSexception on CFITSIO error or invalid row number.
+         */
         void write(const std::shared_ptr<fitsfile>& fptr, const int64_t&);
+        /**
+         * @brief Create (or replace) a FITS file and write this table into it.
+         * @param filename Target FITS path; prepend '!' if replace==true.
+         * @param start 1-based first row to write.
+         * @param replace Overwrite file if true.
+         * @throws FITSexception on CFITSIO error.
+         */
         void write(const std::string&, const int64_t&, bool replace=false);
 #pragma endregion
 
@@ -1605,6 +1770,10 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         struct is_std_vector<std::vector<U,Alloc>> : std::true_type {};
     }
 
+    /**
+     * @brief Immutable set of row indices to operate on.
+     * @details Supports set algebra (&& for intersection, || for union) and iteration.
+     */
     class RowSet
     {
         std::vector<size_t> indices_;
@@ -1701,6 +1870,10 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         }
     };
 
+    /**
+     * @brief RowSet builder for scalar columns; supports chaining of predicates.
+     * @tparam T Scalar column type.
+     */
     template<typename T>
     class RowSetBuilder
     {
@@ -1948,6 +2121,10 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         }
     };
 
+    /**
+     * @brief Entry point to create views and where-chains for a named column.
+     * @details Enables fluently building filters and applying updates.
+     */
     class ColumnHandle
     {
             FITStable& tbl_;
@@ -2052,6 +2229,10 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
             }
     };
 
+    /**
+     * @brief Build a RowSet for the named column, filtering by scalar comparisons.
+     * @tparam T Scalar type of the target column.
+     */
     template<typename T>
     RowSetBuilder<T> FITStable::select(const std::string& columnName)
     {

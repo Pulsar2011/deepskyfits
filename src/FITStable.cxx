@@ -28,21 +28,58 @@
 
 namespace DSL
 {
+    /** @brief Global mutex to serialize CFITSIO calls across threads. */
     std::recursive_timed_mutex g_cfitsio_mutex;
     
 #pragma region - FITSform class implementation
 
 #pragma region -- ctor/dtor
-    
+
+    /**
+     * @brief Construct a column description with default scale/zero and scalar payload.
+     * @param p 1-based column position in the FITS table.
+     * @param name Column name (TTYPEn).
+     * @param t FITS data type (dtype).
+     * @param unit Optional unit string (TUNITn).
+     */
     FITSform::FITSform(const size_t& p,const std::string& name, const dtype& t, const std::string unit):fname(name),ftype(t),funit(unit),fscale(1),fzero(0),frepeat(1),fwidth(1),fpos(p)
     {initWithType();}
     
+    /**
+     * @brief Construct a column description with explicit BSCALE/BZERO for scalar payload.
+     * @param p 1-based column position.
+     * @param name Column name.
+     * @param t FITS data type.
+     * @param s BSCALE-like scale factor to report.
+     * @param z BZERO-like zero point to report.
+     * @param unit Optional unit.
+     */
     FITSform::FITSform(const size_t& p, const std::string& name, const dtype& t, const double& s, const double& z, const std::string unit):fname(name),ftype(t),funit(unit),fscale(s),fzero(z),frepeat(1),fwidth(1),fpos(p)
     {initWithType();}
     
+    /**
+     * @brief Construct a repeated (vector) column description with default scale/zero.
+     * @param p 1-based column position.
+     * @param name Column name.
+     * @param t FITS data type.
+     * @param r Repetition count (TFORMn repeat).
+     * @param w Element width in bytes (for strings: char width).
+     * @param unit Optional unit.
+     */
     FITSform::FITSform(const size_t& p,const std::string& name, const dtype& t, const int64_t& r, const int64_t& w, const std::string unit):fname(name),ftype(t),funit(unit),fscale(1),fzero(0),frepeat(r),fwidth(w),fpos(p)
     {initWithType();}
     
+    /**
+     * @brief Construct a repeated (vector) column with explicit BSCALE/BZERO.
+     * @param p 1-based column position.
+     * @param name Column name.
+     * @param t FITS data type.
+     * @param r Repeat count (TFORMn).
+     * @param w Width in bytes (or char width for strings).
+     * @param s Scale factor.
+     * @param z Zero point.
+     * @param unit Optional unit.
+     */
     FITSform::FITSform(const size_t& p, const std::string& name, const dtype& t, const int64_t& r, const int64_t& w, const double& s, const double& z, const std::string unit):fname(name),ftype(t),funit(unit),fscale(s),fzero(z),frepeat(r),fwidth(w),fpos(p)
     {initWithType();}
     
@@ -53,6 +90,12 @@ namespace DSL
 #pragma endregion
 
 #pragma region -- static member function
+
+    /**
+     * @brief Get textual name for a FITS dtype.
+     * @param tt Data type enumeration.
+     * @return Upper-case string name (e.g. "SHORT", "DOUBLE", "STRING").
+     */
     const std::string FITSform::getDataType(const dtype & tt)
     {
         std::string ss = std::string();
@@ -130,6 +173,13 @@ namespace DSL
         return ss;
     }
     
+    /**
+     * @brief Build a TFORM-compatible code string for this column.
+     * @details
+     *  Also sets implicit BSCALE/BZERO for unsigned pseudo-types when needed
+     *  so that CFITSIO can represent them in signed storage.
+     * @return The TFORMn payload (e.g. "1J", "16A", "2E", "C", ...).
+     */
     const std::string FITSform::getTTYPE() const
     {
         std::string ss = std::string();
@@ -225,6 +275,11 @@ namespace DSL
         return ss;
     }
     
+    /**
+     * @brief Convert an input string (case-insensitive) into a dtype id.
+     * @param stype Data type name (e.g., "short", "uint", "double complex").
+     * @return Matching dtype or tnone if unrecognized.
+     */
     const dtype FITSform::getDataTypeID(const std::string & stype)
     {
         dtype tt = tnone;
@@ -274,6 +329,10 @@ namespace DSL
 #pragma endregion
 
 #pragma region -- modifier
+    /**
+     * @brief Pretty-print this column's descriptor to an output stream.
+     * @param out Output stream to print on.
+     */
     void FITSform::Dump( std::ostream& out) const
     {
         out<<"\033[32m   |- COL #\033[0m "<<fpos<<std::endl
@@ -299,7 +358,14 @@ namespace DSL
 #pragma region - FITStable class implementation
 
 #pragma region -- template specialization
-    
+
+    /**
+     * @brief Read complex<float> (TFORM 'C') column values from CFITSIO table.
+     * @param data Destination FITScolumn of pairs<float,float>.
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param row 1-based index of the first row to read.
+     * @throws FITSexception on CFITSIO error.
+     */
     template< >
     void FITStable::read(FITScolumn<FITSform::complex>* data,  const std::shared_ptr<fitsfile>& fptr,  const size_t& row)
     {
@@ -343,6 +409,13 @@ namespace DSL
         
     }
     
+    /**
+     * @brief Read complex<double> (TFORM 'M') column values from CFITSIO table.
+     * @param data Destination FITScolumn of pairs<double,double>.
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param row 1-based first row.
+     * @throws FITSexception on CFITSIO error.
+     */
     template< >
     void FITStable::read(FITScolumn<FITSform::dblcomplex>* data,  const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
@@ -380,6 +453,13 @@ namespace DSL
         nullarray = NULL;        
     }
     
+    /**
+     * @brief Read string (TFORM 'A') cells as std::string per row.
+     * @param data Destination FITScolumn<std::string>.
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param row 1-based first row.
+     * @throws FITSexception on CFITSIO error.
+     */
     template< >
     void FITStable::read( FITScolumn<std::string>* data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
@@ -439,6 +519,12 @@ namespace DSL
         }
     }
 
+    /**
+     * @brief Read repeated complex<float> vectors (TFORM 'C') into complexVector rows.
+     * @param data Destination FITScolumn<complexVector>.
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param row 1-based first row.
+     */
     template< >
     void FITStable::readVector(FITScolumn< FITSform::complexVector> * data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
@@ -478,6 +564,12 @@ namespace DSL
         return;
     }
 
+    /**
+     * @brief Read repeated complex<double> vectors (TFORM 'M') into dblcomplexVector rows.
+     * @param data Destination FITScolumn<dblcomplexVector>.
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param row 1-based first row.
+     */
     template< >
     void FITStable::readVector(FITScolumn< FITSform::dblcomplexVector> * data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
@@ -517,6 +609,12 @@ namespace DSL
         return;
     }
     
+    /**
+     * @brief Read repeated string vectors (TFORM 'A') into stringVector rows.
+     * @param data Destination FITScolumn<std::vector<std::string>>.
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param row 1-based first row.
+     */
     template< >
     void FITStable::readVector(FITScolumn< std::vector<std::string> >* data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
@@ -617,6 +715,11 @@ namespace DSL
         }
     }
     
+    /**
+     * @brief Write complex<float> scalar values to CFITSIO (TFORM 'C').
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param first_row 1-based first row to write.
+     */
     template< >
     void FITScolumn< FITSform::complex >::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
@@ -649,6 +752,11 @@ namespace DSL
         }
     }
 
+    /**
+     * @brief Write complex<double> scalar values to CFITSIO (TFORM 'M').
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param first_row 1-based first row to write.
+     */
     template< >
     void FITScolumn<FITSform::dblcomplex>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
@@ -681,6 +789,11 @@ namespace DSL
         }
     }
     
+    /**
+     * @brief Write string scalar values to CFITSIO (TFORM 'A').
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param first_row 1-based first row to write.
+     */
     template< >
     void FITScolumn<std::string>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
@@ -713,6 +826,11 @@ namespace DSL
         }
     }
     
+    /**
+     * @brief Write repeated int8 vectors to CFITSIO.
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param first_row 1-based first row to write.
+     */
     template<>
     void FITScolumn<FITSform::int8Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
@@ -744,6 +862,9 @@ namespace DSL
         delete [] buffer;
     }
 
+    /**
+     * @brief Write repeated uint8 vectors to CFITSIO.
+     */
     template<>
     void FITScolumn<FITSform::uint8Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
@@ -775,6 +896,9 @@ namespace DSL
         delete [] buffer;
     }
 
+    /**
+     * @brief Write repeated int16 vectors to CFITSIO.
+     */
     template<>
     void FITScolumn<FITSform::int16Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
@@ -807,6 +931,9 @@ namespace DSL
         delete [] buffer;
     }
 
+    /**
+     * @brief Write repeated uint16 vectors to CFITSIO.
+     */
     template<>
     void FITScolumn<FITSform::uint16Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
@@ -838,6 +965,9 @@ namespace DSL
         delete [] buffer;
     }
 
+    /**
+     * @brief Write repeated int32 vectors to CFITSIO (handles tint and tlong).
+     */
     template<>
     void FITScolumn<FITSform::int32Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
@@ -896,6 +1026,9 @@ namespace DSL
         }
     }
 
+    /**
+     * @brief Write repeated uint32 vectors to CFITSIO (handles tuint and tulong mappings).
+     */
     template<>
     void FITScolumn<FITSform::uint32Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
@@ -954,6 +1087,9 @@ namespace DSL
         }
     }
 
+    /**
+     * @brief Write repeated int64 vectors to CFITSIO.
+     */
     template<>
     void FITScolumn<FITSform::int64Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
@@ -986,6 +1122,9 @@ namespace DSL
         delete [] buffer;
     }
 
+    /**
+     * @brief Write repeated uint64 vectors to CFITSIO.
+     */
     template<>
     void FITScolumn<FITSform::uint64Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
@@ -1012,6 +1151,9 @@ namespace DSL
         delete [] buffer;
     }
 
+    /**
+     * @brief Write repeated float vectors to CFITSIO.
+     */
     template<>
     void FITScolumn<FITSform::floatVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
@@ -1045,6 +1187,9 @@ namespace DSL
         delete [] buffer;
     }
 
+    /**
+     * @brief Write repeated double vectors to CFITSIO.
+     */
     template<>
     void FITScolumn<FITSform::doubleVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
@@ -1078,6 +1223,9 @@ namespace DSL
         delete [] buffer;
     }
 
+    /**
+     * @brief Write repeated complex<float> vectors to CFITSIO (TFORM 'C').
+     */
     template<>
     void FITScolumn<FITSform::complexVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
@@ -1112,6 +1260,9 @@ namespace DSL
         delete [] buffer;
     }
 
+    /**
+     * @brief Write repeated complex<double> vectors to CFITSIO (TFORM 'M').
+     */
     template<>
     void FITScolumn<FITSform::dblcomplexVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
@@ -1155,6 +1306,9 @@ namespace DSL
         delete [] buffer;
     }
     
+    /**
+     * @brief Write repeated string vectors to CFITSIO (TFORM 'A').
+     */
     template<>
     void FITScolumn<FITSform::stringVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
@@ -1186,7 +1340,10 @@ namespace DSL
         }
     }
 
-    // Write a single logical per row ("T"/"F") into an L column
+    /**
+     * @brief Write scalar logicals (L/bit) to CFITSIO.
+     * @details Supports tlogical (uses ffpcl) and tbit (uses ffpclx).
+     */
     template<>
     void FITScolumn<bool>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
@@ -1245,7 +1402,10 @@ namespace DSL
         }
     }
 
-    // Write repeated logicals per row (vector of "T"/"F") into an L column
+    /**
+     * @brief Write repeated logicals to CFITSIO (L or X).
+     * @details Supports tlogical (ffpcll) and tbit (ffpclx).
+     */
     template<>
     void FITScolumn< FITSform::boolVector >::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
@@ -1313,6 +1473,13 @@ namespace DSL
 
     }
 
+    /**
+     * @brief Read scalar logical from CFITSIO into bool.
+     * @details Supports both tlogical (ffgcvl) and tbit (ffgcx).
+     * @param data Destination FITScolumn<bool>.
+     * @param fptr Shared ptr to opened fitsfile.
+     * @param row 1-based first row.
+     */
     template<>
     void FITStable::read(FITScolumn<bool>* data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
@@ -1394,6 +1561,12 @@ namespace DSL
 
     }
 
+    /**
+     * @brief Read repeated logicals (tlogical or tbit) into boolVector rows.
+     * @param data Destination FITScolumn<FITSform::boolVector>.
+     * @param fptr Shared ptr to opened fitsfile.
+     * @param row 1-based first row.
+     */
     template<>
     void FITStable::readVector(FITScolumn<FITSform::boolVector>* data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
