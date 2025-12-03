@@ -23,7 +23,13 @@
 #include <limits>
 #include <stdexcept>
 #include <functional>
-#include <iomanip> // added for hex formatting
+#include <iomanip>
+#include <typeindex> 
+#include <numeric>
+#include <algorithm>
+#include <iterator>
+#include <cstdint>
+#include <type_traits>
 
 
 #include "FITShdu.h"
@@ -35,10 +41,13 @@
 
 namespace DSL
 {
-    // Global CFITSIO mutex (serialize all CFITSIO calls)
+    /** @brief Global CFITSIO mutex (serialize all CFITSIO calls across threads). */
     extern std::recursive_timed_mutex g_cfitsio_mutex;
 
-    // RAII guard for user-side locking
+    /**
+     * @brief RAII guard for global CFITSIO critical section.
+     * @details Locks the global recursive mutex for the lifetime of the guard.
+     */
     struct CFITSIOGuard
     {
         std::unique_lock<std::recursive_timed_mutex> lk;
@@ -46,7 +55,15 @@ namespace DSL
     };
 
 #if __cplusplus < 201703L
+    /**
+     * @brief Fallback replacement for std::bad_any_cast on pre-C++17 compilers.
+     */
     struct bad_any_cast : std::bad_cast {};
+
+    /**
+     * @brief Lightweight std::any-like container for pre-C++17.
+     * @details Stores a heap-allocated type-erased holder with cloning support.
+     */
     class any_type {
         struct base
         {
@@ -80,6 +97,13 @@ namespace DSL
             return h->value;
         }
     };
+    /**
+     * @brief Helper to extract a value from any_type (pre-C++17 helper).
+     * @tparam U Value type.
+     * @param a Source any_type.
+     * @return Extracted value of type U.
+     * @throws bad_any_cast if type mismatches.
+     */
     template<typename U>
     inline U any_cast_any(const any_type& a){ return const_cast<any_type&>(a).get<U>(); }
 
@@ -87,18 +111,85 @@ namespace DSL
 
     class FITStable;
     class FITSform;
+    class RowSet;
+
+    template<typename T>
+    class RowSetBuilder;
+
+    template<typename T>
+    class ColumnView;
+    
+    class ColumnHandle;
+
+    template<typename T>
+    class ColumnFilterExpr;
+
+    namespace TForm
+    {
+        template<typename T>
+        struct columnData;
+
+        struct columnDataBase
+        {
+            virtual ~columnDataBase() = default;
+            virtual size_t size() const = 0;
+            virtual std::type_index type() const = 0;
+        };
+
+        /**
+         * @brief Typed storage for a column's in-memory data.
+         * @tparam T scalar or vector payload type held by a column.
+         */
+        template<typename T>
+        struct columnData : columnDataBase
+        {
+            std::vector<T> arr;
+            columnData() = default;
+            /*!
+             * \brief Construct a storage with a given size.
+             * \param n Number of elements to allocate.
+             */
+            columnData(size_t n) : arr(static_cast<std::size_t>(n)) {}
+            /*!
+             * \brief Construct a storage from an existing vector.
+             * \param v Values to initialize from.
+             */
+            columnData(const std::vector<T>& v) : arr(v) {}
+
+            /*!
+             * \brief Number of stored elements.
+             * \return Vector size.
+             */
+            size_t size() const override { return arr.size(); }
+            /*!
+             * \brief Report the payload type held by this storage.
+             * \return std::type_index of T.
+             */
+            std::type_index type() const override { return std::type_index(typeid(T)); }
+            /*!
+             * \brief Mutable access to the underlying data vector.
+             */
+            std::vector<T>&       ref()       { return arr; }
+            /*!
+             * \brief Const access to the underlying data vector.
+             */
+            const std::vector<T>& ref() const { return arr; }
+        };
+    }
+
+    using namespace TForm;
     
 #pragma region - FITSform class definition
+    /**
+     * @class FITSform
+     * @brief FITS table's column descriptor and storage proxy.
+     * @author GILLARD William
+     * @details
+     *  Encapsulates column metadata (name, dtype, units, repeats, width, scale/zero)
+     *  and provides typed access to the in-memory data buffer through values<T>().
+     */
     class FITSform
     {
-        /**
-         * @class FITSform  FITStable.h "fitsExtractor/FITStable.h"
-         * @author GILLARD William
-         * @date 08/08/2017
-         * @brief FITS table's column descriptor
-         * @details Helper class that allow easy access to the name, type, unit of FITS ASCII and BINARY columns.
-         **/
-        
     private:
 #pragma region -- private member
         const std::string fname;
@@ -113,7 +204,41 @@ namespace DSL
 
         size_t fpos;
 
+        std::unique_ptr<columnDataBase> fdata;
+
+        template<typename T>
+        columnData<T>* storage()
+        {
+            return (fdata && fdata->type() == std::type_index(typeid(T)))
+                   ? static_cast<columnData<T>*>(fdata.get()) : nullptr;
+        }
+
+        template<typename T>
+        const columnData<T>* storage() const
+        {
+            return (fdata && fdata->type() == std::type_index(typeid(T)))
+                   ? static_cast<const columnData<T>*>(fdata.get()) : nullptr;
+        }
+
     protected:
+        
+        template<typename T>
+        void allocateStorageIfNeeded()
+        {
+            if(storage<T>()) return;
+            fdata = std::make_unique< columnData<T> >();
+        }
+        /*!
+         * \brief Allocate typed storage with a specific size.
+         * \tparam T Payload type.
+         * \param n Number of elements to pre-allocate.
+         */
+        template<typename T>
+        void allocateStorageWithSize(size_t n)
+        {
+            fdata = std::make_unique< columnData<T> >(n);
+        }
+
 #pragma endregion
 #pragma region -- protected member function
         inline FITSform():fname(),ftype(dtype::tnone),funit(),fscale(1),fzero(0),frepeat(1),fwidth(0),fpos(0) {};
@@ -121,6 +246,9 @@ namespace DSL
         inline void setNelem(const int64_t& n) {frepeat = n;}
         inline void setWidth(const int64_t& w) {fwidth  = w;}
 
+        /**
+         * @brief Initialize scale/zero defaults for pseudo-unsigned types.
+         */
         void initWithType()
         {
             switch(ftype)
@@ -174,6 +302,11 @@ namespace DSL
         typedef std::vector< std::pair<float,float> >   complexVector;
         typedef std::vector< std::pair<double,double> > dblcomplexVector;
 
+        /*!
+         * \brief Convert 8 bits into a boolean vector (MSB-first).
+         * \param v Output vector cleared and filled with 8 booleans.
+         * \param bits Source 8-bit mask.
+         */
         static void toBoolVector(boolVector* v, const uint8_t& bits)
         {
             v->clear();
@@ -185,6 +318,11 @@ namespace DSL
             }
         }
 
+        /*!
+         * \brief Convert 16 bits into a boolean vector (MSB-first).
+         * \param v Output vector cleared and filled with 16 booleans.
+         * \param bits Source 16-bit mask.
+         */
         static void toBoolVector(boolVector* v, const uint16_t& bits)
         {
             v->clear();
@@ -196,6 +334,11 @@ namespace DSL
             }
         }
 
+        /*!
+         * \brief Convert 32 bits into a boolean vector (MSB-first).
+         * \param v Output vector cleared and filled with 32 booleans.
+         * \param bits Source 32-bit mask.
+         */
         static void toBoolVector(boolVector* v, const uint32_t& bits)
         {
             v->clear();
@@ -207,6 +350,11 @@ namespace DSL
             }
         }
 
+        /*!
+         * \brief Convert 64 bits into a boolean vector (MSB-first).
+         * \param v Output vector cleared and filled with 64 booleans.
+         * \param bits Source 64-bit mask.
+         */
         static void toBoolVector(boolVector* v, const uint64_t& bits)
         {
             v->clear();
@@ -218,6 +366,11 @@ namespace DSL
             }
         }
 
+        /*!
+         * \brief Pack up to 8 booleans into a byte (MSB-first).
+         * \param v Source booleans; only first 8 are used.
+         * \param bits Output bitfield.
+         */
         static void fromBoolVector(const boolVector& v, uint8_t* bits)
         {
             (*bits) = 0;
@@ -229,6 +382,11 @@ namespace DSL
             }
         }
 
+        /*!
+         * \brief Pack up to 16 booleans into a 16-bit value (MSB-first).
+         * \param v Source booleans; only first 16 are used.
+         * \param bits Output bitfield.
+         */
         static void fromBoolVector(const boolVector& v, uint16_t* bits)
         {
             (*bits) = 0;
@@ -240,6 +398,11 @@ namespace DSL
             }
         }
 
+        /*!
+         * \brief Pack up to 32 booleans into a 32-bit value (MSB-first).
+         * \param v Source booleans; only first 32 are used.
+         * \param bits Output bitfield.
+         */
         static void fromBoolVector(const boolVector& v, uint32_t* bits)
         {
             (*bits) = 0;
@@ -251,6 +414,11 @@ namespace DSL
             }
         }
 
+        /*!
+         * \brief Pack up to 64 booleans into a 64-bit value (MSB-first).
+         * \param v Source booleans; only first 64 are used.
+         * \param bits Output bitfield.
+         */
         static void fromBoolVector(const boolVector& v, uint64_t* bits)
         {
             (*bits) = 0;
@@ -294,8 +462,13 @@ namespace DSL
         inline const int64_t&    getNelem()  const {return frepeat;}
         inline const int64_t&    getWidth()  const {return fwidth;}
 
-        // CFITSIO storage type to use when writing table cells.
-        // Unsigned types are stored using signed equivalents with BZERO/BSCALE set by getTTYPE().
+        /**
+         * @brief CFITSIO storage code to use when writing this column.
+         * @details
+         *  Maps pseudo-unsigned dtypes to signed storage types and relies on
+         *  BSCALE/BZERO reported by getTTYPE() to preserve values.
+         * @return CFITSIO TFORM code (as dtype) that matches the storage.
+         */
         inline int getCFITSIOStorageType() const
         {
             switch(ftype)
@@ -308,13 +481,52 @@ namespace DSL
             }
         }
 
+        /**
+         * @brief Typed const access to column's in-memory values.
+         * @tparam T Expected payload type for this column.
+         * @return Reference to a const vector of values; empty if storage type differs.
+         */
+        template<typename T>
+        const std::vector<T>& values() const
+        {
+            static const std::vector<T> empty;
+            const auto* s = storage<T>();
+            if(!s) return empty;
+            return s->ref();
+        }
+
+        /*!
+         * \brief Mutable access to column values of type T.
+         * \tparam T Expected payload type.
+         * \return Reference to the mutable vector of values.
+         * \throws std::bad_cast if internal storage is not T.
+         */
+        template<typename T>
+        std::vector<T>& values()
+        {
+            auto* s = storage<T>();
+            if(!s)
+                throw std::bad_cast();
+            return s->ref();
+        }
+
 #pragma endregion
 
 #pragma region -- pur virtual function
 
+        /**
+         * @brief Number of rows (cells) stored in this column.
+         */
         virtual size_t size() const =0;
+
+        /**
+         * @brief Append one value to this column (type-erased).
+         * @param value std::any wrapping a T value.
+         * @throws std::bad_any_cast if value type mismatches.
+         */
         virtual void push_back(const std::any& value) = 0;
         virtual std::unique_ptr<FITSform> clone() const = 0; // add
+        virtual void sortOn(const std::vector<size_t>& order) = 0;
 
 #pragma endregion
 
@@ -324,14 +536,31 @@ namespace DSL
         
 #pragma endregion
 #pragma region -- Saving & printing
+        /**
+         * @brief Emit a formatted description of this column to a stream.
+         */
         virtual void Dump( std::ostream& ) const;
+
+        /**
+         * @brief Write this column's data to an opened CFITSIO table.
+         * @param fptr Shared pointer to CFITSIO handle.
+         * @param first_row 1-based first row to write.
+         * @throws FITSexception on CFITSIO error or invalid state.
+         */
         virtual void write(const std::shared_ptr<fitsfile>&, const int64_t&)=0;
 #pragma endregion
     };
 #pragma endregion
 
 #pragma region - FITScolumn class definition
-    
+    /**
+     * @class FITScolumn
+     * @brief Typed column container for FITS table data.
+     * @details
+     *  Specializes FITSform with typed in-memory storage and helpers to update
+     *  TFORM-related metadata (repeat, width) when values are appended.
+     * @tparam T Scalar payload or std::vector<scalar> payload type.
+     */
     template<typename T>
     class FITScolumn: public FITSform
     {
@@ -344,7 +573,7 @@ namespace DSL
          **/
     protected:
         typedef std::vector<T> col_map;
-        col_map data;
+        //col_map fdata;
 
     private:
 
@@ -403,19 +632,30 @@ namespace DSL
 #pragma endregion
 #pragma region -- accessor
 
-        size_t size() const override { return data.size(); }
+        /**
+         * @brief Number of rows (cells) stored in this column.
+         */
+        size_t size() const override { return this->values<T>().size(); }
 
+
+        /**
+         * @brief Append one value to this column (type-erased).
+         * @param value std::any wrapping a T value.
+         * @throws std::bad_any_cast if value type mismatches.
+         */
         void push_back(const std::any& value) override
         {
 #if __cplusplus < 201703L
             const T& v = any_cast_any<T>(value);
             Update(v);
-            data.push_back(v);
+            allocateStorageIfNeeded<T>();
+            FITSform::values<T>().push_back(v);
 #else
-            if (const T* pv = std::any_cast<T>(&value)) // no by-value pair construction
-            {   
-                Update(*pv);                                // pass by const&
-                data.push_back(*pv);                        // vector::push_back(const T&)
+            if (const T* pv = std::any_cast<T>(&value))
+            {
+                Update(*pv);
+                allocateStorageIfNeeded<T>();
+                FITSform::values<T>().push_back(*pv);
             }
             else
             {
@@ -424,19 +664,58 @@ namespace DSL
 #endif
         }
 
+        /**
+         * @brief Reorder the rows according to a permutation.
+         * @param order New-to-old index mapping; order.size() must equal size().
+         * @throws std::logic_error on mismatch or invalid indices.
+         */
+        void sortOn(const std::vector<size_t>& order) override
+        {
+            auto& data = this->values<T>();
+            if(order.size() != data.size())
+            {
+                if(order.empty() && data.empty())
+                    return;
+                throw std::logic_error("FITScolumn::reorderRows size mismatch");
+            }
+
+            std::vector<T> reordered(order.size());
+            for(size_t newPos = 0; newPos < order.size(); ++newPos)
+            {
+                const size_t src = order[newPos];
+                if(src >= data.size())
+                    throw std::logic_error("FITScolumn::reorderRows invalid index");
+                reordered[newPos] = std::move(data[src]);
+            }
+            data = std::move(reordered);
+        }
+
         // Read-only accessor for testing
-        inline const col_map& values() const { return data; }
+        //inline const col_map& values() const { return data; }
         
 #pragma endregion
 #pragma region -- diagnoze
+        /**
+         * @brief Print column descriptor and a preview of data to the stream.
+         */
         virtual void Dump( std::ostream& ) const override;
-        
+
+        /**
+         * @brief Polymorphic clone.
+         * @return Newly allocated FITScolumn<T> copy.
+         */
         std::unique_ptr<FITSform> clone() const override
         {
             return std::unique_ptr<FITSform>( new FITScolumn<T>(*this) );
         }
 #pragma endregion
 #pragma region -- Saving
+        /**
+         * @brief Write column data to CFITSIO (generic scalar version).
+         * @param fptr Shared pointer to CFITSIO handle.
+         * @param first_row 1-based first row to write.
+         * @throws FITSexception on CFITSIO error or invalid state.
+         */
         virtual void write(const std::shared_ptr<fitsfile>&, const int64_t&) override;
 #pragma endregion
     };
@@ -466,23 +745,25 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
     
 #pragma endregion
 #pragma region - FITStable class definition
+    /**
+     * @class FITStable
+     * @brief Abstraction over a FITS ASCII/BINARY table HDU.
+     * @author GI::ARD William
+     * @details
+     *  Wraps CFITSIO HDU navigation, column discovery/loading, typed access,
+     *  in-memory mutation, and writing back to a (new or existing) table HDU.
+     */
     class FITStable
     {
-        /**
-         * @class DSL::FITStable FITStable.h "fitsExtractor/FITStable.h"
-         * @author GILLARD William
-         * @version 1.0
-         * @date 07/08/2017
-         * @brief Helper class to work with FITS ASCII and BINARY tables.
-         * @details This class provide foreground method to read and write FITS ASCII and BINARY tables. The FITStable class point toward the HDU block containing the requested tables and it is the reponsibility of the User to deleted and close the fits file that contains the ASCII and/or BINARY table.
-         **/
-
     public:
         typedef std::vector< std::unique_ptr<FITSform> > columns_list;
         typedef std::vector< std::vector<std::string> > clist;
 
     protected:
         columns_list fcolumns;
+
+        template<typename T>
+        ColumnFilterExpr<T> operator()(const std::string& columnName);
 
     private:
 #pragma endregion
@@ -526,17 +807,40 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         
 #pragma endregion
 #pragma region -- Properties
+        /**
+         * @brief Number of rows (max over columns).
+         * @return Row count.
+         */
         size_t nrows() const;
-        size_t ncols() const;
-        
-        const clist    listColumns();
-        //const FITSform columnProperties(const std::string&);
-        //const FITSform columnProperties(const size_t&);
 
         /**
-            @brief Retrive the name of the table extension
-            @return The extension name of \c this table or an empty string if the EXTNAME keyword wasn't found into the HDU.
-        */
+         * @brief Number of columns.
+         */
+        size_t ncols() const;
+
+        /**
+         * @brief List column metadata as {name, TFORM, unit} triples.
+         */
+        const clist    listColumns();
+
+        /**
+         * @brief Access column descriptor by name.
+         * @param cname Column name.
+         * @throws std::out_of_range if not found.
+         */
+        const std::unique_ptr<FITSform>& getColumn(const std::string& cname) const;
+
+        /**
+         * @brief Access column descriptor by 1-based position.
+         * @param cindex Column position (TFIELD index).
+         * @throws std::out_of_range if not found.
+         */
+        const std::unique_ptr<FITSform>& getColumn(const size_t& cindex) const;
+
+        /**
+         * @brief Retrive the name of the table extension
+         * @return The extension name of \c this table or an empty string if the EXTNAME keyword wasn't found into the HDU.
+         */
         inline const std::string GetName() const {if(hdu.Exists("EXTNAME")) return hdu.GetValueForKey("EXTNAME"); else return std::string("NO NAME");}       //!< Get the name of the image      
 
 #pragma endregion
@@ -544,8 +848,57 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         inline const FITShdu& HDU() const {return hdu;}
         inline       FITShdu& HDU() {return hdu;}
         inline const ttype getTableType() const {return ftbl_type;}
-        const std::unique_ptr<FITSform>& getColumn(const std::string& cname) const;
-        const std::unique_ptr<FITSform>& getColumn(const size_t& cindex) const;
+        
+         /**
+         * @brief Begin a row set selection on a given column.
+         * @tparam T Payload type of the column.
+         * @param columnName Column name.
+         * @return RowSetBuilder<T> to build a row set selection.
+         * @throws std::out_of_range if column not found.
+         */
+        template<typename T>
+        RowSetBuilder<T> select(const std::string& columnName);
+
+        /**
+         * @brief Access a column's data as a ColumnView<T>.
+         * @tparam T Payload type of the column.
+         * @param columnName Column name.
+         * @return ColumnView<T> for typed access.
+         * @throws std::out_of_range if column not found.
+         * @throws std::bad_cast if column type mismatches T.
+         */
+        template<typename T>
+        ColumnView<T> column(const std::string& columnName);
+
+        /**
+         * @brief Access a column's data through a ColumnHandle.
+         * @param columnName Column name.
+         * @return ColumnHandle for type-erased access.
+         * @throws std::out_of_range if column not found.
+         */
+        ColumnHandle operator[](const std::string& columnName);
+
+        /**
+         * @brief Begin a filter expression on a given column.
+         * @tparam T Payload type of the column.
+         * @param columnName Column name.
+         * @return ColumnFilterExpr<T> to build a filter expression.
+         * @throws std::out_of_range if column not found.
+         */
+        template<typename T>
+        ColumnFilterExpr<T> filter(const std::string& columnName)
+        {
+            (void)getColumn(columnName);      // ensure it exists
+            return ColumnFilterExpr<T>(*this, columnName);
+        }
+
+        /**
+         * @brief Apply a global permutation to reorder all columns consistently.
+         * @param order New-to-old index mapping; must be a permutation of [0..n-1].
+         * @throws std::logic_error on size mismatch, duplicates, or out-of-range.
+         */
+        void reorderRows(const std::vector<size_t>& order);
+
 #pragma endregion        
 
 #pragma region -- Modifier
@@ -555,7 +908,20 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
 
 #pragma region 1- Inseting new column
         
+        /**
+         * @brief Append a new empty column with a given dtype and TUNIT.
+         * @param cname Column name.
+         * @param type dtype to append.
+         * @param tunit Unit string.
+         * @throws FITSexception on unsupported dtype.
+         */
         void InsertColumn(const std::string& cname, const dtype& type, const std::string& tunit);
+
+        /**
+         * @brief Append a populated column; validates row count consistency.
+         * @param col New column to append.
+         * @throws FITSexception on dimension mismatch.
+         */
         void InsertColumn( std::shared_ptr<FITSform> col );
         
 #pragma endregion
@@ -571,7 +937,20 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
 #pragma endregion
 
 #pragma region -- Saving to file
+        /**
+         * @brief Write the in-memory table to a CFITSIO handle, creating or moving to the HDU.
+         * @param fptr Shared pointer to an opened fitsfile.
+         * @param start 1-based first row where data will be written (append if start==nrows+1).
+         * @throws FITSexception on CFITSIO error or invalid row number.
+         */
         void write(const std::shared_ptr<fitsfile>& fptr, const int64_t&);
+        /**
+         * @brief Create (or replace) a FITS file and write this table into it.
+         * @param filename Target FITS path; prepend '!' if replace==true.
+         * @param start 1-based first row to write.
+         * @param replace Overwrite file if true.
+         * @throws FITSexception on CFITSIO error.
+         */
         void write(const std::string&, const int64_t&, bool replace=false);
 #pragma endregion
 
@@ -1043,6 +1422,7 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
     template< typename T >
     void FITScolumn<T>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<T>();
         if(fptr == nullptr)
         {
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<T>","write");
@@ -1079,8 +1459,9 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
      @note Empty constructor is made private because \c this->fname and \c this->ftype are required.
      */
     template< typename T >
-    FITScolumn<T>::FITScolumn():FITSform(),data()
+    FITScolumn<T>::FITScolumn():FITSform()
     {
+        allocateStorageIfNeeded<T>();
     }
     
     /**
@@ -1089,24 +1470,22 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
      @param type FITS column type
      */
     template< typename T >
-    FITScolumn<T>::FITScolumn(const std::string& name , const dtype& type, const std::string unit, const size_t pos):FITSform(pos,name,type,unit),data()
+    FITScolumn<T>::FITScolumn(const std::string& name , const dtype& type, const std::string unit, const size_t pos):FITSform(pos,name,type,unit)
     {
-        
+        allocateStorageIfNeeded<T>();
     }
 
     template< typename T >
-    FITScolumn<T>::FITScolumn(const std::string& name, const dtype& type, const int64_t& r, const int64_t& w, const std::string unit, const size_t pos):FITSform(pos,name,type,r,w,unit),data()
+    FITScolumn<T>::FITScolumn(const std::string& name, const dtype& type, const int64_t& r, const int64_t& w, const std::string unit, const size_t pos):FITSform(pos,name,type,r,w,unit)
     {
-
+        allocateStorageIfNeeded<T>();
     }
     
     template< typename T >
-    FITScolumn<T>::FITScolumn(const std::string& name, const dtype& type, const int64_t& r, const int64_t& w, const double& s, const double& z, const std::string unit, const size_t pos):FITSform(pos,name,type,r,w,s,z,unit),data()
+    FITScolumn<T>::FITScolumn(const std::string& name, const dtype& type, const int64_t& r, const int64_t& w, const double& s, const double& z, const std::string unit, const size_t pos):FITSform(pos,name,type,r,w,s,z,unit)
     {
-
+        allocateStorageIfNeeded<T>();
     }
-    
-    
     
     /**
      Constructor
@@ -1119,9 +1498,9 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
      @param pos Column position in the FITStable
      */
     template< typename T >
-    FITScolumn<T>::FITScolumn(const std::string& name, const dtype& type, const double& scale, const double& zero, const std::string unit, const size_t pos):FITSform(pos,name,type,scale,zero,unit),data()
+    FITScolumn<T>::FITScolumn(const std::string& name, const dtype& type, const double& scale, const double& zero, const std::string unit, const size_t pos):FITSform(pos,name,type,scale,zero,unit)
     {
-        
+        allocateStorageIfNeeded<T>();
     }
     
     /**
@@ -1129,16 +1508,19 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
      @param col FITS column to be copyed to this
      */
     template< typename T >
-    FITScolumn<T>::FITScolumn(const FITScolumn<T>& col):FITSform(col),data(col.data)
+    FITScolumn<T>::FITScolumn(const FITScolumn<T>& col):FITSform(col)
     {
-        
+         const auto* s = col.storage<T>();
+         if(s)
+         {
+             allocateStorageWithSize<T>( s->ref().size() );
+             this->values<T>() = s->ref();
+         }
     }
     
     template< typename T >
     FITScolumn<T>::~FITScolumn()
-    {
-        data.clear();
-    }
+    {}
 #pragma endregion
 
     template< typename T >
@@ -1244,6 +1626,7 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
     void FITScolumn<T>::Dump( std::ostream& fout) const
     {
         FITSform::Dump(fout);
+        const auto& data = this->values<T>();
         size_t n=0;
         for(typename col_map::const_iterator it = data.cbegin(); it != data.cend(); it++)
         {
@@ -1256,10 +1639,15 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
 
     // --- Added specialized Dump implementations for byte/short columns ---
 
+    /*!
+     * \brief Specialized Dump for int8_t columns.
+     * \details Prints values as decimal for tshort, otherwise as hex bytes.
+     */
     template<>
     inline void DSL::FITScolumn<int8_t>::Dump(std::ostream& fout) const
     {
         FITSform::Dump(fout);
+        const auto& data = this->values<int8_t>();
         size_t n = 0;
         for(const auto& v : data)
         {
@@ -1283,10 +1671,15 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         }
     }
 
+    /*!
+     * \brief Specialized Dump for uint8_t columns.
+     * \details Prints values as decimal for tushort, otherwise as hex bytes.
+     */
     template<>
     inline void DSL::FITScolumn<uint8_t>::Dump(std::ostream& fout) const
     {
         FITSform::Dump(fout);
+        const auto& data = this->values<uint8_t>();
         size_t n = 0;
         for(const auto& v : data)
         {
@@ -1310,11 +1703,17 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         }
     }
 
+    /*!
+     * \brief Specialized Dump for vector<uint8_t> columns.
+     * \details Prints row size and preview, then each element in readable form.
+     */
     template<>
     inline void DSL::FITScolumn< std::vector<uint8_t> >::Dump(std::ostream& fout) const
     {
         FITSform::Dump(fout);
+        const auto& data = this->values< std::vector<uint8_t> >();
         size_t row = 0;
+
         for(const auto& vec : data)
         {
             fout<<"\033[32m   |       \033[31m[\033[0m"<<row<<"\033[31m]\033[0m   size="<<vec.size();
@@ -1361,10 +1760,15 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         }
     }
 
+    /*!
+     * \brief Specialized Dump for vector<int8_t> columns.
+     * \details Prints row size and per-element hex values.
+     */
     template<>
     inline void DSL::FITScolumn< std::vector<int8_t> >::Dump(std::ostream& fout) const
     {
         FITSform::Dump(fout);
+        const auto& data = this->values< std::vector<int8_t> >();
         size_t row = 0;
         for(const auto& vec : data)
         {
@@ -1393,20 +1797,31 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         }
     }
     
+    // Generic dump helpers
+    /*!
+     * \brief Dump a scalar value.
+     * \tparam U Scalar type printable to ostream.
+     */
     template< typename T>
     template< typename U >
     void FITScolumn<T>::dump( std::ostream& fout, const U& val) const
     {
         fout<<val<<std::flush;
     }
-    
+    /*!
+     * \brief Dump a pair of scalar values.
+     * \tparam P Scalar type.
+     */
     template< typename T>
     template< typename P >
     void FITScolumn<T>::dump( std::ostream& fout, const std::pair<P,P>& val) const
     {
         fout<<val.first<<" , "<<val.second<<std::flush;
     }
-    
+    /*!
+     * \brief Dump a vector of scalar values.
+     * \tparam Q Scalar type.
+     */
     template< typename T>
     template< typename Q >
     void FITScolumn<T>::dump( std::ostream& fout, const std::vector<Q>& val) const
@@ -1425,7 +1840,10 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
             ++idx;
         }
     }
-    
+    /*!
+     * \brief Dump a vector of pairs.
+     * \tparam L Scalar type of pair elements.
+     */
     template< typename T>
     template< typename L >
     void FITScolumn<T>::dump( std::ostream& fout, const std::vector< std::pair<L,L> >& val) const
@@ -1445,6 +1863,718 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         }
     }
     
+    #pragma region - RowSet / ColumnView helpers
+    namespace detail
+    {
+        template<typename T> struct is_std_vector : std::false_type {};
+        
+        template<typename U, typename Alloc>
+        struct is_std_vector<std::vector<U,Alloc>> : std::true_type {};
+    }
+
+    /**
+     * @brief Immutable set of row indices to operate on.
+     * @details Supports set algebra (&& for intersection, || for union) and iteration.
+     */
+    class RowSet
+    {
+        std::vector<size_t> indices_;
+        public:
+            RowSet() = default;
+            /*!
+             * \brief Construct from a list of indices.
+             * \details Input is sorted and deduplicated.
+             */
+            explicit RowSet(std::vector<size_t> rows)
+                : indices_(std::move(rows))
+            {
+                std::sort(indices_.begin(), indices_.end());
+                indices_.erase(std::unique(indices_.begin(), indices_.end()), indices_.end());
+            }
+            /*!
+             * \brief Number of indices in the set.
+             */
+            size_t size()  const { return indices_.size(); }
+            /*!
+             * \brief Whether the set is empty.
+             */
+            bool   empty() const { return indices_.empty(); }
+            /*!
+             * \brief Access the internal indices.
+             * \return Const reference to indices vector.
+             */
+            const std::vector<size_t>& indices() const { return indices_; }
+            /*!
+             * \brief Intersection with another set.
+             * \return Resulting RowSet containing common indices.
+             */
+            RowSet intersected(const RowSet& other) const
+            {
+                std::vector<size_t> out;
+                out.reserve(std::min(indices_.size(), other.indices_.size()));
+                std::set_intersection(indices_.begin(), indices_.end(),
+                                      other.indices_.begin(), other.indices_.end(),
+                                      std::back_inserter(out));
+                return RowSet(std::move(out));
+            }
+
+            /*!
+             * \brief Union with another set.
+             * \return Resulting RowSet containing all unique indices.
+             */
+            RowSet united(const RowSet& other) const
+            {
+                std::vector<size_t> out;
+                out.reserve(indices_.size() + other.indices_.size());
+                std::set_union(indices_.begin(), indices_.end(),
+                               other.indices_.begin(), other.indices_.end(),
+                               std::back_inserter(out));
+                return RowSet(std::move(out));
+            }
+
+            /*!
+             * \brief Set difference (this \ other).
+             * \return Indices present in this but not in other.
+             */
+            RowSet subtracted(const RowSet& other) const
+            {
+                std::vector<size_t> out;
+                out.reserve(indices_.size());
+                std::set_difference(indices_.begin(), indices_.end(),
+                                    other.indices_.begin(), other.indices_.end(),
+                                    std::back_inserter(out));
+                return RowSet(std::move(out));
+            }
+
+            /*!
+             * \brief Iterate over indices and invoke a callable.
+             * \tparam Func Callable signature void(size_t).
+             * \param fn Function to apply to each index.
+             */
+            template<typename Func>
+            void forEach(Func&& fn) const
+            {
+                for(size_t idx : indices_) fn(idx);
+            }
+    };
+    /*!
+     * \brief Logical AND of two row sets (intersection).
+     */
+    inline RowSet operator&&(const RowSet& lhs, const RowSet& rhs)
+    {
+        return lhs.intersected(rhs);
+    }
+    /*!
+     * \brief Logical OR of two row sets (union).
+     */
+    inline RowSet operator||(const RowSet& lhs, const RowSet& rhs)
+    {
+        return lhs.united(rhs);
+    }
+
+    template<typename T>
+    class ColumnFilterExpr
+    {
+        FITStable& tbl_;
+        std::string column_;
+
+        template<typename Fn>
+        RowSet buildWith(Fn&& mutator)
+        {
+            auto& form = *tbl_.getColumn(column_);
+            RowSetBuilder<T> builder(form);
+            mutator(builder);
+            return builder.build();
+        }
+
+    public:
+        /*!
+         * \brief Construct a filter expression bound to a table and column.
+         * \param tbl Owning table.
+         * \param column Column name.
+         */
+        ColumnFilterExpr(FITStable& tbl, std::string column)
+            : tbl_(tbl), column_(std::move(column)) {}
+
+        /*!
+         * \brief Equality filter.
+         * \param value Scalar to compare.
+         * \return RowSet of matching rows.
+         */
+        RowSet operator==(const T& value) { return buildWith([&](auto& b){ b.eq(value); }); }
+        /*!
+         * \brief Inequality filter.
+         */
+        RowSet operator!=(const T& value) { return buildWith([&](auto& b){ b.ne(value); }); }
+        /*!
+         * \brief Less-than filter.
+         */
+        RowSet operator< (const T& value) { return buildWith([&](auto& b){ b.lt(value); }); }
+        /*!
+         * \brief Less-or-equal filter.
+         */
+        RowSet operator<=(const T& value) { return buildWith([&](auto& b){ b.le(value); }); }
+        /*!
+         * \brief Greater-than filter.
+         */
+        RowSet operator> (const T& value) { return buildWith([&](auto& b){ b.gt(value); }); }
+        /*!
+         * \brief Greater-or-equal filter.
+         */
+        RowSet operator>=(const T& value) { return buildWith([&](auto& b){ b.ge(value); }); }
+        /*!
+         * \brief Range filter [low, high].
+         * \param low Lower bound (inclusive).
+         * \param high Upper bound (inclusive).
+         */
+        RowSet between(const T& low, const T& high)
+        {
+            return buildWith([&](auto& b){ b.between(low, high); });
+        }
+    };
+
+    /**
+     * @brief RowSet builder for scalar columns; supports chaining of predicates.
+     * @tparam T Scalar column type.
+     */
+    template<typename T>
+    class RowSetBuilder
+    {
+            FITSform* column_;
+            std::vector<T>* values_;
+            std::vector<size_t> indices_;
+
+            void ensureScalar()
+            {
+                static_assert(!detail::is_std_vector<T>::value,
+                              "RowSetBuilder does not support vector payload columns");
+                if(column_->getNelem() > 1)
+                    throw std::logic_error("RowSetBuilder: repeated/vector columns are not supported");
+            }
+
+            template<typename Predicate>
+            RowSetBuilder& filter(Predicate&& pred)
+            {
+                auto* vals = values_;
+                auto newEnd = std::remove_if(indices_.begin(), indices_.end(),
+                    [&](size_t idx){ return !pred((*vals)[idx], idx); });
+                indices_.erase(newEnd, indices_.end());
+                return *this;
+            }
+
+        public:
+            /*!
+             * \brief Initialize a builder for a scalar column.
+             * \param column Column descriptor; must be scalar (nelem==1).
+             * \throws std::logic_error if column repeats or is a vector type.
+             */
+            explicit RowSetBuilder(FITSform& column)
+                : column_(&column)
+            {
+                auto& vec = column.values<T>(); // throws if wrong scalar type
+                values_ = &vec;
+                ensureScalar();
+                indices_.resize(vec.size());
+                std::iota(indices_.begin(), indices_.end(), 0);
+            }
+
+            /*!
+             * \brief Keep rows equal to value.
+             */
+            RowSetBuilder& eq(const T& value) { return filter([&](const T& v, size_t){ return v == value; }); }
+            /*!
+             * \brief Keep rows not equal to value.
+             */
+            RowSetBuilder& ne(const T& value) { return filter([&](const T& v, size_t){ return v != value; }); }
+            /*!
+             * \brief Keep rows less than value.
+             */
+            RowSetBuilder& lt(const T& value) { return filter([&](const T& v, size_t){ return v <  value; }); }
+            /*!
+             * \brief Keep rows less or equal to value.
+             */
+            RowSetBuilder& le(const T& value) { return filter([&](const T& v, size_t){ return v <= value; }); }
+            /*!
+             * \brief Keep rows greater than value.
+             */
+            RowSetBuilder& gt(const T& value) { return filter([&](const T& v, size_t){ return v >  value; }); }
+            /*!
+             * \brief Keep rows greater or equal to value.
+             */
+            RowSetBuilder& ge(const T& value) { return filter([&](const T& v, size_t){ return v >= value; }); }
+            /*!
+             * \brief Keep rows within [low, high].
+             */
+            RowSetBuilder& between(const T& low, const T& high)
+            {
+                return filter([&](const T& v, size_t){ return v >= low && v <= high; });
+            }
+            /*!
+             * \brief Apply a custom predicate to filter rows.
+             * \tparam Predicate bool(const T&) or bool(const T&, size_t) callable.
+             */
+            template<typename Predicate>
+            RowSetBuilder& custom(Predicate&& pred)
+            {
+                // Support both signatures:
+                // - bool(const T&, size_t)
+                // - bool(const T&)
+                if constexpr (std::is_invocable_r_v<bool, Predicate, const T&, size_t>)
+                {
+                    return filter(std::forward<Predicate>(pred));
+                }
+                else if constexpr (std::is_invocable_r_v<bool, Predicate, const T&>)
+                {
+                    return filter([&](const T& v, size_t){ return pred(v); });
+                }
+                else
+                {
+                    static_assert(std::is_invocable_v<Predicate, const T&> || std::is_invocable_v<Predicate, const T&, size_t>,
+                                  "Predicate must be callable as bool(const T&) or bool(const T&, size_t)");
+                    return *this; 
+                }
+            }
+
+            /*!
+             * \brief Build the final RowSet.
+             */
+            RowSet build() const { return RowSet(indices_); }
+            /*!
+             * \brief Implicit conversion to RowSet.
+             */
+            operator RowSet() const { return build(); }
+    };
+
+    template<typename T>
+    class ColumnSelection
+    {
+        ColumnView<T> view_;
+    public:
+        ColumnSelection(ColumnView<T>&& view, const RowSet& rows)
+            : view_(std::move(view))
+        {
+            view_.on(rows);
+        }
+
+        ColumnSelection& add(const T& v) { view_.add(v); return *this; }
+        ColumnSelection& sub(const T& v) { view_.sub(v); return *this; }
+        ColumnSelection& mul(const T& v) { view_.mul(v); return *this; }
+        ColumnSelection& div(const T& v) { view_.div(v); return *this; }
+        ColumnSelection& set(const T& v) { view_.set(v); return *this; }
+
+        ColumnSelection& operator+=(const T& v) { return add(v); }
+        ColumnSelection& operator-=(const T& v) { return sub(v); }
+        ColumnSelection& operator*=(const T& v) { return mul(v); }
+        ColumnSelection& operator/=(const T& v) { return div(v); }
+    };
+
+    template<typename T>
+    class ColumnView
+    {
+        FITStable* owner_;
+        FITSform* column_;
+        std::vector<T>* values_;
+        std::vector<size_t> selection_;
+        bool hasSelection_ = false;
+
+        void ensureScalar()
+        {
+            static_assert(!detail::is_std_vector<T>::value,
+                          "ColumnView does not support vector payload columns");
+            if(column_->getNelem() > 1)
+                throw std::logic_error("ColumnView: repeated/vector columns are not supported");
+        }
+
+        void ensureOwner() const
+        {
+            if(!owner_)
+                throw std::logic_error("ColumnView requires owning FITStable");
+        }
+
+        template<typename Func>
+        ColumnView& mutate(Func&& fn)
+        {
+            auto& vec = *values_;
+            if(hasSelection_)
+            {
+                for(size_t idx : selection_)
+                    fn(vec[idx], idx);
+            }
+            else
+            {
+                for(size_t idx = 0; idx < vec.size(); ++idx)
+                    fn(vec[idx], idx);
+            }
+            return *this;
+        }
+
+        template<typename Comparator>
+        ColumnView& sortWithComparator(Comparator cmp)
+        {
+            ensureOwner();
+            auto& vec = *values_;
+            if(vec.empty())
+            {
+                clearSelection();
+                return *this;
+            }
+
+            std::vector<size_t> order(vec.size());
+            std::iota(order.begin(), order.end(), 0);
+            std::stable_sort(order.begin(), order.end(),
+                             [&](size_t lhs, size_t rhs)
+                             {
+                                 const T& lv = vec[lhs];
+                                 const T& rv = vec[rhs];
+                                 if(cmp(lv, rv)) return true;
+                                 if(cmp(rv, lv)) return false;
+                                 return lhs < rhs;
+                             });
+
+            owner_->reorderRows(order);
+            clearSelection();
+            values_ = &column_->values<T>();
+            return *this;
+        }
+
+    public:
+        /*!
+         * \brief Construct a typed view on a scalar column.
+         * \param owner Owning FITStable.
+         * \param column Column descriptor.
+         * \throws std::logic_error if column repeats or is a vector type.
+         */
+        explicit ColumnView(FITStable& owner, FITSform& column)
+            : owner_(&owner),
+              column_(&column),
+              values_(&column.values<T>())
+        {
+            ensureScalar();
+        }
+
+        /*!
+         * \brief Restrict the view to a set of rows.
+         * \param rows RowSet of indices.
+         * \return Reference to this view.
+         */
+        ColumnView& on(const RowSet& rows)
+        {
+            selection_ = rows.indices();
+            hasSelection_ = true;
+            return *this;
+        }
+
+        /*!
+         * \brief Clear any active row selection.
+         * \return Reference to this view.
+         */
+        ColumnView& clearSelection()
+        {
+            selection_.clear();
+            hasSelection_ = false;
+            return *this;
+        }
+
+        /*!
+         * \brief Add a value to selected cells.
+         */
+        ColumnView& add(const T& value)
+        {
+            return mutate([&](T& cell, size_t){ cell += value; });
+        }
+
+        /*!
+         * \brief Subtract a value from selected cells.
+         */
+        ColumnView& sub(const T& value)
+        {
+            return mutate([&](T& cell, size_t){ cell -= value; });
+        }
+
+        /*!
+         * \brief Multiply selected cells by a value.
+         */
+        ColumnView& mul(const T& value)
+        {
+            return mutate([&](T& cell, size_t){ cell *= value; });
+        }
+
+        /*!
+         * \brief Divide selected cells by a value.
+         */
+        ColumnView& div(const T& value)
+        {
+            return mutate([&](T& cell, size_t){ cell /= value; });
+        }
+
+        /*!
+         * \brief Assign a constant to selected cells.
+         */
+        ColumnView& set(const T& value)
+        {
+            return mutate([&](T& cell, size_t){ cell = value; });
+        }
+
+        /*!
+         * \brief Apply a custom mutator to each selected cell.
+         * \tparam Func Callable with signature void(T&, size_t).
+         */
+        template<typename Func>
+        ColumnView& apply(Func&& fn)
+        {
+            return mutate(std::forward<Func>(fn));
+        }
+
+        /*!
+         * \brief Sort rows ascending by the column and reorder all columns.
+         * \return Reference to this view (selection cleared).
+         */
+        ColumnView& sortAscending()
+        {
+            return sortWithComparator(std::less<T>());
+        }
+
+        /*!
+         * \brief Sort rows descending by the column and reorder all columns.
+         * \return Reference to this view (selection cleared).
+         */
+        ColumnView& sortDescending()
+        {
+            return sortWithComparator(std::greater<T>());
+        }
+
+        /*!
+         * \brief Access the underlying data vector.
+         * \return Const reference to values.
+         */
+        const std::vector<T>& data() const { return *values_; }
+
+        /*!
+         * \brief Create a ColumnSelection from an rvalue view and a RowSet.
+         * \param rows Selection of rows.
+         * \return ColumnSelection bound to the rows.
+         */
+        ColumnSelection<T> operator[](const RowSet& rows) &&
+        {
+            ColumnView<T> tmp(std::move(*this));
+            tmp.on(rows);
+            return ColumnSelection<T>(std::move(tmp), rows);
+        }
+
+        /*!
+         * \brief Create a ColumnSelection from a const lvalue view and a RowSet.
+         * \param rows Selection of rows.
+         * \return ColumnSelection bound to the rows.
+         */
+        ColumnSelection<T> operator[](const RowSet& rows) const &
+        {
+            ColumnView<T> tmp(*this);
+            tmp.on(rows);
+            return ColumnSelection<T>(std::move(tmp), rows);
+        }
+    };
+
+    /**
+     * @brief Entry point to create views and where-chains for a named column.
+     * @details Enables fluently building filters and applying updates.
+     */
+    class ColumnHandle
+    {
+            FITStable& tbl_;
+            std::string target_;
+
+        public:
+            ColumnHandle(FITStable& tbl, std::string name)
+                : tbl_(tbl), target_(std::move(name)) {}
+
+            /*!
+             * \brief Create a typed view over the entire column.
+             * \tparam TargetT Scalar type expected for the column.
+             * \return ColumnView<TargetT> with no selection.
+             */
+            template<typename TargetT>
+            ColumnView<TargetT> all()
+            {
+                auto& form = *tbl_.getColumn(target_);
+                return ColumnView<TargetT>(tbl_, form);
+            }
+
+            /*!
+             * \brief Create a typed view restricted to a RowSet.
+             * \tparam TargetT Scalar type of the column.
+             * \param rows Row selection.
+             * \return ColumnView<TargetT> with the selection applied.
+             */
+            template<typename TargetT>
+            ColumnView<TargetT> on(const RowSet& rows)
+            {
+                auto view = all<TargetT>();
+                view.on(rows);
+                return view;
+            }
+
+            template<typename FilterT>
+            class WhereChain
+            {
+                ColumnHandle& owner_;
+                RowSetBuilder<FilterT> builder_;
+
+                RowSet rows() const { return builder_.build(); }
+
+            public:
+                WhereChain(ColumnHandle& owner, RowSetBuilder<FilterT>&& builder)
+                    : owner_(owner), builder_(std::move(builder)) {}
+
+                WhereChain& eq(const FilterT& value) { builder_.eq(value); return *this; }
+                WhereChain& ne(const FilterT& value) { builder_.ne(value); return *this; }
+                WhereChain& lt(const FilterT& value) { builder_.lt(value); return *this; }
+                WhereChain& le(const FilterT& value) { builder_.le(value); return *this; }
+                WhereChain& gt(const FilterT& value) { builder_.gt(value); return *this; }
+                WhereChain& ge(const FilterT& value) { builder_.ge(value); return *this; }
+                WhereChain& between(const FilterT& low, const FilterT& high) { builder_.between(low, high); return *this; }
+
+                template<typename Predicate>
+                WhereChain& custom(Predicate&& pred)
+                {
+                    builder_.custom(std::forward<Predicate>(pred));
+                    return *this;
+                }
+
+                template<typename TargetT>
+                WhereChain& add(const TargetT& value)
+                {
+                    owner_.all<TargetT>().on(rows()).add(value);
+                    return *this;
+                }
+
+                template<typename TargetT>
+                WhereChain& sub(const TargetT& value)
+                {
+                    owner_.all<TargetT>().on(rows()).sub(value);
+                    return *this;
+                }
+
+                template<typename TargetT>
+                WhereChain& mul(const TargetT& value)
+                {
+                    owner_.all<TargetT>().on(rows()).mul(value);
+                    return *this;
+                }
+
+                template<typename TargetT>
+                WhereChain& div(const TargetT& value)
+                {
+                    owner_.all<TargetT>().on(rows()).div(value);
+                    return *this;
+                }
+
+                template<typename TargetT>
+                WhereChain& set(const TargetT& value)
+                {
+                    owner_.all<TargetT>().on(rows()).set(value);
+                    return *this;
+                }
+
+                template<typename TargetT, typename Func>
+                WhereChain& apply(Func&& fn)
+                {
+                    owner_.all<TargetT>().on(rows()).apply(std::forward<Func>(fn));
+                    return *this;
+                }
+
+                RowSet toRowSet() const { return rows(); }
+            };
+
+            template<typename FilterT>
+            WhereChain<FilterT> where(const std::string& filterColumn)
+            {
+                auto& form = *tbl_.getColumn(filterColumn);
+                return WhereChain<FilterT>(*this, RowSetBuilder<FilterT>(form));
+            }
+    };
+
+    /**
+     * @brief Build a RowSet for the named column, filtering by scalar comparisons.
+     * @tparam T Scalar type of the target column.
+     */
+    template<typename T>
+    RowSetBuilder<T> FITStable::select(const std::string& columnName)
+    {
+        auto& form = *getColumn(columnName);
+        return RowSetBuilder<T>(form);
+    }
+
+    /*!
+     * \brief Get a typed ColumnView for a named column.
+     * \tparam T Expected scalar type.
+     * \param columnName Column name.
+     * \return ColumnView bound to this table and column.
+     * \throws std::out_of_range if column not found.
+     * \throws std::bad_cast if type mismatches.
+     */
+    template<typename T>
+    ColumnView<T> FITStable::column(const std::string& columnName)
+    {
+        auto& form = *getColumn(columnName);
+        return ColumnView<T>(*this, form);
+    }
+
+    /*!
+     * \brief Get a ColumnHandle to fluently build views and filters.
+     * \param columnName Target column name.
+     * \return ColumnHandle bound to this table.
+     */
+    inline ColumnHandle FITStable::operator[](const std::string& columnName)
+    {
+        return ColumnHandle(*this, columnName);
+    }
+
+    /*!
+     * \brief Reorder rows in all columns according to a global permutation.
+     * \param order New-to-old index mapping; must be a permutation of [0..n-1].
+     * \throws std::logic_error on mismatch, duplicates, or out-of-range.
+     */
+    inline void FITStable::reorderRows(const std::vector<size_t>& order)
+    {
+        if(fcolumns.empty())
+            return;
+
+        const size_t expected = fcolumns.front()->size();
+        if(order.size() != expected)
+            throw std::logic_error("FITStable::reorderRows permutation size mismatch");
+
+        std::vector<uint8_t> seen(expected, 0);
+        for(size_t idx : order)
+        {
+            if(idx >= expected)
+                throw std::logic_error("FITStable::reorderRows permutation index out of range");
+            if(seen[idx])
+                throw std::logic_error("FITStable::reorderRows permutation contains duplicates");
+            seen[idx] = 1;
+        }
+
+        for(auto& col : fcolumns)
+        {
+            if(col->size() != expected)
+                throw std::logic_error("FITStable::reorderRows column size mismatch");
+            col->sortOn(order);
+        }
+        nrows_cache = expected;
+    }
+
+    /*!
+     * \brief Begin a filter expression for a named column.
+     * \tparam T Scalar type of the filter column.
+     * \param columnName Column name; must exist.
+     * \return ColumnFilterExpr<T> bound to the column.
+     */
+    template<typename T>
+    ColumnFilterExpr<T> FITStable::operator()(const std::string& columnName)
+    {
+        // Ensures column exists (throws if not)
+        (void)getColumn(columnName);
+        return ColumnFilterExpr<T>(*this, columnName);
+    }
+#pragma endregion
 }
 #endif
-

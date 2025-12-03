@@ -41,6 +41,9 @@ TEST(FITStable,default_tsbyte_ctor)
     fitsfile* rawFptr = nullptr;
     int status = 0;
     ASSERT_EQ(fits_open_file(&rawFptr, testurl.c_str(), READONLY, &status), 0);
+    EXPECT_EQ(status, 0);
+
+    // Wrap in shared_ptr with no-op deleter (manual close below).
     std::shared_ptr<fitsfile> fptr(rawFptr, [](fitsfile*){}); // manual close
 
     int hdutype = 0;
@@ -50,10 +53,10 @@ TEST(FITStable,default_tsbyte_ctor)
 
     auto* col = dynamic_cast<FITScolumn<int8_t>*>(readTable.getColumn(1).get());
     ASSERT_NE(col, nullptr);
-    ASSERT_EQ(col->values().size(), 3u);
-    EXPECT_EQ(col->values()[0], int8_t(1));
-    EXPECT_EQ(col->values()[1], int8_t(2));
-    EXPECT_EQ(col->values()[2], int8_t(3));
+    ASSERT_EQ(col->values<int8_t>().size(), 3u);
+    EXPECT_EQ(col->values<int8_t>()[0], int8_t(1));
+    EXPECT_EQ(col->values<int8_t>()[1], int8_t(2));
+    EXPECT_EQ(col->values<int8_t>()[2], int8_t(3));
 
     EXPECT_EQ(fits_close_file(fptr.get(), &status), 0);
     EXPECT_EQ(status, 0);
@@ -77,8 +80,8 @@ TEST(FITStable,col_tshort_ctor)
     FITStable readTable(fptr,2);
     ASSERT_EQ(readTable.nrows(),3u); ASSERT_EQ(readTable.ncols(),1u);
     auto* col = dynamic_cast<FITScolumn<int16_t>*>(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values().size(),3u);
-    EXPECT_EQ(col->values()[0],int16_t(4)); EXPECT_EQ(col->values()[1],int16_t(5)); EXPECT_EQ(col->values()[2],int16_t(6));
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values<int16_t>().size(),3u);
+    EXPECT_EQ(col->values<int16_t>()[0],int16_t(4)); EXPECT_EQ(col->values<int16_t>()[1],int16_t(5)); EXPECT_EQ(col->values<int16_t>()[2],int16_t(6));
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
@@ -99,8 +102,8 @@ TEST(FITStable,col_tushort_ctor)
     FITStable readTable(fptr,2);
     ASSERT_EQ(readTable.nrows(),3u); ASSERT_EQ(readTable.ncols(),1u);
     auto* col = dynamic_cast<FITScolumn<uint16_t>*>(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values().size(),3u);
-    EXPECT_EQ(col->values()[0],uint16_t(7)); EXPECT_EQ(col->values()[1],uint16_t(8)); EXPECT_EQ(col->values()[2],uint16_t(9));
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values<uint16_t>().size(),3u);
+    EXPECT_EQ(col->values<uint16_t>()[0],uint16_t(7)); EXPECT_EQ(col->values<uint16_t>()[1],uint16_t(8)); EXPECT_EQ(col->values<uint16_t>()[2],uint16_t(9));
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
@@ -129,11 +132,11 @@ TEST(FITStable,col_tint_ctor)
     auto* col = dynamic_cast<FITScolumn<int32_t>*>(readTable.getColumn(1).get());
 
     ASSERT_NE(col,nullptr);
-    ASSERT_EQ(col->values().size(),3u);
+    ASSERT_EQ(col->values<int32_t>().size(),3u);
 
-    EXPECT_EQ(col->values()[0],int32_t(-3));
-    EXPECT_EQ(col->values()[1],int32_t(0));
-    EXPECT_EQ(col->values()[2],int32_t(3));
+    EXPECT_EQ(col->values<int32_t>()[0],int32_t(-3));
+    EXPECT_EQ(col->values<int32_t>()[1],int32_t(0));
+    EXPECT_EQ(col->values<int32_t>()[2],int32_t(3));
     
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
@@ -163,10 +166,10 @@ TEST(FITStable,col_tuint_ctor)
     
     auto* col = dynamic_cast<FITScolumn<uint32_t>*>(readTable.getColumn(1).get());
     
-    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values().size(),3u);
-    EXPECT_EQ(col->values()[0],uint32_t(1));
-    EXPECT_EQ(col->values()[1],uint32_t(2));
-    EXPECT_EQ(col->values()[2],uint32_t(3));
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values<uint32_t>().size(),3u);
+    EXPECT_EQ(col->values<uint32_t>()[0],uint32_t(1));
+    EXPECT_EQ(col->values<uint32_t>()[1],uint32_t(2));
+    EXPECT_EQ(col->values<uint32_t>()[2],uint32_t(3));
 
     status=0;
     EXPECT_EQ(fits_close_file(fptr.get(),&status),0);
@@ -189,8 +192,8 @@ TEST(FITStable,col_tlong_ctor)
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
     auto* col = dynamic_cast<FITScolumn<int32_t>*>(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values().size(),3u);
-    EXPECT_EQ(col->values()[0],int32_t(-11)); EXPECT_EQ(col->values()[1],int32_t(22)); EXPECT_EQ(col->values()[2],int32_t(33));
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values<int32_t>().size(),3u);
+    EXPECT_EQ(col->values<int32_t>()[0],int32_t(-11)); EXPECT_EQ(col->values<int32_t>()[1],int32_t(22)); EXPECT_EQ(col->values<int32_t>()[2],int32_t(33));
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
@@ -210,8 +213,8 @@ TEST(FITStable,col_tulong_ctor)
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
     auto* col = dynamic_cast<FITScolumn<uint32_t>*>(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values().size(),3u);
-    EXPECT_EQ(col->values()[0],uint32_t(1)); EXPECT_EQ(col->values()[1],uint32_t(2)); EXPECT_EQ(col->values()[2],uint32_t(3));
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values<uint32_t>().size(),3u);
+    EXPECT_EQ(col->values<uint32_t>()[0],uint32_t(1)); EXPECT_EQ(col->values<uint32_t>()[1],uint32_t(2)); EXPECT_EQ(col->values<uint32_t>()[2],uint32_t(3));
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
@@ -237,10 +240,10 @@ TEST(FITStable,col_tlonglong_ctor)
     FITStable readTable(fptr,2);
     auto* col = dynamic_cast<FITScolumn<int64_t>*>(readTable.getColumn(1).get());
     ASSERT_NE(col,nullptr);
-    ASSERT_EQ(col->values().size(),3u);
-    EXPECT_EQ(col->values()[0],int64_t(-9));
-    EXPECT_EQ(col->values()[1],int64_t(0));
-    EXPECT_EQ(col->values()[2],int64_t(9));
+    ASSERT_EQ(col->values<int64_t>().size(),3u);
+    EXPECT_EQ(col->values<int64_t>()[0],int64_t(-9));
+    EXPECT_EQ(col->values<int64_t>()[1],int64_t(0));
+    EXPECT_EQ(col->values<int64_t>()[2],int64_t(9));
     
     status=0;
     EXPECT_EQ(fits_close_file(fptr.get(),&status),0);
@@ -263,8 +266,8 @@ TEST(FITStable,col_tulonglong_ctor)
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
     auto* col = dynamic_cast<FITScolumn<uint64_t>*>(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values().size(),3u);
-    EXPECT_EQ(col->values()[0],uint64_t(9)); EXPECT_EQ(col->values()[1],uint64_t(10)); EXPECT_EQ(col->values()[2],uint64_t(11));
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values<uint64_t>().size(),3u);
+    EXPECT_EQ(col->values<uint64_t>()[0],uint64_t(9)); EXPECT_EQ(col->values<uint64_t>()[1],uint64_t(10)); EXPECT_EQ(col->values<uint64_t>()[2],uint64_t(11));
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
@@ -284,8 +287,8 @@ TEST(FITStable,col_tfloat_ctor)
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
     auto* col = dynamic_cast<FITScolumn<float>*>(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values().size(),3u);
-    EXPECT_FLOAT_EQ(col->values()[0],0.f); EXPECT_FLOAT_EQ(col->values()[1],1.f); EXPECT_FLOAT_EQ(col->values()[2],2.f);
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values<float>().size(),3u);
+    EXPECT_FLOAT_EQ(col->values<float>()[0],0.f); EXPECT_FLOAT_EQ(col->values<float>()[1],1.f); EXPECT_FLOAT_EQ(col->values<float>()[2],2.f);
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
@@ -305,8 +308,8 @@ TEST(FITStable,col_tdouble_ctor)
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
     auto* col = dynamic_cast<FITScolumn<double>*>(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values().size(),3u);
-    EXPECT_DOUBLE_EQ(col->values()[0],-1.0); EXPECT_DOUBLE_EQ(col->values()[1],0.5); EXPECT_DOUBLE_EQ(col->values()[2],2.5);
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values<double>().size(),3u);
+    EXPECT_DOUBLE_EQ(col->values<double>()[0],-1.0); EXPECT_DOUBLE_EQ(col->values<double>()[1],0.5); EXPECT_DOUBLE_EQ(col->values<double>()[2],2.5);
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
@@ -326,10 +329,10 @@ TEST(FITStable,col_tcplx_ctor)
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
     auto* col = dynamic_cast<FITScolumn<FITSform::complex>*>(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values().size(),3u);
-    EXPECT_FLOAT_EQ(col->values()[0].first,1.0f); EXPECT_FLOAT_EQ(col->values()[0].second,2.0f);
-    EXPECT_FLOAT_EQ(col->values()[1].first,3.0f); EXPECT_FLOAT_EQ(col->values()[1].second,4.0f);
-    EXPECT_FLOAT_EQ(col->values()[2].first,5.0f); EXPECT_FLOAT_EQ(col->values()[2].second,6.0f);
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values<FITSform::complex>().size(),3u);
+    EXPECT_FLOAT_EQ(col->values<FITSform::complex>()[0].first,1.0f); EXPECT_FLOAT_EQ(col->values<FITSform::complex>()[0].second,2.0f);
+    EXPECT_FLOAT_EQ(col->values<FITSform::complex>()[1].first,3.0f); EXPECT_FLOAT_EQ(col->values<FITSform::complex>()[1].second,4.0f);
+    EXPECT_FLOAT_EQ(col->values<FITSform::complex>()[2].first,5.0f); EXPECT_FLOAT_EQ(col->values<FITSform::complex>()[2].second,6.0f);
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
@@ -349,10 +352,10 @@ TEST(FITStable,col_tdbcplx_ctor)
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
     auto* col = dynamic_cast<FITScolumn<FITSform::dblcomplex>*>(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values().size(),3u);
-    EXPECT_DOUBLE_EQ(col->values()[0].first,1.0); EXPECT_DOUBLE_EQ(col->values()[0].second,2.0);
-    EXPECT_DOUBLE_EQ(col->values()[1].first,3.0); EXPECT_DOUBLE_EQ(col->values()[1].second,4.0);
-    EXPECT_DOUBLE_EQ(col->values()[2].first,5.0); EXPECT_DOUBLE_EQ(col->values()[2].second,6.0);
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values<FITSform::dblcomplex>().size(),3u);
+    EXPECT_DOUBLE_EQ(col->values<FITSform::dblcomplex>()[0].first,1.0); EXPECT_DOUBLE_EQ(col->values<FITSform::dblcomplex>()[0].second,2.0);
+    EXPECT_DOUBLE_EQ(col->values<FITSform::dblcomplex>()[1].first,3.0); EXPECT_DOUBLE_EQ(col->values<FITSform::dblcomplex>()[1].second,4.0);
+    EXPECT_DOUBLE_EQ(col->values<FITSform::dblcomplex>()[2].first,5.0); EXPECT_DOUBLE_EQ(col->values<FITSform::dblcomplex>()[2].second,6.0);
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
@@ -383,10 +386,10 @@ TEST(FITStable,col_tlogical_ctor)
     
     auto* col = dynamic_cast< FITScolumn< bool > *>(readTable.getColumn(1).get());
     ASSERT_NE(col,nullptr);
-    ASSERT_EQ(col->values().size(),3u);
-    EXPECT_TRUE (col->values()[0]);
-    EXPECT_FALSE(col->values()[1]);
-    EXPECT_TRUE (col->values()[2]);
+    ASSERT_EQ(col->size(),3u);
+    EXPECT_TRUE (col->values<bool>()[0]);
+    EXPECT_FALSE(col->values<bool>()[1]);
+    EXPECT_TRUE (col->values<bool>()[2]);
     
     status=0;
     EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
@@ -417,10 +420,10 @@ TEST(FITStable,col_tbit_ctor)
     FITStable readTable(fptr,2);
     auto* col = dynamic_cast< FITScolumn< bool > *>(readTable.getColumn(1).get());
     ASSERT_NE(col,nullptr);
-    ASSERT_EQ(col->values().size(),3u);
-    EXPECT_FALSE (col->values()[0]);
-    EXPECT_TRUE  (col->values()[1]);
-    EXPECT_FALSE (col->values()[2]);
+    ASSERT_EQ(col->size(),3u);
+    EXPECT_FALSE (col->values<bool>()[0]);
+    EXPECT_TRUE  (col->values<bool>()[1]);
+    EXPECT_FALSE (col->values<bool>()[2]);
     
     status=0;
     EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
@@ -442,8 +445,8 @@ TEST(FITStable,col_tbyte_ctor)
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
     auto* col = dynamic_cast<FITScolumn<uint8_t>*>(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values().size(),3u);
-    EXPECT_EQ(col->values()[0],uint8_t(0x10)); EXPECT_EQ(col->values()[1],uint8_t(0x11)); EXPECT_EQ(col->values()[2],uint8_t(0x12));
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->size(),3u);
+    EXPECT_EQ(col->values<uint8_t>()[0],uint8_t(0x10)); EXPECT_EQ(col->values<uint8_t>()[1],uint8_t(0x11)); EXPECT_EQ(col->values<uint8_t>()[2],uint8_t(0x12));
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
@@ -475,12 +478,12 @@ TEST(FITStable,col_tstring_ctor)
     auto* col = dynamic_cast<FITScolumn<std::string>*>(readTable.getColumn(1).get());
     
     ASSERT_NE(col,nullptr);
-    ASSERT_EQ(col->values().size(),4u);
+    ASSERT_EQ(col->values<std::string>().size(),4u);
     
-    EXPECT_EQ(col->values()[0],"A");
-    EXPECT_EQ(col->values()[1],"BC");
-    EXPECT_EQ(col->values()[2],"DEF");
-    EXPECT_EQ(col->values()[3],"GHI");
+    EXPECT_EQ(col->values<std::string>()[0],"A");
+    EXPECT_EQ(col->values<std::string>()[1],"BC");
+    EXPECT_EQ(col->values<std::string>()[2],"DEF");
+    EXPECT_EQ(col->values<std::string>()[3],"GHI");
 
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0);
     EXPECT_EQ(status,0);
@@ -503,10 +506,10 @@ TEST(FITStable,v_tsbyte_ctor)
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
     auto* col = dynamic_cast<FITScolumn<std::vector<int8_t>>*>(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values().size(),3u);
-    EXPECT_EQ(col->values()[0],(std::vector<int8_t>{1,2,3}));
-    EXPECT_EQ(col->values()[1],(std::vector<int8_t>{4,5,6}));
-    EXPECT_EQ(col->values()[2],(std::vector<int8_t>{7,8,9}));
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->size(),3u);
+    EXPECT_EQ(col->values<std::vector<int8_t>>()[0],(std::vector<int8_t>{1,2,3}));
+    EXPECT_EQ(col->values<std::vector<int8_t>>()[1],(std::vector<int8_t>{4,5,6}));
+    EXPECT_EQ(col->values<std::vector<int8_t>>()[2],(std::vector<int8_t>{7,8,9}));
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
@@ -526,10 +529,10 @@ TEST(FITStable,v_tbyte_ctor)
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
     auto* col = dynamic_cast<FITScolumn<std::vector<uint8_t>>*>(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values().size(),3u);
-    EXPECT_EQ(col->values()[0],(std::vector<uint8_t>{0x41,0x42,0x43}));
-    EXPECT_EQ(col->values()[1],(std::vector<uint8_t>{0x44,0x45,0x46}));
-    EXPECT_EQ(col->values()[2],(std::vector<uint8_t>{0x47,0x48,0x49}));
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->size(),3u);
+    EXPECT_EQ(col->values<std::vector<uint8_t>>()[0],(std::vector<uint8_t>{0x41,0x42,0x43}));
+    EXPECT_EQ(col->values<std::vector<uint8_t>>()[1],(std::vector<uint8_t>{0x44,0x45,0x46}));
+    EXPECT_EQ(col->values<std::vector<uint8_t>>()[2],(std::vector<uint8_t>{0x47,0x48,0x49}));
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
@@ -550,7 +553,8 @@ TEST(FITStable,v_tint_ctor)
 
     std::shared_ptr<fitsfile> fptr(rawFptr,[](fitsfile*){});
 
-    int hdutype=0; status=0;
+    int hdutype=0;
+    status=0;
     ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     
     FITStable readTable(fptr,2);
@@ -558,11 +562,11 @@ TEST(FITStable,v_tint_ctor)
     auto* col = dynamic_cast<FITScolumn<std::vector<int32_t>>*>(readTable.getColumn(1).get());
     
     ASSERT_NE(col,nullptr);
-    ASSERT_EQ(col->values().size(),3u);
+    ASSERT_EQ(col->values<std::vector<int32_t>>().size(),3u);
     
-    EXPECT_EQ(col->values()[0],(std::vector<int32_t>{-3,0,3}));
-    EXPECT_EQ(col->values()[1],(std::vector<int32_t>{4,5,6}));
-    EXPECT_EQ(col->values()[2],(std::vector<int32_t>{7,8,9}));
+    EXPECT_EQ(col->values<std::vector<int32_t>>()[0],(std::vector<int32_t>{-3,0,3}));
+    EXPECT_EQ(col->values<std::vector<int32_t>>()[1],(std::vector<int32_t>{4,5,6}));
+    EXPECT_EQ(col->values<std::vector<int32_t>>()[2],(std::vector<int32_t>{7,8,9}));
     
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
@@ -576,8 +580,7 @@ TEST(FITStable,v_tuint_ctor)
     v_uint16.push_back(std::vector<uint32_t>{7,8,9});
     
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<std::vector<uint32_t>> >(v_uint16)));
-    EXPECT_EQ(table.nrows(), 3u);
-    EXPECT_EQ(table.ncols(), 1u);
+    EXPECT_EQ(table.nrows(), 3u); EXPECT_EQ(table.ncols(), 1u);
     
     EXPECT_NO_THROW(table.write(testurl, 0, true));
     
@@ -595,17 +598,14 @@ TEST(FITStable,v_tuint_ctor)
     
     FITStable readTable(fptr,2);
     
-    auto* col = dynamic_cast< FITScolumn< std::vector<uint32_t> >* >(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr);
-    ASSERT_EQ(col->values().size(),3u);
+    auto* col = dynamic_cast<FITScolumn<std::vector<uint32_t>>*>(readTable.getColumn(1).get());
     
-    EXPECT_EQ(col->values()[0],(std::vector<uint32_t>{1,2,3}));
-    EXPECT_EQ(col->values()[1],(std::vector<uint32_t>{4,5,6}));
-    EXPECT_EQ(col->values()[2],(std::vector<uint32_t>{7,8,9}));
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values<std::vector<uint32_t>>().size(),3u);
+    EXPECT_EQ(col->values<std::vector<uint32_t>>()[0],(std::vector<uint32_t>{1,2,3}));
+    EXPECT_EQ(col->values<std::vector<uint32_t>>()[1],(std::vector<uint32_t>{4,5,6}));
+    EXPECT_EQ(col->values<std::vector<uint32_t>>()[2],(std::vector<uint32_t>{7,8,9}));
     
-    status=0;
-    EXPECT_EQ(fits_close_file(fptr.get(),&status),0);
-    EXPECT_EQ(status,0);
+    status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
 TEST(FITStable,v_tlong_ctor)
@@ -624,10 +624,10 @@ TEST(FITStable,v_tlong_ctor)
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
     auto* col = dynamic_cast<FITScolumn<std::vector<int32_t>>*>(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values().size(),3u);
-    EXPECT_EQ(col->values()[0],(std::vector<int32_t>{-10,0,10}));
-    EXPECT_EQ(col->values()[1],(std::vector<int32_t>{11,12,13}));
-    EXPECT_EQ(col->values()[2],(std::vector<int32_t>{14,15,16}));
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values<std::vector<int32_t>>().size(),3u);
+    EXPECT_EQ(col->values<std::vector<int32_t>>()[0],(std::vector<int32_t>{-10,0,10}));
+    EXPECT_EQ(col->values<std::vector<int32_t>>()[1],(std::vector<int32_t>{11,12,13}));
+    EXPECT_EQ(col->values<std::vector<int32_t>>()[2],(std::vector<int32_t>{14,15,16}));
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
@@ -647,10 +647,10 @@ TEST(FITStable,v_tulong_ctor)
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
     auto* col = dynamic_cast<FITScolumn<std::vector<uint32_t>>*>(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values().size(),3u);
-    EXPECT_EQ(col->values()[0],(std::vector<uint32_t>{1,2,3}));
-    EXPECT_EQ(col->values()[1],(std::vector<uint32_t>{4,5,6}));
-    EXPECT_EQ(col->values()[2],(std::vector<uint32_t>{7,8,9}));
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values<std::vector<uint32_t>>().size(),3u);
+    EXPECT_EQ(col->values<std::vector<uint32_t>>()[0],(std::vector<uint32_t>{1,2,3}));
+    EXPECT_EQ(col->values<std::vector<uint32_t>>()[1],(std::vector<uint32_t>{4,5,6}));
+    EXPECT_EQ(col->values<std::vector<uint32_t>>()[2],(std::vector<uint32_t>{7,8,9}));
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
@@ -670,10 +670,10 @@ TEST(FITStable,v_tlonglong_ctor)
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
     auto* col = dynamic_cast<FITScolumn<std::vector<int64_t>>*>(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values().size(),3u);
-    EXPECT_EQ(col->values()[0],(std::vector<int64_t>{-9,0,9}));
-    EXPECT_EQ(col->values()[1],(std::vector<int64_t>{10,11,12}));
-    EXPECT_EQ(col->values()[2],(std::vector<int64_t>{13,14,15}));
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values<std::vector<int64_t>>().size(),3u);
+    EXPECT_EQ(col->values<std::vector<int64_t>>()[0],(std::vector<int64_t>{-9,0,9}));
+    EXPECT_EQ(col->values<std::vector<int64_t>>()[1],(std::vector<int64_t>{10,11,12}));
+    EXPECT_EQ(col->values<std::vector<int64_t>>()[2],(std::vector<int64_t>{13,14,15}));
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
@@ -693,10 +693,10 @@ TEST(FITStable,v_tulonglong_ctor)
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
     auto* col = dynamic_cast<FITScolumn<std::vector<uint64_t>>*>(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values().size(),3u);
-    EXPECT_EQ(col->values()[0],(std::vector<uint64_t>{9,10,11}));
-    EXPECT_EQ(col->values()[1],(std::vector<uint64_t>{12,13,14}));
-    EXPECT_EQ(col->values()[2],(std::vector<uint64_t>{15,16,17}));
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values<std::vector<uint64_t>>().size(),3u);
+    EXPECT_EQ(col->values<std::vector<uint64_t>>()[0],(std::vector<uint64_t>{9,10,11}));
+    EXPECT_EQ(col->values<std::vector<uint64_t>>()[1],(std::vector<uint64_t>{12,13,14}));
+    EXPECT_EQ(col->values<std::vector<uint64_t>>()[2],(std::vector<uint64_t>{15,16,17}));
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
@@ -716,10 +716,10 @@ TEST(FITStable,v_tfloat_ctor)
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
     auto* col = dynamic_cast<FITScolumn<std::vector<float>>*>(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values().size(),3u);
-    EXPECT_EQ(col->values()[0],(std::vector<float>{0.f,1.f,2.f}));
-    EXPECT_EQ(col->values()[1],(std::vector<float>{3.f,4.f,5.f}));
-    EXPECT_EQ(col->values()[2],(std::vector<float>{6.f,7.f,8.f}));
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values<std::vector<float>>().size(),3u);
+    EXPECT_EQ(col->values<std::vector<float>>()[0],(std::vector<float>{0.f,1.f,2.f}));
+    EXPECT_EQ(col->values<std::vector<float>>()[1],(std::vector<float>{3.f,4.f,5.f}));
+    EXPECT_EQ(col->values<std::vector<float>>()[2],(std::vector<float>{6.f,7.f,8.f}));
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
@@ -739,10 +739,10 @@ TEST(FITStable,v_tdouble_ctor)
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
     auto* col = dynamic_cast<FITScolumn<std::vector<double>>*>(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values().size(),3u);
-    EXPECT_EQ(col->values()[0],(std::vector<double>{-1.0,0.5,2.5}));
-    EXPECT_EQ(col->values()[1],(std::vector<double>{3.5,4.5,5.5}));
-    EXPECT_EQ(col->values()[2],(std::vector<double>{6.5,7.5,8.5}));
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values<std::vector<double>>().size(),3u);
+    EXPECT_EQ(col->values<std::vector<double>>()[0],(std::vector<double>{-1.0,0.5,2.5}));
+    EXPECT_EQ(col->values<std::vector<double>>()[1],(std::vector<double>{3.5,4.5,5.5}));
+    EXPECT_EQ(col->values<std::vector<double>>()[2],(std::vector<double>{6.5,7.5,8.5}));
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
@@ -764,10 +764,10 @@ TEST(FITStable,v_tcplx_ctor)
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
     auto* col = dynamic_cast<FITScolumn<std::vector<FITSform::complex>>*>(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values().size(),3u);
-    EXPECT_EQ(col->values()[0],(std::vector<FITSform::complex>{{1.f,2.f},{3.f,4.f},{5.f,6.f}}));
-    EXPECT_EQ(col->values()[1],(std::vector<FITSform::complex>{{7.f,8.f},{9.f,10.f},{11.f,12.f}}));
-    EXPECT_EQ(col->values()[2],(std::vector<FITSform::complex>{{13.f,14.f},{15.f,16.f},{17.f,18.f}}));
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values<std::vector<FITSform::complex>>().size(),3u);
+    EXPECT_EQ(col->values<std::vector<FITSform::complex>>()[0],(std::vector<FITSform::complex>{ {1.f,2.f},{3.f,4.f},{5.f,6.f} }));
+    EXPECT_EQ(col->values<std::vector<FITSform::complex>>()[1],(std::vector<FITSform::complex>{ {7.f,8.f},{9.f,10.f},{11.f,12.f} }));
+    EXPECT_EQ(col->values<std::vector<FITSform::complex>>()[2],(std::vector<FITSform::complex>{ {13.f,14.f},{15.f,16.f},{17.f,18.f} }));
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
@@ -797,13 +797,11 @@ TEST(FITStable,v_tdbcplx_ctor)
     
     FITStable readTable(fptr,2);
     
-    auto* col = dynamic_cast<FITScolumn<FITSform::dblcomplexVector>*>(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr);
-    ASSERT_EQ(col->values().size(),3u);
-    
-    EXPECT_EQ(col->values()[0],(std::vector<FITSform::dblcomplex>{{1.0,2.0},{3.0,4.0},{5.0,6.0}}));
-    EXPECT_EQ(col->values()[1],(std::vector<FITSform::dblcomplex>{{7.0,8.0},{9.0,10.0},{11.0,12.0}}));
-    EXPECT_EQ(col->values()[2],(std::vector<FITSform::dblcomplex>{{13.0,14.0},{15.0,16.0},{17.0,18.0}}));
+    auto* col = dynamic_cast<FITScolumn<std::vector<FITSform::dblcomplex>>*>(readTable.getColumn(1).get());
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values<std::vector<FITSform::dblcomplex>>().size(),3u);
+    EXPECT_EQ(col->values<std::vector<FITSform::dblcomplex>>()[0],(std::vector<FITSform::dblcomplex>{ {1.0,2.0},{3.0,4.0},{5.0,6.0} }));
+    EXPECT_EQ(col->values<std::vector<FITSform::dblcomplex>>()[1],(std::vector<FITSform::dblcomplex>{ {7.0,8.0},{9.0,10.0},{11.0,12.0} }));
+    EXPECT_EQ(col->values<std::vector<FITSform::dblcomplex>>()[2],(std::vector<FITSform::dblcomplex>{ {13.0,14.0},{15.0,16.0},{17.0,18.0} }));
     
     status=0;
     EXPECT_EQ(fits_close_file(fptr.get(),&status),0);
@@ -828,22 +826,21 @@ TEST(FITStable,v_tstring_ctor)
     int hdutype=0; status=0; ASSERT_EQ(fits_movabs_hdu(fptr.get(),2,&hdutype,&status),0);
     FITStable readTable(fptr,2);
     auto* col = dynamic_cast<FITScolumn<std::vector<std::string>>*>(readTable.getColumn(1).get());
-    ASSERT_NE(col,nullptr); ASSERT_EQ(col->values().size(),3u);
-    EXPECT_EQ(col->values()[0],(std::vector<std::string>{"A","BC","DEF"}));
-    EXPECT_EQ(col->values()[1],(std::vector<std::string>{"G","HI","JKL"}));
-    EXPECT_EQ(col->values()[2],(std::vector<std::string>{"M","NO","PQR"}));
+    ASSERT_NE(col,nullptr); ASSERT_EQ(col->size(),3u);
+    EXPECT_EQ(col->values<std::vector<std::string>>()[0],(std::vector<std::string>{"A","BC","DEF"}));
+    EXPECT_EQ(col->values<std::vector<std::string>>()[1],(std::vector<std::string>{"G","HI","JKL"}));
+    EXPECT_EQ(col->values<std::vector<std::string>>()[2],(std::vector<std::string>{"M","NO","PQR"}));
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0); EXPECT_EQ(status,0);
 }
 
 TEST(FITStable,v_tlogical_ctor)
 {
-    FITStable table;
-    expect_empty_table_header(table);
+    FITStable table; expect_empty_table_header(table);
 
     FITScolumn<FITSform::boolVector> v_log("V_LOG", tlogical, "", 1);
-    v_log.push_back(std::vector<bool>{true,false,true});
-    v_log.push_back(std::vector<bool>{false,true,false});
-    v_log.push_back(std::vector<bool>{true,true,false});
+    v_log.push_back(FITSform::boolVector{true,false,true});
+    v_log.push_back(FITSform::boolVector{false,true,false});
+    v_log.push_back(FITSform::boolVector{true,true,false});
     
     EXPECT_NO_THROW(table.InsertColumn(std::make_shared< FITScolumn<FITSform::boolVector> >(v_log)));
     EXPECT_EQ(table.nrows(), 3u);
@@ -866,18 +863,17 @@ TEST(FITStable,v_tlogical_ctor)
     
     auto* col = dynamic_cast<FITScolumn<FITSform::boolVector>*>(readTable.getColumn(1).get());
     ASSERT_NE(col,nullptr);
-    ASSERT_EQ(col->values().size(),3u);
+    ASSERT_EQ(col->size(),3u);
+    EXPECT_TRUE (col->values<FITSform::boolVector>()[0][0]);
+    EXPECT_FALSE(col->values<FITSform::boolVector>()[0][1]);
+    EXPECT_TRUE (col->values<FITSform::boolVector>()[0][2]);
+    EXPECT_FALSE(col->values<FITSform::boolVector>()[1][0]);
+    EXPECT_TRUE (col->values<FITSform::boolVector>()[1][1]);
+    EXPECT_FALSE(col->values<FITSform::boolVector>()[1][2]);
+    EXPECT_TRUE (col->values<FITSform::boolVector>()[2][0]);
+    EXPECT_TRUE (col->values<FITSform::boolVector>()[2][1]);
+    EXPECT_FALSE(col->values<FITSform::boolVector>()[2][2]);
     
-    EXPECT_TRUE (col->values()[0][0]);
-    EXPECT_FALSE(col->values()[0][1]);
-    EXPECT_TRUE (col->values()[0][2]);
-    EXPECT_FALSE(col->values()[1][0]);
-    EXPECT_TRUE (col->values()[1][1]);
-    EXPECT_FALSE(col->values()[1][2]);
-    EXPECT_TRUE (col->values()[2][0]);
-    EXPECT_TRUE (col->values()[2][1]);
-    EXPECT_FALSE(col->values()[2][2]);
-
     status=0; EXPECT_EQ(fits_close_file(fptr.get(),&status),0);
     EXPECT_EQ(status,0);
 }
@@ -925,16 +921,16 @@ TEST(FITStable,v_8tbit_ctor)
     auto* col = dynamic_cast< FITScolumn< FITSform::boolVector >* >(readTable.getColumn(1).get());
 
     ASSERT_NE(col,nullptr);
-    ASSERT_EQ(col->values().size(),3u);
+    ASSERT_EQ(col->size(),3u);
 
     // Each row: 8 bits packed in 1 byte
     uint8_t vtest0 = 0;
     uint8_t vtest1 = 0;
     uint8_t vtest2 = 0;
 
-    FITSform::fromBoolVector(col->values()[0], &vtest0);
-    FITSform::fromBoolVector(col->values()[1], &vtest1);
-    FITSform::fromBoolVector(col->values()[2], &vtest2);
+    FITSform::fromBoolVector(col->values<FITSform::boolVector>()[0], &vtest0);
+    FITSform::fromBoolVector(col->values<FITSform::boolVector>()[1], &vtest1);
+    FITSform::fromBoolVector(col->values<FITSform::boolVector>()[2], &vtest2);
 
     EXPECT_EQ(vtest0, row0);
     EXPECT_EQ(vtest1, row1);
@@ -977,16 +973,16 @@ TEST(FITStable,v_16tbit_ctor)
     auto* col = dynamic_cast< FITScolumn< FITSform::boolVector >* >(readTable.getColumn(1).get());
 
     ASSERT_NE(col,nullptr);
-    ASSERT_EQ(col->values().size(),3u);
+    ASSERT_EQ(col->size(),3u);
 
     // Each row: 8 bits packed in 1 byte
     uint16_t vtest0 = 0;
     uint16_t vtest1 = 0;
     uint16_t vtest2 = 0;
 
-    FITSform::fromBoolVector(col->values()[0], &vtest0);
-    FITSform::fromBoolVector(col->values()[1], &vtest1);
-    FITSform::fromBoolVector(col->values()[2], &vtest2);
+    FITSform::fromBoolVector(col->values<FITSform::boolVector>()[0], &vtest0);
+    FITSform::fromBoolVector(col->values<FITSform::boolVector>()[1], &vtest1);
+    FITSform::fromBoolVector(col->values<FITSform::boolVector>()[2], &vtest2);
 
     EXPECT_EQ(vtest0, row0);
     EXPECT_EQ(vtest1, row1);
@@ -1031,16 +1027,16 @@ TEST(FITStable,v_32tbit_ctor)
     auto* col = dynamic_cast< FITScolumn< FITSform::boolVector >* >(readTable.getColumn(1).get());
 
     ASSERT_NE(col,nullptr);
-    ASSERT_EQ(col->values().size(),3u);
+    ASSERT_EQ(col->size(),3u);
 
     // Each row: 8 bits packed in 1 byte
     uint32_t vtest0 = 0;
     uint32_t vtest1 = 0;
     uint32_t vtest2 = 0;
 
-    FITSform::fromBoolVector(col->values()[0], &vtest0);
-    FITSform::fromBoolVector(col->values()[1], &vtest1);
-    FITSform::fromBoolVector(col->values()[2], &vtest2);
+    FITSform::fromBoolVector(col->values<FITSform::boolVector>()[0], &vtest0);
+    FITSform::fromBoolVector(col->values<FITSform::boolVector>()[1], &vtest1);
+    FITSform::fromBoolVector(col->values<FITSform::boolVector>()[2], &vtest2);
 
     EXPECT_EQ(vtest0, row0);
     EXPECT_EQ(vtest1, row1);
@@ -1083,16 +1079,16 @@ TEST(FITStable,v_64tbit_ctor)
     auto* col = dynamic_cast< FITScolumn< FITSform::boolVector >* >(readTable.getColumn(1).get());
 
     ASSERT_NE(col,nullptr);
-    ASSERT_EQ(col->values().size(),3u);
+    ASSERT_EQ(col->size(),3u);
 
     // Each row: 8 bits packed in 1 byte
     uint64_t vtest0 = 0;
     uint64_t vtest1 = 0;
     uint64_t vtest2 = 0;
 
-    FITSform::fromBoolVector(col->values()[0], &vtest0);
-    FITSform::fromBoolVector(col->values()[1], &vtest1);
-    FITSform::fromBoolVector(col->values()[2], &vtest2);
+    FITSform::fromBoolVector(col->values<FITSform::boolVector>()[0], &vtest0);
+    FITSform::fromBoolVector(col->values<FITSform::boolVector>()[1], &vtest1);
+    FITSform::fromBoolVector(col->values<FITSform::boolVector>()[2], &vtest2);
 
     EXPECT_EQ(vtest0, row0);
     EXPECT_EQ(vtest1, row1);
@@ -1399,265 +1395,265 @@ TEST(FITStable, read_all_columns)
     {
         auto* c1 = dynamic_cast<FITScolumn<int8_t>*>(table.getColumn(1).get());
         ASSERT_NE(c1, nullptr);
-        EXPECT_EQ(c1->values().size(), 3u);
-        EXPECT_EQ(c1->values()[0], int8_t(1));
-        EXPECT_EQ(c1->values()[1], int8_t(2));
-        EXPECT_EQ(c1->values()[2], int8_t(3));
+        EXPECT_EQ(c1->values<int8_t>().size(), 3u);
+        EXPECT_EQ(c1->values<int8_t>()[0], int8_t(1));
+        EXPECT_EQ(c1->values<int8_t>()[1], int8_t(2));
+        EXPECT_EQ(c1->values<int8_t>()[2], int8_t(3));
     }
     {
         auto* c2 = dynamic_cast<FITScolumn<int16_t>*>(table.getColumn(2).get());
         ASSERT_NE(c2, nullptr);
-        EXPECT_EQ(c2->values().size(), 3u);
-        EXPECT_EQ(c2->values()[0], int16_t(4));
-        EXPECT_EQ(c2->values()[1], int16_t(5));
-        EXPECT_EQ(c2->values()[2], int16_t(6));
+        EXPECT_EQ(c2->values<int16_t>().size(), 3u);
+        EXPECT_EQ(c2->values<int16_t>()[0], int16_t(4));
+        EXPECT_EQ(c2->values<int16_t>()[1], int16_t(5));
+        EXPECT_EQ(c2->values<int16_t>()[2], int16_t(6));
     }
     {
         auto* c3 = dynamic_cast<FITScolumn<uint16_t>*>(table.getColumn(3).get());
         ASSERT_NE(c3, nullptr);
-        EXPECT_EQ(c3->values().size(), 3u);
-        EXPECT_EQ(c3->values()[0], uint16_t(7));
-        EXPECT_EQ(c3->values()[1], uint16_t(8));
-        EXPECT_EQ(c3->values()[2], uint16_t(9));
+        EXPECT_EQ(c3->values<uint16_t>().size(), 3u);
+        EXPECT_EQ(c3->values<uint16_t>()[0], uint16_t(7));
+        EXPECT_EQ(c3->values<uint16_t>()[1], uint16_t(8));
+        EXPECT_EQ(c3->values<uint16_t>()[2], uint16_t(9));
     }
     {
         auto* c4 = dynamic_cast<FITScolumn<int32_t>*>(table.getColumn(4).get());
         ASSERT_NE(c4, nullptr);
-        EXPECT_EQ(c4->values().size(), 3u);
-        EXPECT_EQ(c4->values()[0], int32_t(-3));
-        EXPECT_EQ(c4->values()[1], int32_t(0));
-        EXPECT_EQ(c4->values()[2], int32_t(3));
+        EXPECT_EQ(c4->values<int32_t>().size(), 3u);
+        EXPECT_EQ(c4->values<int32_t>()[0], int32_t(-3));
+        EXPECT_EQ(c4->values<int32_t>()[1], int32_t(0));
+        EXPECT_EQ(c4->values<int32_t>()[2], int32_t(3));
     }
     {
         auto* c5 = dynamic_cast<FITScolumn<uint32_t>*>(table.getColumn(5).get());
         ASSERT_NE(c5, nullptr);
-        EXPECT_EQ(c5->values().size(), 3u);
-        EXPECT_EQ(c5->values()[0], uint32_t(1));
-        EXPECT_EQ(c5->values()[1], uint32_t(2));
-        EXPECT_EQ(c5->values()[2], uint32_t(3));
+        EXPECT_EQ(c5->values<uint32_t>().size(), 3u);
+        EXPECT_EQ(c5->values<uint32_t>()[0], uint32_t(1));
+        EXPECT_EQ(c5->values<uint32_t>()[1], uint32_t(2));
+        EXPECT_EQ(c5->values<uint32_t>()[2], uint32_t(3));
     }
     {
         auto* c6 = dynamic_cast<FITScolumn<int32_t>*>(table.getColumn(6).get());
         ASSERT_NE(c6, nullptr);
-        EXPECT_EQ(c6->values().size(), 3u);
-        EXPECT_EQ(c6->values()[0], int32_t(-11));
-        EXPECT_EQ(c6->values()[1], int32_t(22));
-        EXPECT_EQ(c6->values()[2], int32_t(33));
+        EXPECT_EQ(c6->values<int32_t>().size(), 3u);
+        EXPECT_EQ(c6->values<int32_t>()[0], int32_t(-11));
+        EXPECT_EQ(c6->values<int32_t>()[1], int32_t(22));
+        EXPECT_EQ(c6->values<int32_t>()[2], int32_t(33));
     }
     {
         auto* c7 = dynamic_cast<FITScolumn<uint32_t>*>(table.getColumn(7).get());
         ASSERT_NE(c7, nullptr);
-        EXPECT_EQ(c7->values().size(), 3u);
-        EXPECT_EQ(c7->values()[0], uint32_t(1));
-        EXPECT_EQ(c7->values()[1], uint32_t(2));
-        EXPECT_EQ(c7->values()[2], uint32_t(3));
+        EXPECT_EQ(c7->values<uint32_t>().size(), 3u);
+        EXPECT_EQ(c7->values<uint32_t>()[0], uint32_t(1));
+        EXPECT_EQ(c7->values<uint32_t>()[1], uint32_t(2));
+        EXPECT_EQ(c7->values<uint32_t>()[2], uint32_t(3));
     }
     {
         auto* c8 = dynamic_cast<FITScolumn<int64_t>*>(table.getColumn(8).get());
         ASSERT_NE(c8, nullptr);
-        EXPECT_EQ(c8->values().size(), 3u);
-        EXPECT_EQ(c8->values()[0], int64_t(-9));
-        EXPECT_EQ(c8->values()[1], int64_t(0));
-        EXPECT_EQ(c8->values()[2], int64_t(9));
+        EXPECT_EQ(c8->values<int64_t>().size(), 3u);
+        EXPECT_EQ(c8->values<int64_t>()[0], int64_t(-9));
+        EXPECT_EQ(c8->values<int64_t>()[1], int64_t(0));
+        EXPECT_EQ(c8->values<int64_t>()[2], int64_t(9));
     }
     {
         auto* c9 = dynamic_cast<FITScolumn<uint64_t>*>(table.getColumn(9).get());
         ASSERT_NE(c9, nullptr);
-        EXPECT_EQ(c9->values().size(), 3u);
-        EXPECT_EQ(c9->values()[0], uint64_t(9));
-        EXPECT_EQ(c9->values()[1], uint64_t(10));
-        EXPECT_EQ(c9->values()[2], uint64_t(11));
+        EXPECT_EQ(c9->values<uint64_t>().size(), 3u);
+        EXPECT_EQ(c9->values<uint64_t>()[0], uint64_t(9));
+        EXPECT_EQ(c9->values<uint64_t>()[1], uint64_t(10));
+        EXPECT_EQ(c9->values<uint64_t>()[2], uint64_t(11));
     }
     {
         auto* c10 = dynamic_cast<FITScolumn<float>*>(table.getColumn(10).get());
         ASSERT_NE(c10, nullptr);
-        EXPECT_EQ(c10->values().size(), 3u);
-        EXPECT_FLOAT_EQ(c10->values()[0], 0.f);
-        EXPECT_FLOAT_EQ(c10->values()[1], 1.f);
-        EXPECT_FLOAT_EQ(c10->values()[2], 2.f);
+        EXPECT_EQ(c10->values<float>().size(), 3u);
+        EXPECT_FLOAT_EQ(c10->values<float>()[0], 0.f);
+        EXPECT_FLOAT_EQ(c10->values<float>()[1], 1.f);
+        EXPECT_FLOAT_EQ(c10->values<float>()[2], 2.f);
     }
     {
         auto* c11 = dynamic_cast<FITScolumn<double>*>(table.getColumn(11).get());
         ASSERT_NE(c11, nullptr);
-        EXPECT_EQ(c11->values().size(), 3u);
-        EXPECT_DOUBLE_EQ(c11->values()[0], -1.0);
-        EXPECT_DOUBLE_EQ(c11->values()[1], 0.5);
-        EXPECT_DOUBLE_EQ(c11->values()[2], 2.5);
+        EXPECT_EQ(c11->values<double>().size(), 3u);
+        EXPECT_DOUBLE_EQ(c11->values<double>()[0], -1.0);
+        EXPECT_DOUBLE_EQ(c11->values<double>()[1], 0.5);
+        EXPECT_DOUBLE_EQ(c11->values<double>()[2], 2.5);
     }
     {
         auto* c12 = dynamic_cast<FITScolumn<FITSform::complex>*>(table.getColumn(12).get());
         ASSERT_NE(c12, nullptr);
-        EXPECT_EQ(c12->values().size(), 3u);
-        EXPECT_FLOAT_EQ(c12->values()[0].first, 1.0f); EXPECT_FLOAT_EQ(c12->values()[0].second, 2.0f);
-        EXPECT_FLOAT_EQ(c12->values()[1].first, 3.0f); EXPECT_FLOAT_EQ(c12->values()[1].second, 4.0f);
-        EXPECT_FLOAT_EQ(c12->values()[2].first, 5.0f); EXPECT_FLOAT_EQ(c12->values()[2].second, 6.0f);
+        EXPECT_EQ(c12->values<FITSform::complex>().size(), 3u);
+        EXPECT_FLOAT_EQ(c12->values<FITSform::complex>()[0].first, 1.0f); EXPECT_FLOAT_EQ(c12->values<FITSform::complex>()[0].second, 2.0f);
+        EXPECT_FLOAT_EQ(c12->values<FITSform::complex>()[1].first, 3.0f); EXPECT_FLOAT_EQ(c12->values<FITSform::complex>()[1].second, 4.0f);
+        EXPECT_FLOAT_EQ(c12->values<FITSform::complex>()[2].first, 5.0f); EXPECT_FLOAT_EQ(c12->values<FITSform::complex>()[2].second, 6.0f);
     }
     {
         auto* c13 = dynamic_cast<FITScolumn<FITSform::dblcomplex>*>(table.getColumn(13).get());
         ASSERT_NE(c13, nullptr);
-        EXPECT_EQ(c13->values().size(), 3u);
-        EXPECT_DOUBLE_EQ(c13->values()[0].first, 1.0); EXPECT_DOUBLE_EQ(c13->values()[0].second, 2.0);
-        EXPECT_DOUBLE_EQ(c13->values()[1].first, 3.0); EXPECT_DOUBLE_EQ(c13->values()[1].second, 4.0);
-        EXPECT_DOUBLE_EQ(c13->values()[2].first, 5.0); EXPECT_DOUBLE_EQ(c13->values()[2].second, 6.0);
+        EXPECT_EQ(c13->size(), 3u);
+        EXPECT_DOUBLE_EQ(c13->values<FITSform::dblcomplex>()[0].first, 1.0); EXPECT_DOUBLE_EQ(c13->values<FITSform::dblcomplex>()[0].second, 2.0);
+        EXPECT_DOUBLE_EQ(c13->values<FITSform::dblcomplex>()[1].first, 3.0); EXPECT_DOUBLE_EQ(c13->values<FITSform::dblcomplex>()[1].second, 4.0);
+        EXPECT_DOUBLE_EQ(c13->values<FITSform::dblcomplex>()[2].first, 5.0); EXPECT_DOUBLE_EQ(c13->values<FITSform::dblcomplex>()[2].second, 6.0);
     }
     {
         auto* c14 = dynamic_cast<FITScolumn<bool>*>(table.getColumn(14).get());
         ASSERT_NE(c14, nullptr);
-        ASSERT_EQ(c14->values().size(), 3u);
-        EXPECT_TRUE (c14->values()[0]);
-        EXPECT_FALSE(c14->values()[1]);
-        EXPECT_TRUE (c14->values()[2]);
+        ASSERT_EQ(c14->size(), 3u);
+        EXPECT_TRUE (c14->values<bool>()[0]);
+        EXPECT_FALSE(c14->values<bool>()[1]);
+        EXPECT_TRUE (c14->values<bool>()[2]);
     }
     {
         auto* c15 = dynamic_cast<FITScolumn<bool>*>(table.getColumn(15).get());
         ASSERT_NE(c15, nullptr);
-        ASSERT_EQ(c15->values().size(), 3u);
+        ASSERT_EQ(c15->size(), 3u);
 
-        EXPECT_EQ(c15->values()[0], 0u);
-        EXPECT_EQ(c15->values()[1], 1u);
-        EXPECT_EQ(c15->values()[2], 0u);
+        EXPECT_EQ(c15->values<bool>()[0], false);
+        EXPECT_EQ(c15->values<bool>()[1], true);
+        EXPECT_EQ(c15->values<bool>()[2], false);
     }
     {
         auto* c16 = dynamic_cast<FITScolumn<uint8_t>*>(table.getColumn(16).get());
         ASSERT_NE(c16, nullptr);
-        EXPECT_EQ(c16->values().size(), 3u);
-        EXPECT_EQ(c16->values()[0], uint8_t(0x10));
-        EXPECT_EQ(c16->values()[1], uint8_t(0x11));
-        EXPECT_EQ(c16->values()[2], uint8_t(0x12));
+        EXPECT_EQ(c16->size(), 3u);
+        EXPECT_EQ(c16->values<uint8_t>()[0], uint8_t(0x10));
+        EXPECT_EQ(c16->values<uint8_t>()[1], uint8_t(0x11));
+        EXPECT_EQ(c16->values<uint8_t>()[2], uint8_t(0x12));
     }
     {
         auto* c17 = dynamic_cast<FITScolumn<std::string>*>(table.getColumn(17).get());
         ASSERT_NE(c17, nullptr);
-        EXPECT_EQ(c17->values().size(), 3u);
-        EXPECT_EQ(c17->values()[0], std::string("A"));
-        EXPECT_EQ(c17->values()[1], std::string("BC"));
-        EXPECT_EQ(c17->values()[2], std::string("DEF"));
+        EXPECT_EQ(c17->size(), 3u);
+        EXPECT_EQ(c17->values<std::string>()[0], std::string("A"));
+        EXPECT_EQ(c17->values<std::string>()[1], std::string("BC"));
+        EXPECT_EQ(c17->values<std::string>()[2], std::string("DEF"));
     }
 
     // Validate vector column values (per row)
     {
         auto* v18 = dynamic_cast<FITScolumn<std::vector<int8_t>>*>(table.getColumn(18).get());
         ASSERT_NE(v18, nullptr);
-        ASSERT_EQ(v18->values().size(), 3u);
-        EXPECT_EQ(v18->values()[0], (std::vector<int8_t>{1,2,3}));
-        EXPECT_EQ(v18->values()[1], (std::vector<int8_t>{4,5,6}));
-        EXPECT_EQ(v18->values()[2], (std::vector<int8_t>{7,8,9}));
+        ASSERT_EQ(v18->size(), 3u);
+        EXPECT_EQ(v18->values<std::vector<int8_t>>()[0], (std::vector<int8_t>{1,2,3}));
+        EXPECT_EQ(v18->values<std::vector<int8_t>>()[1], (std::vector<int8_t>{4,5,6}));
+        EXPECT_EQ(v18->values<std::vector<int8_t>>()[2], (std::vector<int8_t>{7,8,9}));
     }
     {
         auto* v19 = dynamic_cast<FITScolumn<std::vector<uint8_t>>*>(table.getColumn(19).get());
         ASSERT_NE(v19, nullptr);
-        ASSERT_EQ(v19->values().size(), 3u);
-        EXPECT_EQ(v19->values()[0], (std::vector<uint8_t>{0x41,0x42,0x43}));
-        EXPECT_EQ(v19->values()[1], (std::vector<uint8_t>{0x44,0x45,0x46}));
-        EXPECT_EQ(v19->values()[2], (std::vector<uint8_t>{0x47,0x48,0x49}));
+        ASSERT_EQ(v19->size(), 3u);
+        EXPECT_EQ(v19->values<std::vector<uint8_t>>()[0], (std::vector<uint8_t>{0x41,0x42,0x43}));
+        EXPECT_EQ(v19->values<std::vector<uint8_t>>()[1], (std::vector<uint8_t>{0x44,0x45,0x46}));
+        EXPECT_EQ(v19->values<std::vector<uint8_t>>()[2], (std::vector<uint8_t>{0x47,0x48,0x49}));
     }
     {
         auto* v20 = dynamic_cast<FITScolumn<std::vector<int32_t>>*>(table.getColumn(20).get());
         ASSERT_NE(v20, nullptr);
-        ASSERT_EQ(v20->values().size(), 3u);
-        EXPECT_EQ(v20->values()[0], (std::vector<int32_t>{-3,0,3}));
-        EXPECT_EQ(v20->values()[1], (std::vector<int32_t>{4,5,6}));
-        EXPECT_EQ(v20->values()[2], (std::vector<int32_t>{7,8,9}));
+        ASSERT_EQ(v20->size(), 3u);
+        EXPECT_EQ(v20->values<std::vector<int32_t>>()[0], (std::vector<int32_t>{-3,0,3}));
+        EXPECT_EQ(v20->values<std::vector<int32_t>>()[1], (std::vector<int32_t>{4,5,6}));
+        EXPECT_EQ(v20->values<std::vector<int32_t>>()[2], (std::vector<int32_t>{7,8,9}));
     }
     {
         auto* v21 = dynamic_cast<FITScolumn<std::vector<uint32_t>>*>(table.getColumn(21).get());
         ASSERT_NE(v21, nullptr);
-        ASSERT_EQ(v21->values().size(), 3u);
-        EXPECT_EQ(v21->values()[0], (std::vector<uint32_t>{1,2,3}));
-        EXPECT_EQ(v21->values()[1], (std::vector<uint32_t>{4,5,6}));
-        EXPECT_EQ(v21->values()[2], (std::vector<uint32_t>{7,8,9}));
+        ASSERT_EQ(v21->size(), 3u);
+        EXPECT_EQ(v21->values<std::vector<uint32_t>>()[0], (std::vector<uint32_t>{1,2,3}));
+        EXPECT_EQ(v21->values<std::vector<uint32_t>>()[1], (std::vector<uint32_t>{4,5,6}));
+        EXPECT_EQ(v21->values<std::vector<uint32_t>>()[2], (std::vector<uint32_t>{7,8,9}));
     }
     {
         auto* v22 = dynamic_cast<FITScolumn<std::vector<int32_t>>*>(table.getColumn(22).get());
         ASSERT_NE(v22, nullptr);
-        ASSERT_EQ(v22->values().size(), 3u);
-        EXPECT_EQ(v22->values()[0], (std::vector<int32_t>{-10,0,10}));
-        EXPECT_EQ(v22->values()[1], (std::vector<int32_t>{11,12,13}));
-        EXPECT_EQ(v22->values()[2], (std::vector<int32_t>{14,15,16}));
+        ASSERT_EQ(v22->size(), 3u);
+        EXPECT_EQ(v22->values<std::vector<int32_t>>()[0], (std::vector<int32_t>{-10,0,10}));
+        EXPECT_EQ(v22->values<std::vector<int32_t>>()[1], (std::vector<int32_t>{11,12,13}));
+        EXPECT_EQ(v22->values<std::vector<int32_t>>()[2], (std::vector<int32_t>{14,15,16}));
     }
     {
         auto* v23 = dynamic_cast<FITScolumn<std::vector<uint32_t>>*>(table.getColumn(23).get());
         ASSERT_NE(v23, nullptr);
-        ASSERT_EQ(v23->values().size(), 3u);
-        EXPECT_EQ(v23->values()[0], (std::vector<uint32_t>{1,2,3}));
-        EXPECT_EQ(v23->values()[1], (std::vector<uint32_t>{4,5,6}));
-        EXPECT_EQ(v23->values()[2], (std::vector<uint32_t>{7,8,9}));
+        ASSERT_EQ(v23->size(), 3u);
+        EXPECT_EQ(v23->values<std::vector<uint32_t>>()[0], (std::vector<uint32_t>{1,2,3}));
+        EXPECT_EQ(v23->values<std::vector<uint32_t>>()[1], (std::vector<uint32_t>{4,5,6}));
+        EXPECT_EQ(v23->values<std::vector<uint32_t>>()[2], (std::vector<uint32_t>{7,8,9}));
     }
     {
         auto* v24 = dynamic_cast<FITScolumn<std::vector<int64_t>>*>(table.getColumn(24).get());
         ASSERT_NE(v24, nullptr);
-        ASSERT_EQ(v24->values().size(), 3u);
-        EXPECT_EQ(v24->values()[0], (std::vector<int64_t>{-9,0,9}));
-        EXPECT_EQ(v24->values()[1], (std::vector<int64_t>{10,11,12}));
-        EXPECT_EQ(v24->values()[2], (std::vector<int64_t>{13,14,15}));
+        ASSERT_EQ(v24->size(), 3u);
+        EXPECT_EQ(v24->values<std::vector<int64_t>>()[0], (std::vector<int64_t>{-9,0,9}));
+        EXPECT_EQ(v24->values<std::vector<int64_t>>()[1], (std::vector<int64_t>{10,11,12}));
+        EXPECT_EQ(v24->values<std::vector<int64_t>>()[2], (std::vector<int64_t>{13,14,15}));
     }
     {
         auto* v25 = dynamic_cast<FITScolumn<std::vector<uint64_t>>*>(table.getColumn(25).get());
-        ASSERT_EQ(v25->values().size(), 3u);
-        EXPECT_EQ(v25->values()[0], (std::vector<uint64_t>{9,10,11}));
-        EXPECT_EQ(v25->values()[1], (std::vector<uint64_t>{12,13,14}));
-        EXPECT_EQ(v25->values()[2], (std::vector<uint64_t>{15,16,17}));
+        ASSERT_EQ(v25->size(), 3u);
+        EXPECT_EQ(v25->values<std::vector<uint64_t>>()[0], (std::vector<uint64_t>{9,10,11}));
+        EXPECT_EQ(v25->values<std::vector<uint64_t>>()[1], (std::vector<uint64_t>{12,13,14}));
+        EXPECT_EQ(v25->values<std::vector<uint64_t>>()[2], (std::vector<uint64_t>{15,16,17}));
     }
     {
         auto* v26 = dynamic_cast<FITScolumn<std::vector<float>>*>(table.getColumn(26).get());
         ASSERT_NE(v26, nullptr);
-        ASSERT_EQ(v26->values().size(), 3u);
-        EXPECT_EQ(v26->values()[0], (std::vector<float>{0.f,1.f,2.f}));
-        EXPECT_EQ(v26->values()[1], (std::vector<float>{3.f,4.f,5.f}));
-        EXPECT_EQ(v26->values()[2], (std::vector<float>{6.f,7.f,8.f}));
+        ASSERT_EQ(v26->size(), 3u);
+        EXPECT_EQ(v26->values<std::vector<float>>()[0], (std::vector<float>{0.f,1.f,2.f}));
+        EXPECT_EQ(v26->values<std::vector<float>>()[1], (std::vector<float>{3.f,4.f,5.f}));
+        EXPECT_EQ(v26->values<std::vector<float>>()[2], (std::vector<float>{6.f,7.f,8.f}));
     }
     {
         auto* v27 = dynamic_cast<FITScolumn<std::vector<double>>*>(table.getColumn(27).get());
         ASSERT_NE(v27, nullptr);
-        ASSERT_EQ(v27->values().size(), 3u);
-        EXPECT_EQ(v27->values()[0], (std::vector<double>{-1.0,0.5,2.5}));
-        EXPECT_EQ(v27->values()[1], (std::vector<double>{3.5,4.5,5.5}));
-        EXPECT_EQ(v27->values()[2], (std::vector<double>{6.5,7.5,8.5}));
+        ASSERT_EQ(v27->size(), 3u);
+        EXPECT_EQ(v27->values<std::vector<double> >()[0], (std::vector<double>{-1.0,0.5,2.5}));
+        EXPECT_EQ(v27->values<std::vector<double> >()[1], (std::vector<double>{3.5,4.5,5.5}));
+        EXPECT_EQ(v27->values<std::vector<double> >()[2], (std::vector<double>{6.5,7.5,8.5}));
     }
     {
         auto* v28 = dynamic_cast<FITScolumn<std::vector<FITSform::complex>>*>(table.getColumn(28).get());
         ASSERT_NE(v28, nullptr);
-        ASSERT_EQ(v28->values().size(), 3u);
-        EXPECT_EQ(v28->values()[0], (std::vector<FITSform::complex>{ {1.f,2.f},{3.f,4.f},{5.f,6.f} }));
-        EXPECT_EQ(v28->values()[1], (std::vector<FITSform::complex>{ {7.f,8.f},{9.f,10.f},{11.f,12.f} }));
-        EXPECT_EQ(v28->values()[2], (std::vector<FITSform::complex>{ {13.f,14.f},{15.f,16.f},{17.f,18.f} }));
+        ASSERT_EQ(v28->size(), 3u);
+        EXPECT_EQ(v28->values<std::vector<FITSform::complex>>()[0], (std::vector<FITSform::complex>{ {1.f,2.f},{3.f,4.f},{5.f,6.f} }));
+        EXPECT_EQ(v28->values<std::vector<FITSform::complex>>()[1], (std::vector<FITSform::complex>{ {7.f,8.f},{9.f,10.f},{11.f,12.f} }));
+        EXPECT_EQ(v28->values<std::vector<FITSform::complex>>()[2], (std::vector<FITSform::complex>{ {13.f,14.f},{15.f,16.f},{17.f,18.f} }));
     }
     {
         auto* v29 = dynamic_cast<FITScolumn<std::vector<FITSform::dblcomplex>>*>(table.getColumn(29).get());
         ASSERT_NE(v29, nullptr);
-        ASSERT_EQ(v29->values().size(), 3u);
-        EXPECT_EQ(v29->values()[0], (std::vector<FITSform::dblcomplex>{ {1.0,2.0},{3.0,4.0},{5.0,6.0} }));
-        EXPECT_EQ(v29->values()[1], (std::vector<FITSform::dblcomplex>{ {7.0,8.0},{9.0,10.0},{11.0,12.0} }));
-        EXPECT_EQ(v29->values()[2], (std::vector<FITSform::dblcomplex>{ {13.0,14.0},{15.0,16.0},{17.0,18.0} }));
+        ASSERT_EQ(v29->size(), 3u);
+        EXPECT_EQ(v29->values<std::vector<FITSform::dblcomplex>>()[0], (std::vector<FITSform::dblcomplex>{ {1.0,2.0},{3.0,4.0},{5.0,6.0} }));
+        EXPECT_EQ(v29->values<std::vector<FITSform::dblcomplex>>()[1], (std::vector<FITSform::dblcomplex>{ {7.0,8.0},{9.0,10.0},{11.0,12.0} }));
+        EXPECT_EQ(v29->values<std::vector<FITSform::dblcomplex>>()[2], (std::vector<FITSform::dblcomplex>{ {13.0,14.0},{15.0,16.0},{17.0,18.0} }));
     }
     {
         auto* v30 = dynamic_cast<FITScolumn<std::vector<std::string>>*>(table.getColumn(30).get());
         ASSERT_NE(v30, nullptr);
-        ASSERT_EQ(v30->values().size(), 3u);
-        EXPECT_EQ(v30->values()[0], (std::vector<std::string>{"A","BC","DEF"}));
-        EXPECT_EQ(v30->values()[1], (std::vector<std::string>{"G","HI","JKL"}));
-        EXPECT_EQ(v30->values()[2], (std::vector<std::string>{"M","NO","PQR"}));
+        ASSERT_EQ(v30->size(), 3u);
+        EXPECT_EQ(v30->values<std::vector<std::string>>()[0], (std::vector<std::string>{"A","BC","DEF"}));
+        EXPECT_EQ(v30->values<std::vector<std::string>>()[1], (std::vector<std::string>{"G","HI","JKL"}));
+        EXPECT_EQ(v30->values<std::vector<std::string>>()[2], (std::vector<std::string>{"M","NO","PQR"}));
     }
     {
         auto* v31 = dynamic_cast<FITScolumn< std::vector<bool> >*>(table.getColumn(31).get());
         ASSERT_NE(v31, nullptr);
-        ASSERT_EQ(v31->values().size(), 3u);
-        ASSERT_EQ(v31->values()[0].size(), 3u);
-        ASSERT_EQ(v31->values()[1].size(), 3u);
-        ASSERT_EQ(v31->values()[2].size(), 3u);
+        ASSERT_EQ(v31->size(), 3u);
+        ASSERT_EQ(v31->values<std::vector<bool>>()[0].size(), 3u);
+        ASSERT_EQ(v31->values<std::vector<bool>>()[1].size(), 3u);
+        ASSERT_EQ(v31->values<std::vector<bool>>()[2].size(), 3u);
 
-        EXPECT_TRUE (v31->values()[0][0]); EXPECT_FALSE(v31->values()[0][1]); EXPECT_TRUE (v31->values()[0][2]);
-        EXPECT_FALSE(v31->values()[1][0]); EXPECT_TRUE (v31->values()[1][1]); EXPECT_FALSE(v31->values()[1][2]);
-        EXPECT_TRUE (v31->values()[2][0]); EXPECT_TRUE (v31->values()[2][1]); EXPECT_FALSE(v31->values()[2][2]);
+        EXPECT_TRUE (v31->values<std::vector<bool>>()[0][0]); EXPECT_FALSE(v31->values<std::vector<bool>>()[0][1]); EXPECT_TRUE (v31->values<std::vector<bool>>()[0][2]);
+        EXPECT_FALSE(v31->values<std::vector<bool>>()[1][0]); EXPECT_TRUE (v31->values<std::vector<bool>>()[1][1]); EXPECT_FALSE(v31->values<std::vector<bool>>()[1][2]);
+        EXPECT_TRUE (v31->values<std::vector<bool>>()[2][0]); EXPECT_TRUE (v31->values<std::vector<bool>>()[2][1]); EXPECT_FALSE(v31->values<std::vector<bool>>()[2][2]);
     }
     {
         auto* v32 = dynamic_cast< FITScolumn< std::vector<bool> >*>(table.getColumn(32).get());
         ASSERT_NE(v32, nullptr);
-        ASSERT_EQ(v32->values().size(), 3u);
+        ASSERT_EQ(v32->size(), 3u);
 
-        EXPECT_TRUE (v32->values()[0][0]); EXPECT_FALSE(v32->values()[0][1]); EXPECT_TRUE (v32->values()[0][2]);
-        EXPECT_FALSE(v32->values()[1][0]); EXPECT_TRUE (v32->values()[1][1]); EXPECT_FALSE(v32->values()[1][2]);
-        EXPECT_TRUE (v32->values()[2][0]); EXPECT_TRUE (v32->values()[2][1]); EXPECT_FALSE(v32->values()[2][2]);
+        EXPECT_TRUE (v32->values<std::vector<bool> >()[0][0]); EXPECT_FALSE(v32->values<std::vector<bool> >()[0][1]); EXPECT_TRUE (v32->values<std::vector<bool> >()[0][2]);
+        EXPECT_FALSE(v32->values<std::vector<bool> >()[1][0]); EXPECT_TRUE (v32->values<std::vector<bool> >()[1][1]); EXPECT_FALSE(v32->values<std::vector<bool> >()[1][2]);
+        EXPECT_TRUE (v32->values<std::vector<bool> >()[2][0]); EXPECT_TRUE (v32->values<std::vector<bool> >()[2][1]); EXPECT_FALSE(v32->values<std::vector<bool> >()[2][2]);
     }
 
     status = 0;

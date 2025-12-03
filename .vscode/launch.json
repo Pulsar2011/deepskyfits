@@ -72,7 +72,7 @@
         "preLaunchTask": "make gtest"
     },
     {
-        "type": "cppdbg",
+        "type": "lldb-dap",
         "request": "launch",
         "name": "gTest_table (LLDB)",
         "program": "${workspaceRoot}/build/exe/gTest_table",

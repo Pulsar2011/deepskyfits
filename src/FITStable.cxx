@@ -28,21 +28,58 @@
 
 namespace DSL
 {
+    /** @brief Global mutex to serialize CFITSIO calls across threads. */
     std::recursive_timed_mutex g_cfitsio_mutex;
     
 #pragma region - FITSform class implementation
 
 #pragma region -- ctor/dtor
-    
+
+    /**
+     * @brief Construct a column description with default scale/zero and scalar payload.
+     * @param p 1-based column position in the FITS table.
+     * @param name Column name (TTYPEn).
+     * @param t FITS data type (dtype).
+     * @param unit Optional unit string (TUNITn).
+     */
     FITSform::FITSform(const size_t& p,const std::string& name, const dtype& t, const std::string unit):fname(name),ftype(t),funit(unit),fscale(1),fzero(0),frepeat(1),fwidth(1),fpos(p)
     {initWithType();}
     
+    /**
+     * @brief Construct a column description with explicit BSCALE/BZERO for scalar payload.
+     * @param p 1-based column position.
+     * @param name Column name.
+     * @param t FITS data type.
+     * @param s BSCALE-like scale factor to report.
+     * @param z BZERO-like zero point to report.
+     * @param unit Optional unit.
+     */
     FITSform::FITSform(const size_t& p, const std::string& name, const dtype& t, const double& s, const double& z, const std::string unit):fname(name),ftype(t),funit(unit),fscale(s),fzero(z),frepeat(1),fwidth(1),fpos(p)
     {initWithType();}
     
+    /**
+     * @brief Construct a repeated (vector) column description with default scale/zero.
+     * @param p 1-based column position.
+     * @param name Column name.
+     * @param t FITS data type.
+     * @param r Repetition count (TFORMn repeat).
+     * @param w Element width in bytes (for strings: char width).
+     * @param unit Optional unit.
+     */
     FITSform::FITSform(const size_t& p,const std::string& name, const dtype& t, const int64_t& r, const int64_t& w, const std::string unit):fname(name),ftype(t),funit(unit),fscale(1),fzero(0),frepeat(r),fwidth(w),fpos(p)
     {initWithType();}
     
+    /**
+     * @brief Construct a repeated (vector) column with explicit BSCALE/BZERO.
+     * @param p 1-based column position.
+     * @param name Column name.
+     * @param t FITS data type.
+     * @param r Repeat count (TFORMn).
+     * @param w Width in bytes (or char width for strings).
+     * @param s Scale factor.
+     * @param z Zero point.
+     * @param unit Optional unit.
+     */
     FITSform::FITSform(const size_t& p, const std::string& name, const dtype& t, const int64_t& r, const int64_t& w, const double& s, const double& z, const std::string unit):fname(name),ftype(t),funit(unit),fscale(s),fzero(z),frepeat(r),fwidth(w),fpos(p)
     {initWithType();}
     
@@ -53,6 +90,12 @@ namespace DSL
 #pragma endregion
 
 #pragma region -- static member function
+
+    /**
+     * @brief Get textual name for a FITS dtype.
+     * @param tt Data type enumeration.
+     * @return Upper-case string name (e.g. "SHORT", "DOUBLE", "STRING").
+     */
     const std::string FITSform::getDataType(const dtype & tt)
     {
         std::string ss = std::string();
@@ -130,6 +173,13 @@ namespace DSL
         return ss;
     }
     
+    /**
+     * @brief Build a TFORM-compatible code string for this column.
+     * @details
+     *  Also sets implicit BSCALE/BZERO for unsigned pseudo-types when needed
+     *  so that CFITSIO can represent them in signed storage.
+     * @return The TFORMn payload (e.g. "1J", "16A", "2E", "C", ...).
+     */
     const std::string FITSform::getTTYPE() const
     {
         std::string ss = std::string();
@@ -225,6 +275,11 @@ namespace DSL
         return ss;
     }
     
+    /**
+     * @brief Convert an input string (case-insensitive) into a dtype id.
+     * @param stype Data type name (e.g., "short", "uint", "double complex").
+     * @return Matching dtype or tnone if unrecognized.
+     */
     const dtype FITSform::getDataTypeID(const std::string & stype)
     {
         dtype tt = tnone;
@@ -274,6 +329,10 @@ namespace DSL
 #pragma endregion
 
 #pragma region -- modifier
+    /**
+     * @brief Pretty-print this column's descriptor to an output stream.
+     * @param out Output stream to print on.
+     */
     void FITSform::Dump( std::ostream& out) const
     {
         out<<"\033[32m   |- COL #\033[0m "<<fpos<<std::endl
@@ -299,7 +358,14 @@ namespace DSL
 #pragma region - FITStable class implementation
 
 #pragma region -- template specialization
-    
+
+    /**
+     * @brief Read complex<float> (TFORM 'C') column values from CFITSIO table.
+     * @param data Destination FITScolumn of pairs<float,float>.
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param row 1-based index of the first row to read.
+     * @throws FITSexception on CFITSIO error.
+     */
     template< >
     void FITStable::read(FITScolumn<FITSform::complex>* data,  const std::shared_ptr<fitsfile>& fptr,  const size_t& row)
     {
@@ -343,6 +409,13 @@ namespace DSL
         
     }
     
+    /**
+     * @brief Read complex<double> (TFORM 'M') column values from CFITSIO table.
+     * @param data Destination FITScolumn of pairs<double,double>.
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param row 1-based first row.
+     * @throws FITSexception on CFITSIO error.
+     */
     template< >
     void FITStable::read(FITScolumn<FITSform::dblcomplex>* data,  const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
@@ -380,6 +453,13 @@ namespace DSL
         nullarray = NULL;        
     }
     
+    /**
+     * @brief Read string (TFORM 'A') cells as std::string per row.
+     * @param data Destination FITScolumn<std::string>.
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param row 1-based first row.
+     * @throws FITSexception on CFITSIO error.
+     */
     template< >
     void FITStable::read( FITScolumn<std::string>* data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
@@ -439,6 +519,12 @@ namespace DSL
         }
     }
 
+    /**
+     * @brief Read repeated complex<float> vectors (TFORM 'C') into complexVector rows.
+     * @param data Destination FITScolumn<complexVector>.
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param row 1-based first row.
+     */
     template< >
     void FITStable::readVector(FITScolumn< FITSform::complexVector> * data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
@@ -478,6 +564,12 @@ namespace DSL
         return;
     }
 
+    /**
+     * @brief Read repeated complex<double> vectors (TFORM 'M') into dblcomplexVector rows.
+     * @param data Destination FITScolumn<dblcomplexVector>.
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param row 1-based first row.
+     */
     template< >
     void FITStable::readVector(FITScolumn< FITSform::dblcomplexVector> * data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
@@ -517,6 +609,13 @@ namespace DSL
         return;
     }
     
+    /**
+     * @brief Read repeated string vectors (TFORM 'A') into stringVector rows.
+     * @param data Destination FITScolumn<std::vector<std::string>>.
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param row 1-based first row.
+     * @throws FITSexception on CFITSIO error.
+     */
     template< >
     void FITStable::readVector(FITScolumn< std::vector<std::string> >* data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
@@ -585,9 +684,15 @@ namespace DSL
         }
     }
 
+    /**
+     * @brief Write unsigned 32-bit scalars, respecting storage type mapping.
+     * @param fptr CFITSIO handle.
+     * @param first_row 1-based first row.
+     */
     template< >
     void FITScolumn< uint32_t >::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<uint32_t>();
         if(fptr == nullptr)
         {
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<T>","write");
@@ -616,9 +721,15 @@ namespace DSL
         }
     }
     
+    /**
+     * @brief Write complex<float> scalar values to CFITSIO (TFORM 'C').
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param first_row 1-based first row to write.
+     */
     template< >
     void FITScolumn< FITSform::complex >::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<FITSform::complex>();
         if(fptr == nullptr)
         {
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<complex>","write");
@@ -647,9 +758,15 @@ namespace DSL
         }
     }
 
+    /**
+     * @brief Write complex<double> scalar values to CFITSIO (TFORM 'M').
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param first_row 1-based first row to write.
+     */
     template< >
     void FITScolumn<FITSform::dblcomplex>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<FITSform::dblcomplex>();
         if(fptr == nullptr)
         {
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<dblcomplex>","write");
@@ -678,9 +795,15 @@ namespace DSL
         }
     }
     
+    /**
+     * @brief Write string scalar values to CFITSIO (TFORM 'A').
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param first_row 1-based first row to write.
+     */
     template< >
     void FITScolumn<std::string>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<std::string>();
         if(fptr == nullptr)
         {
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<std::string>","write");
@@ -709,9 +832,15 @@ namespace DSL
         }
     }
     
+    /**
+     * @brief Write repeated int8 vectors to CFITSIO.
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param first_row 1-based first row to write.
+     */
     template<>
     void FITScolumn<FITSform::int8Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<FITSform::int8Vector>();
         if(!fptr)
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<int8Vector>","write");
         
@@ -739,9 +868,15 @@ namespace DSL
         delete [] buffer;
     }
 
+    /**
+     * @brief Write repeated uint8 vectors to CFITSIO.
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param first_row 1-based first row to write.
+     */
     template<>
     void FITScolumn<FITSform::uint8Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<FITSform::uint8Vector>();
         if(!fptr)
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<uint8Vector>","write");
 
@@ -769,50 +904,95 @@ namespace DSL
         delete [] buffer;
     }
 
+    /**
+     * @brief Write repeated int16 vectors to CFITSIO.
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param first_row 1-based first row to write.
+     */
     template<>
     void FITScolumn<FITSform::int16Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<int16Vector>","write");
-        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<int16Vector>","write");
+        const auto& data = this->values<FITSform::int16Vector>();
+        if(!fptr)
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<int16Vector>","write");
+
+        if(data.empty())
+            throw FITSexception(NOT_TABLE,"FITScolumn<int16Vector>","write");
+
         const int64_t nelem = getNelem();
         int16_t* buffer = new int16_t[nelem];
         int tbl_status = 0;
         size_t row=0;
+
         for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
         {
-            if(row < static_cast<size_t>(first_row-1)) continue;
-            for(int64_t i=0;i<nelem;++i) buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : int16_t(0);
+            if(row < static_cast<size_t>(first_row-1))
+                continue;
+            
+            for(int64_t i=0;i<nelem;++i)
+                buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : int16_t(0);
+
             if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
-            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<int16Vector>","write"); }
+            {
+                delete [] buffer;
+                throw FITSexception(tbl_status,"FITScolumn<int16Vector>","write");
+            }
         }
         delete [] buffer;
     }
 
+    /**
+     * @brief Write repeated uint16 vectors to CFITSIO.
+     * @param fptr Shared pointer to an opened fitsfile.
+     * @param first_row 1-based first row to write.
+     */
     template<>
     void FITScolumn<FITSform::uint16Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<uint16Vector>","write");
-        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<uint16Vector>","write");
-        const int64_t nelem = getNelem();
+        const auto& data = this->values<FITSform::uint16Vector>();
+        if(!fptr)
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<uint16Vector>","write");
+
+        if(data.empty())
+            throw FITSexception(NOT_TABLE,"FITScolumn<uint16Vector>","write");
+        
+            const int64_t nelem = getNelem();
         uint16_t* buffer = new uint16_t[nelem];
         int tbl_status = 0;
         size_t row=0;
         const int cfitsType = static_cast<int>(getType());// getCFITSIOStorageType(); // maps tuint/tulong -> tlong
+        
         for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
         {
-            if(row < static_cast<size_t>(first_row-1)) continue;
+            if(row < static_cast<size_t>(first_row-1))
+                continue;
+
             for(int64_t i=0;i<nelem;++i) buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : uint16_t(0);
             if(ffpcl(fptr.get(), cfitsType, static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
-            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<uint16Vector>","write"); }
+            {
+                delete [] buffer;
+                throw FITSexception(tbl_status,"FITScolumn<uint16Vector>","write");
+            }
         }
         delete [] buffer;
     }
 
+    /**
+     * @brief Write repeated int32 vectors to CFITSIO (handles tint and tlong).
+     * @param fptr CFITSIO handle.
+     * @param first_row 1-based first row.
+     */
     template<>
     void FITScolumn<FITSform::int32Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<int32Vector>","write");
-        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<int32Vector>","write");
+        const auto& data = this->values<FITSform::int32Vector>();
+
+        if(!fptr)
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<int32Vector>","write");
+        
+        if(data.empty())
+            throw FITSexception(NOT_TABLE,"FITScolumn<int32Vector>","write");
+        
         const int64_t nelem = getNelem();
 
         int tbl_status = 0;
@@ -860,11 +1040,21 @@ namespace DSL
         }
     }
 
+    /**
+     * @brief Write repeated uint32 vectors to CFITSIO (handles tuint and tulong mappings).
+     * @param fptr CFITSIO handle.
+     * @param first_row 1-based first row.
+     */
     template<>
     void FITScolumn<FITSform::uint32Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<uint32Vector>","write");
-        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<uint32Vector>","write");
+        const auto& data = this->values<FITSform::uint32Vector>();
+
+        if(!fptr)
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<uint32Vector>","write");
+        if(data.empty())
+            throw FITSexception(NOT_TABLE,"FITScolumn<uint32Vector>","write");
+
         const int64_t nelem = getNelem();
 
         int tbl_status = 0;
@@ -913,37 +1103,67 @@ namespace DSL
         }
     }
 
+    /**
+     * @brief Write repeated int64 vectors to CFITSIO.
+     * @param fptr CFITSIO handle.
+     * @param first_row 1-based first row.
+     */
     template<>
     void FITScolumn<FITSform::int64Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<int64Vector>","write");
-        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<int64Vector>","write");
+        const auto& data = this->values<FITSform::int64Vector>();
+        if(!fptr)
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<int64Vector>","write");
+
+        if(data.empty())
+            throw FITSexception(NOT_TABLE,"FITScolumn<int64Vector>","write");
+
         const int64_t nelem = getNelem();
         int64_t* buffer = new int64_t[nelem];
         int tbl_status = 0;
         size_t row=0;
+
         for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
         {
-            if(row < static_cast<size_t>(first_row-1)) continue;
-            for(int64_t i=0;i<nelem;++i) buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : int64_t(0);
+            if(row < static_cast<size_t>(first_row-1))
+                continue;
+
+            for(int64_t i=0;i<nelem;++i)
+                buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : int64_t(0);
+
             if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
-            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<int64Vector>","write"); }
+            {
+                delete [] buffer;
+                throw FITSexception(tbl_status,"FITScolumn<int64Vector>","write");
+            }
         }
         delete [] buffer;
     }
 
+    /**
+     * @brief Write repeated uint64 vectors to CFITSIO.
+     * @param fptr CFITSIO handle.
+     * @param first_row 1-based first row.
+     */
     template<>
     void FITScolumn<FITSform::uint64Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<uint64Vector>","write");
-        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<uint64Vector>","write");
+        const auto& data = this->values<FITSform::uint64Vector>();
+
+        if(!fptr)
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<uint64Vector>","write");
+
+        if(data.empty())
+            throw FITSexception(NOT_TABLE,"FITScolumn<uint64Vector>","write");
+
         const int64_t nelem = getNelem();
         uint64_t* buffer = new uint64_t[nelem];
         int tbl_status = 0;
         size_t row=0;
         for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
         {
-            if(row < static_cast<size_t>(first_row-1)) continue;
+            if(row < static_cast<size_t>(first_row-1))
+                continue;
             for(int64_t i=0;i<nelem;++i) buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : uint64_t(0);
             if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
             { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<uint64Vector>","write"); }
@@ -951,47 +1171,91 @@ namespace DSL
         delete [] buffer;
     }
 
+    /**
+     * @brief Write repeated float vectors to CFITSIO.
+     * @param fptr CFITSIO handle.
+     * @param first_row 1-based first row.
+     */
     template<>
     void FITScolumn<FITSform::floatVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<floatVector>","write");
-        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<floatVector>","write");
+        const auto& data = this->values<FITSform::floatVector>();
+        
+        if(!fptr)
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<floatVector>","write");
+
+        if(data.empty())
+            throw FITSexception(NOT_TABLE,"FITScolumn<floatVector>","write");
+
         const int64_t nelem = getNelem();
         float* buffer = new float[nelem];
         int tbl_status = 0;
         size_t row=0;
+
         for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
         {
-            if(row < static_cast<size_t>(first_row-1)) continue;
-            for(int64_t i=0;i<nelem;++i) buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : std::numeric_limits<float>::quiet_NaN();
+            if(row < static_cast<size_t>(first_row-1))
+                continue;
+
+            for(int64_t i=0;i<nelem;++i)
+                buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : std::numeric_limits<float>::quiet_NaN();
+
             if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
-            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<floatVector>","write"); }
+            {
+                delete [] buffer;
+                throw FITSexception(tbl_status,"FITScolumn<floatVector>","write");
+            }
         }
         delete [] buffer;
     }
 
+    /**
+     * @brief Write repeated double vectors to CFITSIO.
+     * @param fptr CFITSIO handle.
+     * @param first_row 1-based first row.
+     */
     template<>
     void FITScolumn<FITSform::doubleVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<doubleVector>","write");
-        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<doubleVector>","write");
+        const auto& data = this->values<FITSform::doubleVector>();
+
+        if(!fptr)
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<doubleVector>","write");
+        
+        if(data.empty())
+            throw FITSexception(NOT_TABLE,"FITScolumn<doubleVector>","write");
+    
         const int64_t nelem = getNelem();
         double* buffer = new double[nelem];
         int tbl_status = 0;
         size_t row=0;
+
         for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
         {
-            if(row < static_cast<size_t>(first_row-1)) continue;
-            for(int64_t i=0;i<nelem;++i) buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : std::numeric_limits<double>::quiet_NaN();
+            if(row < static_cast<size_t>(first_row-1))
+                continue;
+
+            for(int64_t i=0;i<nelem;++i)
+                buffer[i] = (i < static_cast<int64_t>(it->size())) ? (*it)[static_cast<size_t>(i)] : std::numeric_limits<double>::quiet_NaN();
+
             if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
-            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<doubleVector>","write"); }
+            {
+                delete [] buffer;
+                throw FITSexception(tbl_status,"FITScolumn<doubleVector>","write");
+            }
         }
         delete [] buffer;
     }
 
+    /**
+     * @brief Write repeated complex<float> vectors to CFITSIO (TFORM 'C').
+     * @param fptr CFITSIO handle.
+     * @param first_row 1-based first row.
+     */
     template<>
     void FITScolumn<FITSform::complexVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<FITSform::complexVector>();
         if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<complexVector>","write");
         if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<complexVector>","write");
         const int64_t nelem = getNelem();
@@ -1022,15 +1286,27 @@ namespace DSL
         delete [] buffer;
     }
 
+    /**
+     * @brief Write repeated complex<double> vectors to CFITSIO (TFORM 'M').
+     * @param fptr CFITSIO handle.
+     * @param first_row 1-based first row.
+     */
     template<>
     void FITScolumn<FITSform::dblcomplexVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<dblcomplexVector>","write");
-        if(data.empty()) throw FITSexception(NOT_TABLE,"FITScolumn<dblcomplexVector>","write");
+        const auto& data = this->values<FITSform::dblcomplexVector>();
+
+        if(!fptr)
+            throw FITSexception(FILE_NOT_OPENED,"FITScolumn<dblcomplexVector>","write");
+
+        if(data.empty())
+            throw FITSexception(NOT_TABLE,"FITScolumn<dblcomplexVector>","write");
+
         const int64_t nelem = getNelem();
         double* buffer = new double[nelem*2];
         int tbl_status = 0;
         size_t row=0;
+
         for(auto it=data.cbegin(); it!=data.cend(); ++it,++row)
         {
             if(row < static_cast<size_t>(first_row-1)) continue;
@@ -1050,14 +1326,24 @@ namespace DSL
                 pos+=2;
             }
             if(ffpcl(fptr.get(), static_cast<int>(getType()), static_cast<int>(getPosition()), row+1, 1, nelem, buffer, &tbl_status))
-            { delete [] buffer; throw FITSexception(tbl_status,"FITScolumn<dblcomplexVector>","write"); }
+            {
+                delete [] buffer;
+                throw FITSexception(tbl_status,"FITScolumn<dblcomplexVector>","write");
+            }
         }
         delete [] buffer;
     }
     
+    /**
+     * @brief Write repeated string vectors to CFITSIO (TFORM 'A').
+     * @param fptr CFITSIO handle.
+     * @param first_row 1-based first row.
+     */
     template<>
     void FITScolumn<FITSform::stringVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<FITSform::stringVector>();
+
         if(fptr == nullptr)
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<stringVector>","write");
         if(data.size() < 1)
@@ -1084,10 +1370,17 @@ namespace DSL
         }
     }
 
-    // Write a single logical per row ("T"/"F") into an L column
+    /**
+     * @brief Write scalar logicals (L/bit) to CFITSIO.
+     * @details Supports tlogical (uses ffpcl) and tbit (uses ffpclx).
+     * @param fptr CFITSIO handle.
+     * @param first_row 1-based first row.
+     */
     template<>
     void FITScolumn<bool>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<bool>();
+
         if(!fptr)
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<char*>","write");
         if(data.size() < 1)
@@ -1141,10 +1434,17 @@ namespace DSL
         }
     }
 
-    // Write repeated logicals per row (vector of "T"/"F") into an L column
+    /**
+     * @brief Write repeated logicals to CFITSIO (L or X).
+     * @details Supports tlogical (ffpcll) and tbit (ffpclx).
+     * @param fptr CFITSIO handle.
+     * @param first_row 1-based first row.
+     */
     template<>
     void FITScolumn< FITSform::boolVector >::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        const auto& data = this->values<FITSform::boolVector>();
+
         if(!fptr)
         {
             throw FITSexception(FILE_NOT_OPENED,"FITScolumn<std::vector<FITSform::boolVector>","write");
@@ -1207,6 +1507,13 @@ namespace DSL
 
     }
 
+    /**
+     * @brief Read scalar logical from CFITSIO into bool.
+     * @details Supports both tlogical (ffgcvl) and tbit (ffgcx).
+     * @param data Destination FITScolumn<bool>.
+     * @param fptr Shared ptr to opened fitsfile.
+     * @param row 1-based first row.
+     */
     template<>
     void FITStable::read(FITScolumn<bool>* data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
@@ -1288,6 +1595,12 @@ namespace DSL
 
     }
 
+    /**
+     * @brief Read repeated logicals (tlogical or tbit) into boolVector rows.
+     * @param data Destination FITScolumn<FITSform::boolVector>.
+     * @param fptr Shared ptr to opened fitsfile.
+     * @param row 1-based first row.
+     */
     template<>
     void FITStable::readVector(FITScolumn<FITSform::boolVector>* data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
@@ -1578,7 +1891,11 @@ namespace DSL
     }
 
     /** 
-     * 
+     * @brief Read column metadata and data, in scalar or repeated form.
+     * @param fptr Shared fitsfile.
+     * @param n 1-based column index.
+     * @param start 1-based first row.
+     * @return Owned FITSform pointer (unique_ptr).
      */
     std::unique_ptr<FITSform> FITStable::readColumn(const std::shared_ptr<fitsfile>& fptr, const size_t& n, const size_t& start)
     {
@@ -1872,12 +2189,10 @@ namespace DSL
 
 #pragma region -- Accessing data from column
     /**
-     @brief Access a specific column by its name.
-     @details Retrive a specific column from the FITS table by providing its name.
-
-     @param cname The name of the column to access
-     @return A pointer to the requested column
-     @throw out_of_range if the requested column name does not exist in the FITS table.
+     * @brief Access a specific column by its name.
+     * @param cname Column name.
+     * @return Const unique_ptr reference to descriptor.
+     * @throws std::out_of_range if not found.
      */
     const std::unique_ptr<FITSform>& FITStable::getColumn(const std::string& cname) const
     {
@@ -2350,7 +2665,9 @@ namespace DSL
 #pragma endregion
 
 #pragma region - FITScolumn template specialization
-    
+    /**
+     * @brief Explicit template instantiations for supported column types.
+     */
     template class FITScolumn< bool >;
     template class FITScolumn< uint32_t>;
     template class FITScolumn< FITSform::complex>;
