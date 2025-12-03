@@ -133,16 +133,52 @@ namespace DSL {
     template<typename T>
     struct FitsArray;
 
-
+    /*!
+     * \brief Polymorphic base for typed FITS array storage.
+     *
+     * Provides a uniform interface for accessing and modifying array elements
+     * as doubles, querying size, and retrieving the concrete storage type via
+     * std::type_index. Derived classes wrap std::valarray<T>.
+     *
+     * \note Only interface is declared here; inline helper applyIfType is implemented below.
+     */
     struct FitsArrayBase
     {
         virtual ~FitsArrayBase() = default;
+        /*!
+         * \brief Get number of elements in the array.
+         * \return Element count.
+         */
         virtual size_t size() const = 0;
+        /*!
+         * \brief Read an element as double.
+         * \param idx Zero-based index.
+         * \return Value converted to double.
+         */
         virtual double get(const size_t& idx) const = 0;
+        /*!
+         * \brief Write an element from double.
+         * \param idx Zero-based index.
+         * \param v Value to store (cast to underlying type).
+         */
         virtual void   set(const size_t& idx, double v) = 0;
+        /*!
+         * \brief Return the concrete storage type of the array.
+         * \return std::type_index of the underlying T.
+         */
         virtual std::type_index type() const = 0;
         
-        // attempt to execute fn with the typed valarray<T>&; returns true if successful
+        /*!
+         * \brief Apply a functor if the underlying type matches T.
+         *
+         * Attempts a downcast to FitsArray<T> and, if successful, invokes the
+         * provided callable with a reference to the internal std::valarray<T>.
+         *
+         * \tparam T Expected element type.
+         * \tparam Fn Callable taking std::valarray<T>&.
+         * \param fn Function to execute on the typed storage.
+         * \return true if the type matched and fn was invoked; false otherwise.
+         */
         template<typename T, typename Fn>
         bool applyIfType(Fn &&fn)
         {
@@ -153,22 +189,75 @@ namespace DSL {
         }
     };
 
+    /*!
+     * \brief Typed FITS array wrapper.
+     *
+     * Holds a std::valarray<T> and provides virtual overrides for size/get/set/type,
+     * along with direct accessors to the underlying valarray via ref().
+     *
+     * \tparam T Element type of the storage.
+     */
     template<typename T>
     struct FitsArray : FitsArrayBase
     {
         std::valarray<T> arr;
+        /*!
+         * \brief Default-construct an empty array.
+         */
         FitsArray() = default;
+        /*!
+         * \brief Construct with a fixed size.
+         * \param n Number of elements.
+         */
         FitsArray(size_t n) : arr(static_cast<std::size_t>(n)) {}
+        /*!
+         * \brief Construct from an existing valarray.
+         * \param v Source valarray to copy.
+         */
         FitsArray(const std::valarray<T>& v) : arr(v) {}
         
+        /*!
+         * \brief Number of elements.
+         * \return Size of valarray.
+         */
         size_t size() const override { return arr.size(); }
+        /*!
+         * \brief Read element at index as double.
+         * \param idx Zero-based index.
+         * \return Value converted to double.
+         */
         double get(const size_t& idx) const override { return static_cast<double>( arr[ idx ] ); }
+        /*!
+         * \brief Write element at index from double.
+         * \param idx Zero-based index.
+         * \param v Value to assign after casting to T.
+         */
         void   set(const size_t& idx, double v) override { arr[ idx ] = static_cast<T>( v ); }
+        /*!
+         * \brief Report the underlying storage type.
+         * \return std::type_index of T.
+         */
         std::type_index type() const override { return std::type_index(typeid(T)); }
+        /*!
+         * \brief Access the underlying valarray.
+         * \return Mutable reference to std::valarray<T>.
+         */
         std::valarray<T>& ref() { return arr; }
+        /*!
+         * \brief Access the underlying valarray.
+         * \return Const reference to std::valarray<T>.
+         */
         const std::valarray<T>& ref() const { return arr; }
     };
 
+    /*!
+     * \brief Trait to restrict supported storage types.
+     *
+     * Evaluates to true for numeric types allowed in FITS storage:
+     * various integers, size_t, float, and double.
+     *
+     * \tparam U Type to check.
+     */
     template<typename U>
     constexpr bool is_allowed_storage_type_v =
         std::is_same_v<U,uint8_t> || std::is_same_v<U,int8_t> ||
@@ -178,6 +267,21 @@ namespace DSL {
         std::is_same_v<U,size_t>  ||
         std::is_same_v<U,float>   || std::is_same_v<U,double> ;
 
+    /*!
+     * \brief Validate that a scalar value can be safely cast from S to T.
+     *
+     * Performs type- and range-checks to avoid undefined behavior or silent
+     * truncation when converting numeric types. Checks include:
+     * - Allowed storage types (is_allowed_storage_type_v)
+     * - Convertibility (std::is_convertible_v)
+     * - Finite checks for floating points
+     * - Range checks for integral targets
+     *
+     * \tparam S Source type.
+     * \tparam T Target type.
+     * \param v Value to validate.
+     * \return true if the cast is considered safe; false otherwise.
+     */
     template<typename S, typename T>
     inline bool safe_cast_check_scalar(const S &v) noexcept
     {
@@ -223,9 +327,23 @@ namespace DSL {
         return true;
     }
 
+    /*!
+     * \brief Helper variable template for static_assert in templates.
+     *
+     * Always false, used to trigger compile-time errors in dependent contexts.
+     */
     template<typename> inline constexpr bool always_false_v = false;
 
 #ifdef Darwinx86_64
+    /*!
+     * \brief Demangle a C++ type or symbol name (Darwin x86_64 variant).
+     *
+     * Uses abi::__cxa_demangle to obtain a human-readable C++ name.
+     * Falls back to the input name on failure.
+     *
+     * \param name Mangled symbol name (e.g., typeid(T).name()).
+     * \return Demangled name string if available; otherwise original.
+     */
     auto demangle = [](const char* name) -> std::string
     {
         int status = 0;
@@ -235,6 +353,15 @@ namespace DSL {
         return s;
     };
 #else
+    /*!
+     * \brief Demangle a C++ type or symbol name.
+     *
+     * Uses abi::__cxa_demangle to convert a mangled name to a readable one.
+     * Returns the input name if demangling fails.
+     *
+     * \param name Mangled symbol name (e.g., typeid(T).name()).
+     * \return Demangled name string if available; otherwise original.
+     */
     inline std::string demangle(const char* name)
     {
         int status = 0;

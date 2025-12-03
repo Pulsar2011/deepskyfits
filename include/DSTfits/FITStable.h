@@ -145,12 +145,34 @@ namespace DSL
         {
             std::vector<T> arr;
             columnData() = default;
+            /*!
+             * \brief Construct a storage with a given size.
+             * \param n Number of elements to allocate.
+             */
             columnData(size_t n) : arr(static_cast<std::size_t>(n)) {}
+            /*!
+             * \brief Construct a storage from an existing vector.
+             * \param v Values to initialize from.
+             */
             columnData(const std::vector<T>& v) : arr(v) {}
 
+            /*!
+             * \brief Number of stored elements.
+             * \return Vector size.
+             */
             size_t size() const override { return arr.size(); }
+            /*!
+             * \brief Report the payload type held by this storage.
+             * \return std::type_index of T.
+             */
             std::type_index type() const override { return std::type_index(typeid(T)); }
+            /*!
+             * \brief Mutable access to the underlying data vector.
+             */
             std::vector<T>&       ref()       { return arr; }
+            /*!
+             * \brief Const access to the underlying data vector.
+             */
             const std::vector<T>& ref() const { return arr; }
         };
     }
@@ -206,7 +228,11 @@ namespace DSL
             if(storage<T>()) return;
             fdata = std::make_unique< columnData<T> >();
         }
-
+        /*!
+         * \brief Allocate typed storage with a specific size.
+         * \tparam T Payload type.
+         * \param n Number of elements to pre-allocate.
+         */
         template<typename T>
         void allocateStorageWithSize(size_t n)
         {
@@ -276,6 +302,11 @@ namespace DSL
         typedef std::vector< std::pair<float,float> >   complexVector;
         typedef std::vector< std::pair<double,double> > dblcomplexVector;
 
+        /*!
+         * \brief Convert 8 bits into a boolean vector (MSB-first).
+         * \param v Output vector cleared and filled with 8 booleans.
+         * \param bits Source 8-bit mask.
+         */
         static void toBoolVector(boolVector* v, const uint8_t& bits)
         {
             v->clear();
@@ -287,6 +318,11 @@ namespace DSL
             }
         }
 
+        /*!
+         * \brief Convert 16 bits into a boolean vector (MSB-first).
+         * \param v Output vector cleared and filled with 16 booleans.
+         * \param bits Source 16-bit mask.
+         */
         static void toBoolVector(boolVector* v, const uint16_t& bits)
         {
             v->clear();
@@ -298,6 +334,11 @@ namespace DSL
             }
         }
 
+        /*!
+         * \brief Convert 32 bits into a boolean vector (MSB-first).
+         * \param v Output vector cleared and filled with 32 booleans.
+         * \param bits Source 32-bit mask.
+         */
         static void toBoolVector(boolVector* v, const uint32_t& bits)
         {
             v->clear();
@@ -309,6 +350,11 @@ namespace DSL
             }
         }
 
+        /*!
+         * \brief Convert 64 bits into a boolean vector (MSB-first).
+         * \param v Output vector cleared and filled with 64 booleans.
+         * \param bits Source 64-bit mask.
+         */
         static void toBoolVector(boolVector* v, const uint64_t& bits)
         {
             v->clear();
@@ -320,6 +366,11 @@ namespace DSL
             }
         }
 
+        /*!
+         * \brief Pack up to 8 booleans into a byte (MSB-first).
+         * \param v Source booleans; only first 8 are used.
+         * \param bits Output bitfield.
+         */
         static void fromBoolVector(const boolVector& v, uint8_t* bits)
         {
             (*bits) = 0;
@@ -331,6 +382,11 @@ namespace DSL
             }
         }
 
+        /*!
+         * \brief Pack up to 16 booleans into a 16-bit value (MSB-first).
+         * \param v Source booleans; only first 16 are used.
+         * \param bits Output bitfield.
+         */
         static void fromBoolVector(const boolVector& v, uint16_t* bits)
         {
             (*bits) = 0;
@@ -342,6 +398,11 @@ namespace DSL
             }
         }
 
+        /*!
+         * \brief Pack up to 32 booleans into a 32-bit value (MSB-first).
+         * \param v Source booleans; only first 32 are used.
+         * \param bits Output bitfield.
+         */
         static void fromBoolVector(const boolVector& v, uint32_t* bits)
         {
             (*bits) = 0;
@@ -353,6 +414,11 @@ namespace DSL
             }
         }
 
+        /*!
+         * \brief Pack up to 64 booleans into a 64-bit value (MSB-first).
+         * \param v Source booleans; only first 64 are used.
+         * \param bits Output bitfield.
+         */
         static void fromBoolVector(const boolVector& v, uint64_t* bits)
         {
             (*bits) = 0;
@@ -429,6 +495,12 @@ namespace DSL
             return s->ref();
         }
 
+        /*!
+         * \brief Mutable access to column values of type T.
+         * \tparam T Expected payload type.
+         * \return Reference to the mutable vector of values.
+         * \throws std::bad_cast if internal storage is not T.
+         */
         template<typename T>
         std::vector<T>& values()
         {
@@ -1567,6 +1639,10 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
 
     // --- Added specialized Dump implementations for byte/short columns ---
 
+    /*!
+     * \brief Specialized Dump for int8_t columns.
+     * \details Prints values as decimal for tshort, otherwise as hex bytes.
+     */
     template<>
     inline void DSL::FITScolumn<int8_t>::Dump(std::ostream& fout) const
     {
@@ -1595,6 +1671,10 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         }
     }
 
+    /*!
+     * \brief Specialized Dump for uint8_t columns.
+     * \details Prints values as decimal for tushort, otherwise as hex bytes.
+     */
     template<>
     inline void DSL::FITScolumn<uint8_t>::Dump(std::ostream& fout) const
     {
@@ -1623,6 +1703,10 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         }
     }
 
+    /*!
+     * \brief Specialized Dump for vector<uint8_t> columns.
+     * \details Prints row size and preview, then each element in readable form.
+     */
     template<>
     inline void DSL::FITScolumn< std::vector<uint8_t> >::Dump(std::ostream& fout) const
     {
@@ -1676,6 +1760,10 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         }
     }
 
+    /*!
+     * \brief Specialized Dump for vector<int8_t> columns.
+     * \details Prints row size and per-element hex values.
+     */
     template<>
     inline void DSL::FITScolumn< std::vector<int8_t> >::Dump(std::ostream& fout) const
     {
@@ -1709,20 +1797,31 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         }
     }
     
+    // Generic dump helpers
+    /*!
+     * \brief Dump a scalar value.
+     * \tparam U Scalar type printable to ostream.
+     */
     template< typename T>
     template< typename U >
     void FITScolumn<T>::dump( std::ostream& fout, const U& val) const
     {
         fout<<val<<std::flush;
     }
-    
+    /*!
+     * \brief Dump a pair of scalar values.
+     * \tparam P Scalar type.
+     */
     template< typename T>
     template< typename P >
     void FITScolumn<T>::dump( std::ostream& fout, const std::pair<P,P>& val) const
     {
         fout<<val.first<<" , "<<val.second<<std::flush;
     }
-    
+    /*!
+     * \brief Dump a vector of scalar values.
+     * \tparam Q Scalar type.
+     */
     template< typename T>
     template< typename Q >
     void FITScolumn<T>::dump( std::ostream& fout, const std::vector<Q>& val) const
@@ -1741,7 +1840,10 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
             ++idx;
         }
     }
-    
+    /*!
+     * \brief Dump a vector of pairs.
+     * \tparam L Scalar type of pair elements.
+     */
     template< typename T>
     template< typename L >
     void FITScolumn<T>::dump( std::ostream& fout, const std::vector< std::pair<L,L> >& val) const
@@ -1779,17 +1881,33 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         std::vector<size_t> indices_;
         public:
             RowSet() = default;
+            /*!
+             * \brief Construct from a list of indices.
+             * \details Input is sorted and deduplicated.
+             */
             explicit RowSet(std::vector<size_t> rows)
                 : indices_(std::move(rows))
             {
                 std::sort(indices_.begin(), indices_.end());
                 indices_.erase(std::unique(indices_.begin(), indices_.end()), indices_.end());
             }
-
+            /*!
+             * \brief Number of indices in the set.
+             */
             size_t size()  const { return indices_.size(); }
+            /*!
+             * \brief Whether the set is empty.
+             */
             bool   empty() const { return indices_.empty(); }
+            /*!
+             * \brief Access the internal indices.
+             * \return Const reference to indices vector.
+             */
             const std::vector<size_t>& indices() const { return indices_; }
-
+            /*!
+             * \brief Intersection with another set.
+             * \return Resulting RowSet containing common indices.
+             */
             RowSet intersected(const RowSet& other) const
             {
                 std::vector<size_t> out;
@@ -1800,6 +1918,10 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
                 return RowSet(std::move(out));
             }
 
+            /*!
+             * \brief Union with another set.
+             * \return Resulting RowSet containing all unique indices.
+             */
             RowSet united(const RowSet& other) const
             {
                 std::vector<size_t> out;
@@ -1810,6 +1932,10 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
                 return RowSet(std::move(out));
             }
 
+            /*!
+             * \brief Set difference (this \ other).
+             * \return Indices present in this but not in other.
+             */
             RowSet subtracted(const RowSet& other) const
             {
                 std::vector<size_t> out;
@@ -1820,19 +1946,27 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
                 return RowSet(std::move(out));
             }
 
+            /*!
+             * \brief Iterate over indices and invoke a callable.
+             * \tparam Func Callable signature void(size_t).
+             * \param fn Function to apply to each index.
+             */
             template<typename Func>
             void forEach(Func&& fn) const
             {
                 for(size_t idx : indices_) fn(idx);
             }
     };
-
-    // Logical combinators for RowSet to enable expressions with && and ||
+    /*!
+     * \brief Logical AND of two row sets (intersection).
+     */
     inline RowSet operator&&(const RowSet& lhs, const RowSet& rhs)
     {
         return lhs.intersected(rhs);
     }
-    
+    /*!
+     * \brief Logical OR of two row sets (union).
+     */
     inline RowSet operator||(const RowSet& lhs, const RowSet& rhs)
     {
         return lhs.united(rhs);
@@ -1854,16 +1988,45 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         }
 
     public:
+        /*!
+         * \brief Construct a filter expression bound to a table and column.
+         * \param tbl Owning table.
+         * \param column Column name.
+         */
         ColumnFilterExpr(FITStable& tbl, std::string column)
             : tbl_(tbl), column_(std::move(column)) {}
 
+        /*!
+         * \brief Equality filter.
+         * \param value Scalar to compare.
+         * \return RowSet of matching rows.
+         */
         RowSet operator==(const T& value) { return buildWith([&](auto& b){ b.eq(value); }); }
+        /*!
+         * \brief Inequality filter.
+         */
         RowSet operator!=(const T& value) { return buildWith([&](auto& b){ b.ne(value); }); }
+        /*!
+         * \brief Less-than filter.
+         */
         RowSet operator< (const T& value) { return buildWith([&](auto& b){ b.lt(value); }); }
+        /*!
+         * \brief Less-or-equal filter.
+         */
         RowSet operator<=(const T& value) { return buildWith([&](auto& b){ b.le(value); }); }
+        /*!
+         * \brief Greater-than filter.
+         */
         RowSet operator> (const T& value) { return buildWith([&](auto& b){ b.gt(value); }); }
+        /*!
+         * \brief Greater-or-equal filter.
+         */
         RowSet operator>=(const T& value) { return buildWith([&](auto& b){ b.ge(value); }); }
-
+        /*!
+         * \brief Range filter [low, high].
+         * \param low Lower bound (inclusive).
+         * \param high Upper bound (inclusive).
+         */
         RowSet between(const T& low, const T& high)
         {
             return buildWith([&](auto& b){ b.between(low, high); });
@@ -1900,6 +2063,11 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
             }
 
         public:
+            /*!
+             * \brief Initialize a builder for a scalar column.
+             * \param column Column descriptor; must be scalar (nelem==1).
+             * \throws std::logic_error if column repeats or is a vector type.
+             */
             explicit RowSetBuilder(FITSform& column)
                 : column_(&column)
             {
@@ -1910,18 +2078,41 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
                 std::iota(indices_.begin(), indices_.end(), 0);
             }
 
+            /*!
+             * \brief Keep rows equal to value.
+             */
             RowSetBuilder& eq(const T& value) { return filter([&](const T& v, size_t){ return v == value; }); }
+            /*!
+             * \brief Keep rows not equal to value.
+             */
             RowSetBuilder& ne(const T& value) { return filter([&](const T& v, size_t){ return v != value; }); }
+            /*!
+             * \brief Keep rows less than value.
+             */
             RowSetBuilder& lt(const T& value) { return filter([&](const T& v, size_t){ return v <  value; }); }
+            /*!
+             * \brief Keep rows less or equal to value.
+             */
             RowSetBuilder& le(const T& value) { return filter([&](const T& v, size_t){ return v <= value; }); }
+            /*!
+             * \brief Keep rows greater than value.
+             */
             RowSetBuilder& gt(const T& value) { return filter([&](const T& v, size_t){ return v >  value; }); }
+            /*!
+             * \brief Keep rows greater or equal to value.
+             */
             RowSetBuilder& ge(const T& value) { return filter([&](const T& v, size_t){ return v >= value; }); }
-
+            /*!
+             * \brief Keep rows within [low, high].
+             */
             RowSetBuilder& between(const T& low, const T& high)
             {
                 return filter([&](const T& v, size_t){ return v >= low && v <= high; });
             }
-
+            /*!
+             * \brief Apply a custom predicate to filter rows.
+             * \tparam Predicate bool(const T&) or bool(const T&, size_t) callable.
+             */
             template<typename Predicate>
             RowSetBuilder& custom(Predicate&& pred)
             {
@@ -1944,7 +2135,13 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
                 }
             }
 
+            /*!
+             * \brief Build the final RowSet.
+             */
             RowSet build() const { return RowSet(indices_); }
+            /*!
+             * \brief Implicit conversion to RowSet.
+             */
             operator RowSet() const { return build(); }
     };
 
@@ -2041,6 +2238,12 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         }
 
     public:
+        /*!
+         * \brief Construct a typed view on a scalar column.
+         * \param owner Owning FITStable.
+         * \param column Column descriptor.
+         * \throws std::logic_error if column repeats or is a vector type.
+         */
         explicit ColumnView(FITStable& owner, FITSform& column)
             : owner_(&owner),
               column_(&column),
@@ -2049,6 +2252,11 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
             ensureScalar();
         }
 
+        /*!
+         * \brief Restrict the view to a set of rows.
+         * \param rows RowSet of indices.
+         * \return Reference to this view.
+         */
         ColumnView& on(const RowSet& rows)
         {
             selection_ = rows.indices();
@@ -2056,6 +2264,10 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
             return *this;
         }
 
+        /*!
+         * \brief Clear any active row selection.
+         * \return Reference to this view.
+         */
         ColumnView& clearSelection()
         {
             selection_.clear();
@@ -2063,49 +2275,85 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
             return *this;
         }
 
+        /*!
+         * \brief Add a value to selected cells.
+         */
         ColumnView& add(const T& value)
         {
             return mutate([&](T& cell, size_t){ cell += value; });
         }
 
+        /*!
+         * \brief Subtract a value from selected cells.
+         */
         ColumnView& sub(const T& value)
         {
             return mutate([&](T& cell, size_t){ cell -= value; });
         }
 
+        /*!
+         * \brief Multiply selected cells by a value.
+         */
         ColumnView& mul(const T& value)
         {
             return mutate([&](T& cell, size_t){ cell *= value; });
         }
 
+        /*!
+         * \brief Divide selected cells by a value.
+         */
         ColumnView& div(const T& value)
         {
             return mutate([&](T& cell, size_t){ cell /= value; });
         }
 
+        /*!
+         * \brief Assign a constant to selected cells.
+         */
         ColumnView& set(const T& value)
         {
             return mutate([&](T& cell, size_t){ cell = value; });
         }
 
+        /*!
+         * \brief Apply a custom mutator to each selected cell.
+         * \tparam Func Callable with signature void(T&, size_t).
+         */
         template<typename Func>
         ColumnView& apply(Func&& fn)
         {
             return mutate(std::forward<Func>(fn));
         }
 
+        /*!
+         * \brief Sort rows ascending by the column and reorder all columns.
+         * \return Reference to this view (selection cleared).
+         */
         ColumnView& sortAscending()
         {
             return sortWithComparator(std::less<T>());
         }
 
+        /*!
+         * \brief Sort rows descending by the column and reorder all columns.
+         * \return Reference to this view (selection cleared).
+         */
         ColumnView& sortDescending()
         {
             return sortWithComparator(std::greater<T>());
         }
 
+        /*!
+         * \brief Access the underlying data vector.
+         * \return Const reference to values.
+         */
         const std::vector<T>& data() const { return *values_; }
 
+        /*!
+         * \brief Create a ColumnSelection from an rvalue view and a RowSet.
+         * \param rows Selection of rows.
+         * \return ColumnSelection bound to the rows.
+         */
         ColumnSelection<T> operator[](const RowSet& rows) &&
         {
             ColumnView<T> tmp(std::move(*this));
@@ -2113,6 +2361,11 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
             return ColumnSelection<T>(std::move(tmp), rows);
         }
 
+        /*!
+         * \brief Create a ColumnSelection from a const lvalue view and a RowSet.
+         * \param rows Selection of rows.
+         * \return ColumnSelection bound to the rows.
+         */
         ColumnSelection<T> operator[](const RowSet& rows) const &
         {
             ColumnView<T> tmp(*this);
@@ -2134,6 +2387,11 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
             ColumnHandle(FITStable& tbl, std::string name)
                 : tbl_(tbl), target_(std::move(name)) {}
 
+            /*!
+             * \brief Create a typed view over the entire column.
+             * \tparam TargetT Scalar type expected for the column.
+             * \return ColumnView<TargetT> with no selection.
+             */
             template<typename TargetT>
             ColumnView<TargetT> all()
             {
@@ -2141,6 +2399,12 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
                 return ColumnView<TargetT>(tbl_, form);
             }
 
+            /*!
+             * \brief Create a typed view restricted to a RowSet.
+             * \tparam TargetT Scalar type of the column.
+             * \param rows Row selection.
+             * \return ColumnView<TargetT> with the selection applied.
+             */
             template<typename TargetT>
             ColumnView<TargetT> on(const RowSet& rows)
             {
@@ -2240,6 +2504,14 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         return RowSetBuilder<T>(form);
     }
 
+    /*!
+     * \brief Get a typed ColumnView for a named column.
+     * \tparam T Expected scalar type.
+     * \param columnName Column name.
+     * \return ColumnView bound to this table and column.
+     * \throws std::out_of_range if column not found.
+     * \throws std::bad_cast if type mismatches.
+     */
     template<typename T>
     ColumnView<T> FITStable::column(const std::string& columnName)
     {
@@ -2247,11 +2519,21 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         return ColumnView<T>(*this, form);
     }
 
+    /*!
+     * \brief Get a ColumnHandle to fluently build views and filters.
+     * \param columnName Target column name.
+     * \return ColumnHandle bound to this table.
+     */
     inline ColumnHandle FITStable::operator[](const std::string& columnName)
     {
         return ColumnHandle(*this, columnName);
     }
 
+    /*!
+     * \brief Reorder rows in all columns according to a global permutation.
+     * \param order New-to-old index mapping; must be a permutation of [0..n-1].
+     * \throws std::logic_error on mismatch, duplicates, or out-of-range.
+     */
     inline void FITStable::reorderRows(const std::vector<size_t>& order)
     {
         if(fcolumns.empty())
@@ -2280,6 +2562,12 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         nrows_cache = expected;
     }
 
+    /*!
+     * \brief Begin a filter expression for a named column.
+     * \tparam T Scalar type of the filter column.
+     * \param columnName Column name; must exist.
+     * \return ColumnFilterExpr<T> bound to the column.
+     */
     template<typename T>
     ColumnFilterExpr<T> FITStable::operator()(const std::string& columnName)
     {
