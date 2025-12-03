@@ -1510,12 +1510,18 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
     template< typename T >
     FITScolumn<T>::FITScolumn(const FITScolumn<T>& col):FITSform(col)
     {
-         const auto* s = col.storage<T>();
-         if(s)
-         {
-             allocateStorageWithSize<T>( s->ref().size() );
-             this->values<T>() = s->ref();
-         }
+        // Avoid calling protected storage<T>() on another instance.
+        // Use the public const accessor which is legal and equivalent.
+        const auto& v = col.values<T>();
+        if (!v.empty())
+        {
+            allocateStorageWithSize<T>(v.size());
+            this->values<T>() = v;
+        }
+        else
+        {
+            allocateStorageIfNeeded<T>();
+        }
     }
     
     template< typename T >
