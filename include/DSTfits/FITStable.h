@@ -206,6 +206,8 @@ namespace DSL
 
         std::unique_ptr<columnDataBase> fdata;
 
+    protected:
+
         template<typename T>
         columnData<T>* storage()
         {
@@ -219,8 +221,6 @@ namespace DSL
             return (fdata && fdata->type() == std::type_index(typeid(T)))
                    ? static_cast<const columnData<T>*>(fdata.get()) : nullptr;
         }
-
-    protected:
         
         template<typename T>
         void allocateStorageIfNeeded()
