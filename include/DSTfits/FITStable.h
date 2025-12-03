@@ -860,6 +860,16 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         RowSetBuilder<T> select(const std::string& columnName);
 
         /**
+         * @brief Begin a row set selection on a given column.
+         * @tparam T Payload type of the column.
+         * @param columnName Column name.
+         * @return RowSetBuilder<T> to build a row set selection.
+         * @throws std::out_of_range if column not found.
+         */
+        template<typename T>
+        RowSetBuilder<T> select(const std::string& columnName) const;
+
+        /**
          * @brief Access a column's data as a ColumnView<T>.
          * @tparam T Payload type of the column.
          * @param columnName Column name.
@@ -871,12 +881,31 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         ColumnView<T> column(const std::string& columnName);
 
         /**
+         * @brief Access a column's data as a ColumnView<T>.
+         * @tparam T Payload type of the column.
+         * @param columnName Column name.
+         * @return ColumnView<T> for typed access.
+         * @throws std::out_of_range if column not found.
+         * @throws std::bad_cast if column type mismatches T.
+         */
+        template<typename T>
+        ColumnView<T> column(const std::string& columnName) const;
+
+        /**
          * @brief Access a column's data through a ColumnHandle.
          * @param columnName Column name.
          * @return ColumnHandle for type-erased access.
          * @throws std::out_of_range if column not found.
          */
         ColumnHandle operator[](const std::string& columnName);
+
+        /**
+         * @brief Access a column's data through a ColumnHandle.
+         * @param columnName Column name.
+         * @return ColumnHandle for type-erased access.
+         * @throws std::out_of_range if column not found.
+         */
+        ColumnHandle operator[](const std::string& columnName) const;
 
         /**
          * @brief Begin a filter expression on a given column.
@@ -890,6 +919,20 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         {
             (void)getColumn(columnName);      // ensure it exists
             return ColumnFilterExpr<T>(*this, columnName);
+        }
+
+        /**
+         * @brief Begin a filter expression on a given column.
+         * @tparam T Payload type of the column.
+         * @param columnName Column name.
+         * @return ColumnFilterExpr<T> to build a filter expression.
+         * @throws std::out_of_range if column not found.
+         */
+        template<typename T>
+        ColumnFilterExpr<T> filter(const std::string& columnName) const
+        {
+            (void)getColumn(columnName);      // ensure it exists
+            return ColumnFilterExpr<T>(const_cast<FITStable&>(*this), columnName);
         }
 
         /**
@@ -2180,6 +2223,7 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         FITStable* owner_;
         FITSform* column_;
         std::vector<T>* values_;
+        mutable std::vector<T> cache_;
         std::vector<size_t> selection_;
         bool hasSelection_ = false;
 
@@ -2353,7 +2397,14 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
          * \brief Access the underlying data vector.
          * \return Const reference to values.
          */
-        const std::vector<T>& data() const { return *values_; }
+        const std::vector<T>& data() const
+        {
+            if(!hasSelection_) return *values_;
+            cache_.clear();
+            cache_.reserve(selection_.size());
+            for(size_t idx : selection_) cache_.push_back((*values_)[idx]);
+            return cache_;
+        }
 
         /*!
          * \brief Create a ColumnSelection from an rvalue view and a RowSet.
@@ -2510,6 +2561,17 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         return RowSetBuilder<T>(form);
     }
 
+    /**
+     * @brief Build a RowSet for the named column, filtering by scalar comparisons.
+     * @tparam T Scalar type of the target column.
+     */
+    template<typename T>
+    RowSetBuilder<T> FITStable::select(const std::string& columnName) const
+    {
+        auto& form = *getColumn(columnName);
+        return RowSetBuilder<T>(const_cast<FITSform&>(form));
+    }
+
     /*!
      * \brief Get a typed ColumnView for a named column.
      * \tparam T Expected scalar type.
@@ -2526,6 +2588,21 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
     }
 
     /*!
+     * \brief Get a typed ColumnView for a named column.
+     * \tparam T Expected scalar type.
+     * \param columnName Column name.
+     * \return ColumnView bound to this table and column.
+     * \throws std::out_of_range if column not found.
+     * \throws std::bad_cast if type mismatches.
+     */
+    template<typename T>
+    ColumnView<T> FITStable::column(const std::string& columnName) const
+    {
+        auto& form = *getColumn(columnName);
+        return ColumnView<T>(const_cast<FITStable&>(*this), const_cast<FITSform&>(form));
+    }
+
+    /*!
      * \brief Get a ColumnHandle to fluently build views and filters.
      * \param columnName Target column name.
      * \return ColumnHandle bound to this table.
@@ -2533,6 +2610,16 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
     inline ColumnHandle FITStable::operator[](const std::string& columnName)
     {
         return ColumnHandle(*this, columnName);
+    }
+
+    /*!
+     * \brief Get a ColumnHandle to fluently build views and filters.
+     * \param columnName Target column name.
+     * \return ColumnHandle bound to this table.
+     */
+    inline ColumnHandle FITStable::operator[](const std::string& columnName) const
+    {
+        return ColumnHandle(const_cast<FITStable&>(*this), columnName);
     }
 
     /*!
