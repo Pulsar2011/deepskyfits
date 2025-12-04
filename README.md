@@ -13,9 +13,11 @@ A C++ library for reading, writing, and manipulating FITS images and tables, bui
 Clone with submodules (required: googletest, cfitsio, Minuit2, doxygen-awesome-css):
 
 - Recommended:
-  git clone --recurse-submodules https://gitlab.in2p3.fr/deepskyproject/deepskyfits.git
+
+  `git clone --recurse-submodules https://gitlab.in2p3.fr/deepskyproject/deepskyfits.git`
 - If already cloned:
-  git submodule update --init --recursive
+
+  `git submodule update --init --recursive`
 
 --------------------------------------------------------------------------------
 
@@ -28,25 +30,30 @@ Clone with submodules (required: googletest, cfitsio, Minuit2, doxygen-awesome-c
 - Internet access (to download wcslib tarball during build)
 
 ### Notes about dependencies:
-- CFITSIO builds from the submodule via ExternalProject_Add
-- WCSLIB is downloaded and built via ExternalProject_Add (static)
-- Minuit2 and googletest come from submodules
-- Doxygen is optional (target: doc)
+- *CFITSIO* builds from the submodule via ExternalProject_Add
+- *WCSLIB* is downloaded and built via ExternalProject_Add (static)
+- *Minuit2* and *googletest* come from submodules
+- *Doxygen* is optional (target: doc)
 
 ### Basic build:
-- mkdir -p build
-- cmake -S . -B build
+```
+mkdir -p build
+cmake -S . -B build
   -DWITH_DEBUG=ON                        # optional: debug flags, ASan
   -DCMAKE_INSTALL_PREFIX=/desired/prefix # optional, default printed by CMake
-- cmake --build build -j
+cmake --build build -j
+```
+
 
 ### Install (optional):
-- cmake --build build --target install
+```
+cmake --build build --target install
+```
 
 What CMake does:
 - Picks the highest supported C++ standard (23→20→17)
-- Builds internal static CFITSIO and WCSLIB (no system CFITSIO needed)
-- Produces the shared library libDSTfits and test executables
+- **Builds** internal static *CFITSIO* and *WCSLIB* (no system CFITSIO needed)
+- Produces the shared library **libDSTfits** and test executables
 - Generates helper scripts to copy CFITSIO/Minuit2 headers for install
 
 --------------------------------------------------------------------------------
@@ -57,11 +64,11 @@ Tests are based on GoogleTest and come with automated test data download.
 
 - Build tests (already done with the regular build)
 - Run tests:
-  - From build dir: ctest          # or: ctest -V for verbose
-  - With Makefiles: make test
+  - From build dir: `ctest` or: `ctest -V for verbose`
+  - With Makefiles: `make test`
 - Notes:
   - A custom target download_testdata fetches sample FITS files; test executables depend on it
-  - The wcslib "tofits" utility is built and used by a test dependency
+  - The wcslib *tofits* utility is built and used by a test dependency
 
 --------------------------------------------------------------------------------
 
@@ -95,6 +102,84 @@ At the core of image handling are FITScube and its typed implementation FITSimg<
 #### Storage model and rationale
 Using flattened std::valarray for both pixels and masks gives predictable performance and expressive slicing. It's easy to address N‑D data through 1‑D indices, and operations like Window, Layer, and Rebin rely on std::gslice to copy contiguous blocks efficiently. Although std::valarray is less commonly used than std::vector, its element‑wise semantics and slicing make it well‑suited to numerical image processing.
 
+#### Logic behind selection/filtering
+Working with tables usually starts by choosing a column, building a set of matching rows, and then operating on those rows. A RowSet is simply a list of row indices that satisfy your predicates (for example, "MAG < 20 and FLAG == 0"). You create it with select<T>("COL") and chain comparisons; combining sets with && and || lets you intersect or union selections naturally. ColumnView<T> then gives you typed access to a column's in‑memory data, and can be restricted to a RowSet to read or update only the selected rows. If you need to stay type‑erased until the last moment, ColumnHandle provides a fluent entry point to obtain typed views and apply selections. Finally, when you sort or reorder rows, reorderRows applies one global permutation to all columns, keeping the table consistent.
+- ColumnView<T> gives typed, read/write access to a column's in-memory data (std::vector<T>) with optional RowSet restriction. It throws if the column's dtype doesn't match T.
+- RowSet represents a set of row indices. You build it with select<T>("COL") and chain predicates; sets support && (intersection) and || (union).
+- ColumnHandle provides a fluent entry point to create typed views, apply RowSet selections, and perform updates without exposing the underlying storage.
+- reorderRows enforces a single global permutation across all columns. It validates:
+  - size(order) == nrows,
+  - indices are within [0..nrows-1],
+  - no duplicates,
+  - all columns share the same row count.
+
+#### Examples: creating, manipulating, and exporting FITS images
+- Construct and inspect an image:
+```c++
+   FITSmanager fm("path/to/file.fits");
+   auto cube = fm.GetPrimary(); // shared_ptr<FITScube>
+   auto imgD = std::dynamic_pointer_cast<FITSimg<double>>(cube); // typed image
+   size_t nelem = imgD->Nelements();
+   int bitpix = imgD->GetBitPerPixel();
+```
+
+- Access typed data and pixels:
+```c++
+   const std::valarray<double>* data = imgD->GetData<double>();
+   double p00 = imgD->DoubleValueAtPixel({0,0}); // by coordinates
+   double pIdx = imgD->DoubleValueAtPixel(42);   // by linear index
+```
+
+- Arithmetic on the whole image:
+```c++
+ (*imgD) += 10.0;       // shift all unmasked pixels
+ (*imgD) *= 2.0;        // scale
+ (*imgD) /= 3.0;        // divide (checks for zero)
+ std::valarray<double> v(nelem); v = 1.0;
+ (*imgD) += v;          // element-wise add
+ (*imgD) *= v;          // element-wise multiply
+```
+
+- Masking and statistics:
+```c++
+   imgD->MaskPixels({0,1,2});     // mask first three pixels
+   bool isMasked = imgD->Masked(1);
+   double mean = imgD->GetMean(); // computed on unmasked pixels
+   double p95  = imgD->Get95thpercentil();
+```
+
+- Resize and crop:
+```c++
+   // Crop a 2D image from (xMin=10,yMin=20) with width=100,height=80
+   imgD->Resize(10, 20, 100, 80);
+   // Or get a new cropped image without modifying the original:
+   auto win = imgD->Window(10, 20, 100, 80);
+```
+
+- Layer extraction (3D cubes):
+```c++
+  // Extract layer k into a new 2D image
+  auto layer2D = imgD->Layer(3); // returns shared_ptr<FITScube>
+  ```
+
+- Rebinning:
+```c++
+   // Downsample X by 2 and Y by 2; do mean aggregation
+   auto rebinned = imgD->Rebin({2,2}, /*doMean*/true);
+```
+
+- WCS usage:
+```c++
+   auto wc = imgD->WorldCoordinates({50,25}); // world coords at pixel (50,25)
+   auto px = imgD->World2Pixel(wc);           // inverse transform
+```
+
+- Write table back:
+```c++
+   fm.UpdateTable(tbl); // update existing HDU, or
+   tbl->write("!updated.fits", /*start*/1, /*replace*/true);
+```
+
 ### FITStable (tables)
 Tables follow a similar philosophy: load once, work in memory with typed columns, then write back. A FITStable discovers columns and their metadata (names, types, units), provides typed views for safe access, and lets you build RowSet selections by chaining simple predicates. Sorting and reordering apply globally, ensuring all columns stay aligned. This design aims to make common catalog tasks—filtering, adding derived columns, exporting—straightforward while preserving FITS conventions like BSCALE/BZERO for pseudo‑unsigned types.
 - Abstraction for ASCII/BINARY table HDUs with typed columns
@@ -113,70 +198,9 @@ Tables follow a similar philosophy: load once, work in memory with typed columns
   - boolVector encoding/decoding helpers for bit-packed columns
   - reorderRows applies a consistent permutation across all columns
 
-#### Logic behind selection/filtering
-Working with tables usually starts by choosing a column, building a set of matching rows, and then operating on those rows. A RowSet is simply a list of row indices that satisfy your predicates (for example, "MAG < 20 and FLAG == 0"). You create it with select<T>("COL") and chain comparisons; combining sets with && and || lets you intersect or union selections naturally. ColumnView<T> then gives you typed access to a column's in‑memory data, and can be restricted to a RowSet to read or update only the selected rows. If you need to stay type‑erased until the last moment, ColumnHandle provides a fluent entry point to obtain typed views and apply selections. Finally, when you sort or reorder rows, reorderRows applies one global permutation to all columns, keeping the table consistent.
-- ColumnView<T> gives typed, read/write access to a column's in-memory data (std::vector<T>) with optional RowSet restriction. It throws if the column's dtype doesn't match T.
-- RowSet represents a set of row indices. You build it with select<T>("COL") and chain predicates; sets support && (intersection) and || (union).
-- ColumnHandle provides a fluent entry point to create typed views, apply RowSet selections, and perform updates without exposing the underlying storage.
-- reorderRows enforces a single global permutation across all columns. It validates:
-  - size(order) == nrows,
-  - indices are within [0..nrows-1],
-  - no duplicates,
-  - all columns share the same row count.
-
-#### Examples: creating, manipulating, and exporting FITS images
-- Construct and inspect an image:
-  // FITSmanager fm("path/to/file.fits");
-  // auto cube = fm.GetPrimary(); // shared_ptr<FITScube>
-  // auto imgD = std::dynamic_pointer_cast<FITSimg<double>>(cube); // typed image
-  // size_t nelem = imgD->Nelements();
-  // int bitpix = imgD->GetBitPerPixel();
-
-- Access typed data and pixels:
-  // const std::valarray<double>* data = imgD->GetData<double>();
-  // double p00 = imgD->DoubleValueAtPixel({0,0}); // by coordinates
-  // double pIdx = imgD->DoubleValueAtPixel(42);   // by linear index
-
-- Arithmetic on the whole image:
-  // (*imgD) += 10.0;       // shift all unmasked pixels
-  // (*imgD) *= 2.0;        // scale
-  // (*imgD) /= 3.0;        // divide (checks for zero)
-  // std::valarray<double> v(nelem); v = 1.0;
-  // (*imgD) += v;          // element-wise add
-  // (*imgD) *= v;          // element-wise multiply
-
-- Masking and statistics:
-  // imgD->MaskPixels({0,1,2});     // mask first three pixels
-  // bool isMasked = imgD->Masked(1);
-  // double mean = imgD->GetMean(); // computed on unmasked pixels
-  // double p95  = imgD->Get95thpercentil();
-
-- Resize and crop:
-  // // Crop a 2D image from (xMin=10,yMin=20) with width=100,height=80
-  // imgD->Resize(10, 20, 100, 80);
-  // // Or get a new cropped image without modifying the original:
-  // auto win = imgD->Window(10, 20, 100, 80);
-
-- Layer extraction (3D cubes):
-  // // Extract layer k into a new 2D image
-  // auto layer2D = imgD->Layer(3); // returns shared_ptr<FITScube>
-
-- Rebinning:
-  // // Downsample X by 2 and Y by 2; do mean aggregation
-  // auto rebinned = imgD->Rebin({2,2}, /*doMean*/true);
-
-- WCS usage:
-  // auto wc = imgD->WorldCoordinates({50,25}); // world coords at pixel (50,25)
-  // auto px = imgD->World2Pixel(wc);           // inverse transform
-
-- Write table back:
-  // fm.UpdateTable(tbl); // update existing HDU, or
-  // tbl->write("!updated.fits", /*start*/1, /*replace*/true);
-
-
 Notes
-- Pseudo-unsigned types (tsbyte, tushort, tuint, tulong, tulonglong) are stored with signed CFITSIO codes and use BSCALE/BZERO for exact value preservation. Typed access remains in the target unsigned type.
-- For bit-packed flags, use toBoolVector/fromBoolVector helpers to decode/encode scalar masks.
+- Pseudo-unsigned types (`tsbyte`, `tushort`, `tuint`, `tulong`, `tulonglong`) are stored with signed *CFITSIO* codes and use BSCALE/BZERO for exact value preservation. Typed access remains in the target unsigned type.
+- For bit-packed flags, use `toBoolVector`/`fromBoolVector` helpers to decode/encode scalar masks.
 
 --------------------------------------------------------------------------------
 
