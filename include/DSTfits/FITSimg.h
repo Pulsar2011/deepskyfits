@@ -1045,7 +1045,7 @@ namespace DSL
     template< typename S >
     void FITSimg<T>::ReadArray(const std::shared_ptr<fitsfile>& fptr)
     {
-        
+        CFITSIOGuard cfits;
         if(fptr == nullptr || fptr.use_count() < 1)
             return;
             
@@ -1224,6 +1224,7 @@ namespace DSL
     template< typename T>
     void FITSimg<T>::WriteDataCube(const std::shared_ptr<fitsfile>&  fptr)
     {
+        CFITSIOGuard cfits;
         if(fptr == nullptr || fptr.use_count() < 1)
         {
             throw std::invalid_argument("\033[31m[FITSimg::WriteDataCube]\033[0mreceived nullptr");
@@ -1284,6 +1285,7 @@ namespace DSL
     template<typename S>
     void FITSimg<T>::WriteData(const std::shared_ptr<fitsfile>& fptr, int DATA_TYPE)
     {
+        CFITSIOGuard cfits;
         if (!fptr || fptr.use_count() < 1)
         {
             throw std::invalid_argument("\033[31m[FITSimg::WriteDataCube]\033[0mreceived nullptr");
@@ -1366,6 +1368,7 @@ namespace DSL
     template< typename T >
     FITSimg<T>::FITSimg(const std::shared_ptr<fitsfile>& fptr): FITScube(fptr)
     {
+        CFITSIOGuard cfits;
         img_init();
 
         if(fptr == nullptr || fptr.use_count() < 1)

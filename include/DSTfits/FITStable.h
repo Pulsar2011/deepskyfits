@@ -30,6 +30,9 @@
 #include <iterator>
 #include <cstdint>
 #include <type_traits>
+#include <numeric>
+#include <execution>
+#include <shared_mutex>
 
 
 #include "FITShdu.h"
@@ -37,23 +40,9 @@
 #include "FITSexception.h"
 
 #include <fitsio.h>
-#include <mutex>
 
 namespace DSL
 {
-    /** @brief Global CFITSIO mutex (serialize all CFITSIO calls across threads). */
-    extern std::recursive_timed_mutex g_cfitsio_mutex;
-
-    /**
-     * @brief RAII guard for global CFITSIO critical section.
-     * @details Locks the global recursive mutex for the lifetime of the guard.
-     */
-    struct CFITSIOGuard
-    {
-        std::unique_lock<std::recursive_timed_mutex> lk;
-        CFITSIOGuard() : lk(g_cfitsio_mutex) {}
-    };
-
 #if __cplusplus < 201703L
     /**
      * @brief Fallback replacement for std::bad_any_cast on pre-C++17 compilers.
@@ -208,6 +197,9 @@ namespace DSL
 
     protected:
 
+        // per-column data mutex
+        mutable std::shared_mutex data_mtx;
+
         template<typename T>
         columnData<T>* storage()
         {
@@ -282,6 +274,11 @@ namespace DSL
         }
         
     public:
+
+    // Grant ColumnView<T> access to protected synchronization (data_mtx) and storage helpers.
+    template<typename T>
+    friend class ColumnView;
+
 #pragma endregion
 #pragma region -- definition
         typedef std::pair<float,float>   complex;
@@ -485,6 +482,7 @@ namespace DSL
          * @brief Typed const access to column's in-memory values.
          * @tparam T Expected payload type for this column.
          * @return Reference to a const vector of values; empty if storage type differs.
+         * @note Caller must take a shared lock on data_mtx if concurrent mutation is possible.
          */
         template<typename T>
         const std::vector<T>& values() const
@@ -645,6 +643,8 @@ namespace DSL
          */
         void push_back(const std::any& value) override
         {
+            // Unique lock: we mutate the column storage
+            std::unique_lock<std::shared_mutex> lk(this->data_mtx);
 #if __cplusplus < 201703L
             const T& v = any_cast_any<T>(value);
             Update(v);
@@ -671,6 +671,9 @@ namespace DSL
          */
         void sortOn(const std::vector<size_t>& order) override
         {
+            // Unique lock while reordering rows
+            std::unique_lock<std::shared_mutex> lk(this->data_mtx);
+
             auto& data = this->values<T>();
             if(order.size() != data.size())
             {
@@ -1465,6 +1468,9 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
     template< typename T >
     void FITScolumn<T>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
+        // Unique lock during write to prevent concurrent in-memory mutation while reading out
+        std::shared_lock<std::shared_mutex> lk(this->data_mtx); // reading values only
+
         const auto& data = this->values<T>();
         if(fptr == nullptr)
         {
@@ -2227,6 +2233,67 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         std::vector<size_t> selection_;
         bool hasSelection_ = false;
 
+        static T computeSumBuffer(const std::vector<T>& vec)
+        {
+            if constexpr (!std::is_arithmetic<T>::value)
+                throw std::logic_error("ColumnView::sum requires arithmetic scalar type T");
+#if __cpp_lib_execution
+            return std::reduce(std::execution::par_unseq, vec.begin(), vec.end(), T{});
+#else
+            T total{};
+            for(const auto& v : vec) total += v;
+            return total;
+#endif
+        }
+
+        // Helper: parallel-capable sum of squares over a contiguous buffer (no locks)
+        static T computeSumsquareBuffer(const std::vector<T>& vec)
+        {
+            if constexpr (!std::is_arithmetic<T>::value)
+                throw std::logic_error("ColumnView::sumsquare requires arithmetic scalar type T");
+#if __cpp_lib_execution
+            return std::transform_reduce(std::execution::par_unseq,
+                                         vec.begin(), vec.end(),
+                                         T{}, std::plus<T>(),
+                                         [](const T& v){ return v*v; });
+#else
+            T total{};
+            for(const auto& v : vec) total += v*v;
+            return total;
+#endif
+        }
+
+        static double computeVarianceBuffer(const std::vector<T>& vec)
+        {
+            if constexpr (!std::is_arithmetic<T>::value)
+                throw std::logic_error("ColumnView::variance requires arithmetic scalar type T");
+            const size_t count = vec.size();
+            if(count == 0) return 0.0;
+
+#if __cpp_lib_execution
+            // Parallel sum and sum of squares
+            const T s  = std::reduce(std::execution::par_unseq, vec.begin(), vec.end(), T{});
+            const T ss = std::transform_reduce(std::execution::par_unseq,
+                                               vec.begin(), vec.end(),
+                                               T{}, std::plus<T>(),
+                                               [](const T& v){ return v * v; });
+#else
+            T s = T{}, ss = T{};
+            for(const auto& v : vec) { s += v; ss += v * v; }
+#endif
+            const double m  = static_cast<double>(s)  / static_cast<double>(count);
+            const double m2 = static_cast<double>(ss) / static_cast<double>(count);
+            return m2 - m*m;
+        }
+
+        // Helper: snapshot selected values under a lock into tmp buffer
+        void snapshotSelection(const std::vector<T>& src, std::vector<T>& tmp) const
+        {
+            tmp.clear();
+            tmp.reserve(selection_.size());
+            for(size_t idx : selection_) tmp.push_back(src[idx]);
+        }
+
         void ensureScalar()
         {
             static_assert(!detail::is_std_vector<T>::value,
@@ -2244,6 +2311,9 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         template<typename Func>
         ColumnView& mutate(Func&& fn)
         {
+            // Unique-lock per-column data during mutations
+            std::unique_lock<std::shared_mutex> lk(column_->data_mtx);
+
             auto& vec = *values_;
             if(hasSelection_)
             {
@@ -2292,7 +2362,7 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
          * \brief Construct a typed view on a scalar column.
          * \param owner Owning FITStable.
          * \param column Column descriptor.
-         * \throws std::logic_error if column repeats or is a vector type.
+         * @throws std::logic_error if column repeats or is a vector type.
          */
         explicit ColumnView(FITStable& owner, FITSform& column)
             : owner_(&owner),
@@ -2399,6 +2469,9 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
          */
         const std::vector<T>& data() const
         {
+            // Shared-lock while building cached selection snapshot
+            std::shared_lock<std::shared_mutex> lk(column_->data_mtx);
+
             if(!hasSelection_) return *values_;
             cache_.clear();
             cache_.reserve(selection_.size());
@@ -2428,6 +2501,261 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
             ColumnView<T> tmp(*this);
             tmp.on(rows);
             return ColumnSelection<T>(std::move(tmp), rows);
+        }
+
+        T sum() const
+        {
+            ensureOwner();
+            if constexpr (!std::is_arithmetic<T>::value)
+                throw std::logic_error("ColumnView::sum requires arithmetic scalar type T");
+
+            std::shared_lock<std::shared_mutex> lk(column_->data_mtx);
+            const auto& vec = *values_;
+            if(!hasSelection_)
+                return computeSumBuffer(vec);
+
+            std::vector<T> tmp;
+            snapshotSelection(vec, tmp);
+            return computeSumBuffer(tmp);
+        }
+
+        T sumsquare() const
+        {
+            ensureOwner();
+            if constexpr (!std::is_arithmetic<T>::value)
+                throw std::logic_error("ColumnView::sumsquare requires arithmetic scalar type T");
+
+            std::shared_lock<std::shared_mutex> lk(column_->data_mtx);
+            const auto& vec = *values_;
+            if(!hasSelection_)
+                return computeSumsquareBuffer(vec);
+
+            std::vector<T> tmp;
+            snapshotSelection(vec, tmp);
+            return computeSumsquareBuffer(tmp);
+        }
+
+        double mean() const
+        {
+            ensureOwner();
+            if constexpr (!std::is_arithmetic<T>::value)
+                throw std::logic_error("ColumnView::mean requires arithmetic scalar type T");
+
+            std::shared_lock<std::shared_mutex> lk(column_->data_mtx);
+            const auto& vec = *values_;
+            const size_t count = hasSelection_ ? selection_.size() : vec.size();
+            if(count == 0) throw std::logic_error("ColumnView::mean on empty selection");
+
+            const T total = (!hasSelection_) ? computeSumBuffer(vec)
+                                             : [&]{
+                                                 std::vector<T> tmp; snapshotSelection(vec, tmp);
+                                                 return computeSumBuffer(tmp);
+                                               }();
+            return static_cast<double>(total) / static_cast<double>(count);
+        }
+
+        T min() const
+        {
+            ensureOwner();
+            if constexpr (!std::is_arithmetic<T>::value)
+                throw std::logic_error("ColumnView::min requires arithmetic scalar type T");
+
+            std::shared_lock<std::shared_mutex> lk(column_->data_mtx);
+
+            const auto& vec = *values_;
+            if(vec.empty())
+                throw std::logic_error("ColumnView::min on empty column");
+
+            if(hasSelection_)
+            {
+                T minimum = vec[selection_.front()];
+                for(size_t idx : selection_)
+                {
+                    if(vec[idx] < minimum)
+                        minimum = vec[idx];
+                }
+                return minimum;
+            }
+            else
+            {
+                return *std::min_element(vec.begin(), vec.end());
+            }
+        }
+
+        T max() const
+        {
+            ensureOwner();
+            if constexpr (!std::is_arithmetic<T>::value)
+                throw std::logic_error("ColumnView::max requires arithmetic scalar type T");
+
+            std::shared_lock<std::shared_mutex> lk(column_->data_mtx);
+
+            const auto& vec = *values_;
+            if(vec.empty())
+                throw std::logic_error("ColumnView::max on empty column");
+
+            if(hasSelection_)
+            {
+                T maximum = vec[selection_.front()];
+                for(size_t idx : selection_)
+                {
+                    if(vec[idx] > maximum)
+                        maximum = vec[idx];
+                }
+                return maximum;
+            }
+            else
+            {
+                return *std::max_element(vec.begin(), vec.end());
+            }
+        }
+
+        double rms() const
+        {
+            ensureOwner();
+            std::shared_lock<std::shared_mutex> lk(column_->data_mtx);
+            const auto& vec = *values_;
+            const size_t count = hasSelection_ ? selection_.size() : vec.size();
+            if(count == 0) throw std::logic_error("ColumnView::rms on empty selection");
+
+            const double ss = static_cast<double>(
+                (!hasSelection_) ? computeSumsquareBuffer(vec)
+                                 : [&]{
+                                     std::vector<T> tmp; snapshotSelection(vec, tmp);
+                                     return computeSumsquareBuffer(tmp);
+                                   }());
+            return std::sqrt(ss / static_cast<double>(count));
+        }
+
+        double variance() const
+        {
+            ensureOwner();
+            std::shared_lock<std::shared_mutex> lk(column_->data_mtx);
+            const auto& vec = *values_;
+            const size_t count = hasSelection_ ? selection_.size() : vec.size();
+            if(count == 0) throw std::logic_error("ColumnView::variance on empty selection");
+
+            if(!hasSelection_)
+            {
+                return computeVarianceBuffer(vec);
+            }
+            else
+            {
+                std::vector<T> tmp;
+                snapshotSelection(vec, tmp);
+                return computeVarianceBuffer(tmp);
+            }
+        }
+
+        double rmse() const
+        {
+            ensureOwner();
+            std::shared_lock<std::shared_mutex> lk(column_->data_mtx);
+            const auto& vec = *values_;
+            const size_t count = hasSelection_ ? selection_.size() : vec.size();
+            if(count == 0) throw std::logic_error("ColumnView::rmse on empty selection");
+
+            double s, ss;
+            if(!hasSelection_)
+            {
+                s  = static_cast<double>(computeSumBuffer(vec));
+                ss = static_cast<double>(computeSumsquareBuffer(vec));
+            }
+            else
+            {
+                std::vector<T> tmp; snapshotSelection(vec, tmp);
+                s  = static_cast<double>(computeSumBuffer(tmp));
+                ss = static_cast<double>(computeSumsquareBuffer(tmp));
+            }
+            const double m  = s  / static_cast<double>(count);
+            const double m2 = ss / static_cast<double>(count);
+            return std::sqrt(m2 - m*m);
+        }
+
+        double skewness() const
+        {
+            ensureOwner();
+            if constexpr (!std::is_arithmetic<T>::value)
+                throw std::logic_error("ColumnView::skewness requires arithmetic scalar type T");
+
+            std::shared_lock<std::shared_mutex> lk(column_->data_mtx);
+
+            const auto& vec = *values_;
+            const size_t count = hasSelection_ ? selection_.size() : vec.size();
+            if(count == 0)
+                throw std::logic_error("ColumnView::skewness on empty selection");
+
+            // Compute mean and variance under the same lock using buffer helpers
+            double meanValue;
+            double var;
+
+            if(!hasSelection_)
+            {
+                // mean via sum; variance via helper
+                const T s  = computeSumBuffer(vec);
+                meanValue  = static_cast<double>(s) / static_cast<double>(count);
+                var        = computeVarianceBuffer(vec);
+            }
+            else
+            {
+                std::vector<T> tmp;
+                snapshotSelection(vec, tmp);
+                const T s  = computeSumBuffer(tmp);
+                meanValue  = static_cast<double>(s) / static_cast<double>(count);
+                var        = computeVarianceBuffer(tmp);
+            }
+
+            if(var <= std::numeric_limits<double>::min())
+                throw std::logic_error("ColumnView::skewness on empty or zero-variance selection");
+
+#if __cpp_lib_execution
+            double m3;
+            if(!hasSelection_)
+            {
+                m3 = std::transform_reduce(std::execution::par_unseq,
+                                           vec.begin(), vec.end(),
+                                           0.0, std::plus<double>(),
+                                           [meanValue](const T& v) {
+                                               const double d = static_cast<double>(v) - meanValue;
+                                               return d * d * d;
+                                           }) / static_cast<double>(count);
+            }
+            else
+            {
+                std::vector<T> tmp;
+                tmp.reserve(selection_.size());
+                for(size_t idx : selection_) tmp.push_back(vec[idx]);
+
+                m3 = std::transform_reduce(std::execution::par_unseq,
+                                           tmp.begin(), tmp.end(),
+                                           0.0, std::plus<double>(),
+                                           [meanValue](const T& v) {
+                                               const double d = static_cast<double>(v) - meanValue;
+                                               return d * d * d;
+                                           }) / static_cast<double>(count);
+            }
+#else
+            double m3 = 0.0;
+            if(hasSelection_)
+            {
+                for(size_t idx : selection_)
+                {
+                    const double d = static_cast<double>(vec[idx]) - meanValue;
+                    m3 += d * d * d;
+                }
+            }
+            else
+            {
+                for(const auto& v : vec)
+                {
+                    const double d = static_cast<double>(v) - meanValue;
+                    m3 += d * d * d;
+                }
+            }
+            m3 /= static_cast<double>(count);
+#endif
+            // Skewness = m3 / (sigma^3), with sigma^2 = var
+            return m3 / (var * std::sqrt(var));
         }
     };
 
@@ -2625,7 +2953,7 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
     /*!
      * \brief Reorder rows in all columns according to a global permutation.
      * \param order New-to-old index mapping; must be a permutation of [0..n-1].
-     * \throws std::logic_error on mismatch, duplicates, or out-of-range.
+     * @throws std::logic_error on mismatch, duplicates, or out-of-range.
      */
     inline void FITStable::reorderRows(const std::vector<size_t>& order)
     {

@@ -75,8 +75,8 @@ namespace DSL
      */
     void FITSmanager::explore()
     {
-        // Acquire exclusive lock because we will query CFITSIO and update internal state.
-        std::unique_lock<std::shared_mutex> lk(fptr_mtx);
+        CFITSIOGuard cfits; // serialize CFITSIO globally
+        std::unique_lock<std::shared_mutex> lk(fptr_mtx); // exclusive: we update state
 
         if(!fptr || fptr.use_count() == 0)
         {
@@ -237,11 +237,12 @@ namespace DSL
 
     const std::string FITSmanager::GetFileName(fitsfile *inFits) const
     {
+        CFITSIOGuard cfits; // CFITSIO call below
         if(inFits == NULL)
             return std::string();
         
         char ffname[999];
-        int  this_status;
+        int  this_status = 0;
         ffflnm(inFits, ffname, &this_status);
         
         return std::string(ffname);
@@ -514,9 +515,10 @@ namespace DSL
     
     const std::shared_ptr<FITScube> FITSmanager::GetImageAtIndex(const int& hdu_index)
     {
-        // ensure HDU movement and subsequent CFITSIO calls are safe -> use MoveToHDU which locks
-        int hdu_type = MoveToHDU(hdu_index);
-        
+        CFITSIOGuard cfits; // hold across HDU move + type query + object construction
+
+        int hdu_type = MoveToHDU(hdu_index); // already under both guards via call above
+
         if(fits_status)
             return NULL;
         
@@ -744,6 +746,7 @@ namespace DSL
 
     int FITSmanager::MoveToHDU(const int& hdu_index)
     {
+        CFITSIOGuard cfits; // serialize current-HDU movement
         std::unique_lock<std::shared_mutex> lk(fptr_mtx);
 
         if(!fptr)
@@ -789,7 +792,7 @@ namespace DSL
      */
     void FITSmanager::AppendImage(FITScube &img)
     {
-        // Mutates file -> exclusive lock
+        CFITSIOGuard cfits; // serialize all CFITSIO ops below
         std::unique_lock<std::shared_mutex> lk(fptr_mtx);
 
         if(!fptr)

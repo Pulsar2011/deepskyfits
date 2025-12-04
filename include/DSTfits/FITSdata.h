@@ -21,9 +21,24 @@
 #include <string>
 #include <array>
 #include <vector>
+#include <mutex>
+#include <shared_mutex>
 
 namespace DSL
 {
+    /** @brief Global CFITSIO mutex (serialize all CFITSIO calls across threads). */
+    extern std::recursive_timed_mutex g_cfitsio_mutex;
+
+    /**
+     * @brief RAII guard for global CFITSIO critical section.
+     * @details Locks the global recursive mutex for the lifetime of the guard.
+     */
+    struct CFITSIOGuard
+    {
+        std::unique_lock<std::recursive_timed_mutex> lk;
+        CFITSIOGuard() : lk(g_cfitsio_mutex) {}
+    };
+
     typedef std::vector<double> pixelCoords;
     typedef std::vector<double> worldCoords;
 

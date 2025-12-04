@@ -81,7 +81,7 @@ set(BUILD_SHARED_LIBS "YES")
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 	# Linux specific code
     set(CMAKE_SYSTEM_PROCESSOR x86_64)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Wall -pipe -fexceptions -fPIC -Wno-unknown-pragmas -Wmisleading-indentation")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Wall -pipe -pthread -fexceptions -fPIC -Wno-unknown-pragmas -Wmisleading-indentation")
 
 	set(OperatingSystem "Linux")
 	ADD_DEFINITIONS(-DLinuxx86_64)
