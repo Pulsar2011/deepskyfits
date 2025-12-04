@@ -174,11 +174,15 @@ Working with tables usually starts by choosing a column, building a set of match
    auto px = imgD->World2Pixel(wc);           // inverse transform
 ```
 
-- Write table back:
+- Write back to FITS:
 ```c++
-   fm.UpdateTable(tbl); // update existing HDU, or
-   tbl->write("!updated.fits", /*start*/1, /*replace*/true);
+   fm.UpdateTable(/*tables*/);           // if you modified tables
+   imgD->Write("!out.fits", /*replace*/true);
 ```
+
+#### Notes
+- Arithmetic and SetPixelValue perform safe casting between scalar types and storage type T; masked pixels are skipped.
+- Layer and Window return new images with updated headers and best-effort WCS updates; complex WCS may require recalibration.
 
 ### FITStable (tables)
 Tables follow a similar philosophy: load once, work in memory with typed columns, then write back. A FITStable discovers columns and their metadata (names, types, units), provides typed views for safe access, and lets you build RowSet selections by chaining simple predicates. Sorting and reordering apply globally, ensuring all columns stay aligned. This design aims to make common catalog tasks—filtering, adding derived columns, exporting—straightforward while preserving FITS conventions like BSCALE/BZERO for pseudo‑unsigned types.
@@ -198,10 +202,74 @@ Tables follow a similar philosophy: load once, work in memory with typed columns
   - boolVector encoding/decoding helpers for bit-packed columns
   - reorderRows applies a consistent permutation across all columns
 
-Notes
-- Pseudo-unsigned types (`tsbyte`, `tushort`, `tuint`, `tulong`, `tulonglong`) are stored with signed *CFITSIO* codes and use BSCALE/BZERO for exact value preservation. Typed access remains in the target unsigned type.
-- For bit-packed flags, use `toBoolVector`/`fromBoolVector` helpers to decode/encode scalar masks.
+#### Logic behind selection/filtering
+Working with tables usually starts by choosing a column, building a set of matching rows, and then operating on those rows. A RowSet is simply a list of row indices that satisfy your predicates (for example, “MAG < 20 and FLAG == 0”). You create it with select<T>("COL") and chain comparisons; combining sets with && and || lets you intersect or union selections naturally. ColumnView<T> then gives you typed access to a column’s in‑memory data, and can be restricted to a RowSet to read or update only the selected rows. If you need to stay type‑erased until the last moment, ColumnHandle provides a fluent entry point to obtain typed views and apply selections. Finally, when you sort or reorder rows, reorderRows applies one global permutation to all columns, keeping the table consistent.
+- ColumnView<T> gives typed, read/write access to a column's in-memory data (std::vector<T>) with optional RowSet restriction. It throws if the column's dtype doesn't match T.
+- RowSet represents a set of row indices. You build it with select<T>("COL") and chain predicates; sets support && (intersection) and || (union).
+- ColumnHandle provides a fluent entry point to create typed views, apply RowSet selections, and perform updates without exposing the underlying storage.
+- reorderRows enforces a single global permutation across all columns. It validates:
+  - size(order) == nrows,
+  - indices are within [0..nrows-1],
+  - no duplicates,
+  - all columns share the same row count.
 
+#### Examples: filtering, selecting, and manipulating table rows
+- Open a table and list columns:
+```c++
+   FITSmanager fm("path/to/file.fits");
+   auto tbl = fm.GetTable("MYTABLE");
+   auto meta = tbl->listColumns(); // each entry is {name, TFORM, unit}
+```
+
+- Typed column access and filtering:
+```c++
+   // Get a typed view by column name, e.g. double column "MAG"
+   auto mag = tbl->column<double>("MAG");
+   Build a row selection where MAG < 20 and "FLAG" == 0:
+   auto rows = tbl->select<double>("MAG") /* builder for MAG */
+                 /* chain predicates, e.g. .lt(20) && tbl->select<int>("FLAG").eq(0) */
+                 /* finalize to RowSet */;
+   Use the selection with a handle:
+   auto h = (*tbl)["MAG"]; // ColumnHandle
+   auto v = h.view<double>(rows); // ColumnView<double> restricted to rows
+```
+
+- Sort or reorder rows globally:
+```c++
+   // Suppose you computed a custom permutation "order"
+   std::vector<size_t> order = { /* new-to-old indices, size == nrows */ };
+   tbl->reorderRows(order); // applies to all columns; validates permutation
+```
+
+- Append/update columns:
+```c++
+   // Insert a new empty column:
+   tbl->InsertColumn("SNR", dtype::tfloat, ""); // define type/unit
+  // Insert a populated column:
+   auto snr = std::make_shared<FITScolumn<float>>("SNR", dtype::tfloat);
+   snr->push_back(std::any(12.3f)); // repeat for each row
+   tbl->InsertColumn(snr);
+```
+
+- Write table back:
+```c++
+   fm.UpdateTable(tbl); // update existing HDU, or
+   tbl->write("!updated.fits", /*start*/1, /*replace*/true);
+```
+
+Logic behind selection/filtering
+- ColumnView<T> gives typed, read/write access to a column's in-memory data (std::vector<T>) with optional RowSet restriction. It throws if the column's dtype doesn't match T.
+- RowSet represents a set of row indices. You build it with select<T>("COL") and chain predicates; sets support && (intersection) and || (union).
+- ColumnHandle provides a fluent entry point to create typed views, apply RowSet selections, and perform updates without exposing the underlying storage.
+- reorderRows enforces a single global permutation across all columns. It validates:
+  - size(order) == nrows,
+  - indices are within [0..nrows-1],
+  - no duplicates,
+  - all columns share the same row count.
+
+Notes
+- Pseudo-unsigned types (tsbyte, tushort, tuint, tulong, tulonglong) are stored with signed CFITSIO codes and use BSCALE/BZERO for exact value preservation. Typed access remains in the target unsigned type.
+- For bit-packed flags, use toBoolVector/fromBoolVector helpers to decode/encode scalar masks..
 --------------------------------------------------------------------------------
 
 # C++ API reference
