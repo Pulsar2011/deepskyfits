@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <tuple>
 #include <random>
+#include <thread>
 
 
 using namespace DSL;
@@ -579,4 +580,110 @@ TEST(ColumnViewTest, StatisticalComputations)
     EXPECT_NEAR(table.column<float>("NORM").on(flaggedRows).rmse()    , f_stddev, 1e-6);
     EXPECT_NEAR(table.column<float>("NORM").on(flaggedRows).rms()     , f_rms, 1e-6);
     EXPECT_NEAR(table.column<float>("NORM").on(flaggedRows).skewness(), f_skewness, 1e-5);
+}
+
+TEST(ColumnViewTest, StatisticalComputations_inParralel)
+{
+
+    const size_t N = 1000000;
+    float dN = static_cast<double>(N);
+    std::default_random_engine re;
+    re.seed(123456); // deterministic for test
+    std::normal_distribution<float> norm(0.0, 1.0);   // normal( mean=0, sigma=1 )
+    std::uniform_real_distribution<float> unif(0, 1);   // normal( mean=0, sigma=1 )
+
+    FITScolumn<float> col("NORM", tfloat, "", 1);
+    FITScolumn<bool> flag("FLAG", tlogical, "", 1);
+    
+    float sum = 0.0f;
+    float sumsq = 0.0f;
+    float sum3  = 0.0f;
+    float min = std::numeric_limits<float>::max();
+    float max = std::numeric_limits<float>::lowest();
+
+    float f_sum = 0.0f;
+    float f_sumsq = 0.0f;
+    float f_sum3  = 0.0f;
+    float f_min = std::numeric_limits<float>::max();
+    float f_max = std::numeric_limits<float>::lowest();
+    float f_N=0.0f;
+    
+    for (size_t i = 0; i < N; ++i)
+    {
+        float sample = norm(re);
+        float u = unif(re);
+        
+        
+        sum += sample;
+        sumsq += sample * sample;
+        sum3  += sample * sample * sample;
+
+        min = (sample < min) ? sample : min;
+        max = (sample > max) ? sample : max;
+
+        if(u < 0.5f)
+        {
+            f_sum   += sample;
+            f_sumsq += sample * sample;
+            f_sum3  += sample * sample * sample;
+            
+            f_min = (sample < f_min) ? sample : f_min;
+            f_max = (sample > f_max) ? sample : f_max;
+            f_N ++;
+        }
+
+        col.push_back(sample);
+        flag.push_back(u < 0.5f); // 10% true
+    }
+
+    double mean = sum / dN;
+    double variance = (sumsq /dN) - (mean * mean);
+    double stddev = std::sqrt(variance);
+    double rms = std::sqrt(sumsq / dN);
+    double skewness = ((sum3 / dN) - 3 * mean * variance - mean * mean * mean) / (stddev * stddev * stddev);
+
+    double f_mean = f_sum / f_N;
+    double f_variance = (f_sumsq /f_N) - (f_mean * f_mean);
+    double f_stddev = std::sqrt(f_variance);
+    double f_rms = std::sqrt(f_sumsq / f_N);
+    double f_skewness = ((f_sum3 / f_N) - 3 * f_mean * f_variance - f_mean * f_mean * f_mean) / (f_stddev * f_stddev * f_stddev);
+
+    FITStable table;
+    table.InsertColumn(std::make_shared< FITScolumn<float> >(col));
+    table.InsertColumn(std::make_shared< FITScolumn<bool> >(flag));
+
+    std::thread t1([&](){
+
+        EXPECT_NEAR(table.column<float>("NORM").mean()    , mean, 1e-6);
+        EXPECT_NEAR(table.column<float>("NORM").min()     , min, 1e-6);
+        EXPECT_NEAR(table.column<float>("NORM").max()     , max, 1e-6);
+        EXPECT_NEAR(table.column<float>("NORM").variance(), variance, 1e-6);
+        EXPECT_NEAR(table.column<float>("NORM").rmse()    , stddev, 1e-6);
+        EXPECT_NEAR(table.column<float>("NORM").rms()     , rms, 1e-6);
+    });
+
+    std::thread t2([&](){
+        auto flaggedRows = table.select<bool>("FLAG").eq(true).build();
+
+        EXPECT_NEAR(table.column<float>("NORM").on(flaggedRows).mean()    , f_mean, 1e-6);
+        EXPECT_NEAR(table.column<float>("NORM").on(flaggedRows).min()     , f_min, 1e-6);
+        EXPECT_NEAR(table.column<float>("NORM").on(flaggedRows).max()     , f_max, 1e-6);
+        EXPECT_NEAR(table.column<float>("NORM").on(flaggedRows).variance(), f_variance, 1e-6);
+        EXPECT_NEAR(table.column<float>("NORM").on(flaggedRows).rmse()    , f_stddev, 1e-6);
+        EXPECT_NEAR(table.column<float>("NORM").on(flaggedRows).rms()     , f_rms, 1e-6);
+    });
+
+    std::thread t3([&](){
+        // just to increase concurrency
+        for(int i=0;i<100000;++i)
+        {
+            float sample = norm(re);
+            table.push_back<float>("NORM", sample);
+        }
+    });
+
+    t1.join();
+    t2.join();
+    t3.join();
+
 }
