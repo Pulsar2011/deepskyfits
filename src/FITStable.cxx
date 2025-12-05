@@ -2253,13 +2253,8 @@ namespace DSL
      */
     const std::unique_ptr<FITSform>& FITStable::getColumn(const std::string& cname) const
     {
-        for(columns_list::const_iterator n = fcolumns.cbegin(); n != fcolumns.cend(); n++)
-        {
-            if((*n)->getName() == cname)
-                return (*n);
-        }
-        
-        throw std::out_of_range("FITStable::getColumn: Column name '"+cname+"' does not exist in the FITS table.");
+        columns_list::const_iterator it = findColumnByName_const(cname);
+        return (*it);
     }
 
     /**

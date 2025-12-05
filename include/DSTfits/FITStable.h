@@ -526,6 +526,13 @@ namespace DSL
         virtual std::unique_ptr<FITSform> clone() const = 0; // add
         virtual void sortOn(const std::vector<size_t>& order) = 0;
 
+        /**
+         * @brief Append a default-initialized value to this column.
+         * @details For scalar numeric types this is 0, for string it's "",
+         *          for vector types it's an empty vector, and for pairs it is {0,0}.
+         */
+        virtual void push_default() = 0;
+
 #pragma endregion
 
 #pragma region -- modifier
@@ -695,6 +702,18 @@ namespace DSL
 
         // Read-only accessor for testing
         //inline const col_map& values() const { return data; }
+
+        /**
+         * @brief Append a default-initialized value to the column.
+         */
+        void push_default() override
+        {
+            std::unique_lock<std::shared_mutex> lk(this->data_mtx);
+            allocateStorageIfNeeded<T>();
+            T def{};               // zero / empty string / empty vector / {0,0} etc.
+            FITSform::values<T>().push_back(def);
+            Update(def);           // keep TFORM metadata in sync (width/nelem)
+        }
         
 #pragma endregion
 #pragma region -- diagnoze
@@ -788,6 +807,26 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         
         template <typename T>
         void readVector(FITScolumn< std::vector<T> >*, const std::shared_ptr<fitsfile>& fptr, const size_t& row=1);
+
+        columns_list::iterator findColumnByName(const std::string& cname)
+        {
+            columns_list::iterator it = std::find_if(fcolumns.begin(), fcolumns.end(),
+                                   [&cname](const std::unique_ptr<FITSform>& c)
+                                   {
+                                       return c->getName() == cname;
+                                   });
+            return it;
+        }
+
+        columns_list::const_iterator findColumnByName_const(const std::string& cname) const
+        {
+            columns_list::const_iterator it = std::find_if(fcolumns.begin(), fcolumns.end(),
+                                   [&cname](const std::unique_ptr<FITSform>& c)
+                                   {
+                                       return c->getName() == cname;
+                                   });
+            return it;
+        }
         
     public:
 
@@ -962,19 +1001,63 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
          * @throws FITSexception on unsupported dtype.
          */
         void InsertColumn(const std::string& cname, const dtype& type, const std::string& tunit);
-
-        /**
-         * @brief Append a populated column; validates row count consistency.
-         * @param col New column to append.
-         * @throws FITSexception on dimension mismatch.
-         */
         void InsertColumn( std::shared_ptr<FITSform> col );
         
 #pragma endregion
 #pragma region 2- Inseting value to an existing column
+
+        /**
+         * @brief Append value to an existing column.
+         * @param cname column name
+         * @param val value to insert
+         * @throws FITSexception on column name missmatch.
+         * @return true position at which the value was inserted, it will be the \c this->nrows()-1. This allow to know where the value was inserted for the user to fill in the remaing columns at the correct position.
+         * @note  It is the responsibility of the user to fill in the remaing columns.
+         */
+        template <typename T>
+        size_t push_back(const std::string& cname, const T& val)
+        {
+            auto col = findColumnByName(cname);
+            if(col == fcolumns.end())
+                throw FITSexception(COL_NOT_FOUND,"FITStable","InsertAt","Column '"+cname+"' not found.");
+
+            size_t _pos = nrows();
+            if(_pos >= nrows())
+            {
+                for(columns_list::iterator it = fcolumns.begin(); it != fcolumns.end(); ++it)
+                {
+                    (*it)->push_default(); // add empty value to all columns
+                }
+                _pos = nrows() - 1;
+            }
+            
+            updateAt(cname, _pos, val);
+            return _pos;
+        }
         
 #pragma endregion
 #pragma region 3- Updating value from an existing column
+
+        /**
+         * @brief update value of an existing column.
+         * @param col New column to append.
+         * @param pos position at which the value have to be updated.
+         * @param val new value for the specified position.
+         * @throws FITSexception on dimension and column mismatch.
+         */
+        template <typename T>
+        void updateAt(const std::string& cname, const size_t pos, const T& val)
+        {
+            if(pos >= nrows())
+                throw FITSexception(BAD_ROW_NUM,"FITStable","InsertAt","Row position "+std::to_string(pos)+" is out of range.");
+
+            auto col = findColumnByName(cname);
+            if(col == fcolumns.end())
+                throw FITSexception(COL_NOT_FOUND,"FITStable","InsertAt","Column '"+cname+"' not found.");
+            
+            (*col)->values<T>()[pos] = val;
+            return;
+        }
         
 #pragma endregion
 #pragma endregion
