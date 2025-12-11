@@ -17,6 +17,18 @@
         "preLaunchTask": "make gtest"
     },
     {
+        "type": "lldb-dap",
+        "request": "launch",
+        "name": "gTest_imageProcessing (LLDB)",
+        "program": "${workspaceRoot}/build/exe/gTest_imageProcessing",
+        "args": [],
+        "env": [],
+        "cwd": "${workspaceRoot}",
+        "MIMode": "lldb",
+        "sourceLanguages":["C++"],
+        "preLaunchTask": "make gtest"
+    },
+    {
         "type": "cppdbg",
         "request": "launch",
         "name": "gTest_hdu (LLDB)",

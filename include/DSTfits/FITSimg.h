@@ -32,6 +32,7 @@
 #include "FITSstatistic.h"
 #include "FITSdata.h" // <- add include for FitsArrayBase / FitsArray
 #include "FITSwcs.h"
+#include "DSF_version.h"
 
 namespace DSL
 {
@@ -142,6 +143,9 @@ namespace DSL
         static FITScube* DoubleFITSimg     (const std::vector<size_t>& );
 
 #pragma endregion
+#pragma region * array manipulation
+        enum class overlay {mean, median, min, max, sum};  //!< Overlay method enumeration
+        virtual std::shared_ptr<FITScube> Overlay(const overlay& method = overlay::mean, const std::pair<double,double>& clip=std::pair<double,double>(-1.,-1.)) const = 0;
 
 #pragma region * Accessor
         size_t Size(const size_t& i = 0) const ;                       //!< Get number of pixel of the axe
@@ -647,14 +651,18 @@ namespace DSL
         double GetSkewness()               const override;
 
 #pragma endregion
-#pragma region * data operation
 
         
     private:
         template< typename S > void ReadArray(const std::shared_ptr<fitsfile>& fptr); //!< Read and interpret FITS BINARY data
         
     public:
-        
+
+#pragma region * array manipulation
+        std::shared_ptr<FITScube> Overlay(const overlay& method = overlay::mean, const std::pair<double,double>& clip=std::pair<double,double>(-1.,-1.)) const override;
+
+#pragma endregion
+#pragma region * data operation
         FITSimg<T>& operator=(const FITSimg<T>&);		///< Get pixel content
         
         const T operator [](const size_t&) const;  ///< Get pixel content
@@ -2229,6 +2237,120 @@ namespace DSL
     }
 
 
+#pragma endregion
+#pragma region * image manipulation
+
+    template< typename T >
+    std::shared_ptr<FITScube> FITSimg<T>::Overlay(const overlay& method, const std::pair<double,double>& clip) const
+    {
+        FITSimg<T> result(2,{this->Size(1),this->Size(2)});
+        for(FITSDictionary::const_iterator it = this->hdu.begin(); it != this->hdu.end(); ++it)
+        {
+            if(it->first != "NAXIS" &&
+               it->first != "NAXIS1" &&
+               it->first != "NAXIS2" &&
+               it->first != "BITPIX" &&
+               it->first != "BSCALE" &&
+               it->first != "BZERO" &&
+               it->first != "BLANK")
+               continue;
+
+            result.HDU().ValueForKey(it->first,it->second.value(),it->second.type(),it->second.comment());
+        }
+
+        switch (method)
+        {
+            case overlay::mean:
+                result.HDU().ValueForKey("OVERLAY","MEAN",fChar,"Overlay method");
+                break;
+            case overlay::median:
+                result.HDU().ValueForKey("OVERLAY","MEDIAN",fChar,"Overlay method");
+                break;
+            case overlay::min:
+                result.HDU().ValueForKey("OVERLAY","MIN",fChar,"Overlay method");
+                break;
+            case overlay::max:
+                result.HDU().ValueForKey("OVERLAY","MAX",fChar,"Overlay method");
+                break;
+            case overlay::sum:
+                result.HDU().ValueForKey("OVERLAY","SUM",fChar,"Overlay method");
+                break;
+            default:
+                break;
+        }
+
+        result.HDU().ValueForKey("DSF_VER",DSF::gGIT::version_short(),key_type::fChar,"DST framwork version library");
+
+        std::valarray<bool> msk = this->GetMask();
+        msk &= false;
+
+        if(clip.first > std::numeric_limits<double>::epsilon() || clip.second > std::numeric_limits<double>::epsilon())
+        {
+            double var = this->GetVariance();
+            double mean= this->GetMean();
+            double min = mean - clip.first * std::sqrt(var);
+            double max = mean + clip.second * std::sqrt(var);
+
+            msk[(*(this->template GetData<T>())) < static_cast<T>(min+0.5)] = true;
+            msk[(*(this->template GetData<T>())) > static_cast<T>(max+0.5)] = true;
+        }
+
+        msk |= this->GetMask();
+
+        const std::valarray<T>* dst_data = this->template GetData<T>();
+        std::valarray<T>* res_data = result.template GetData<T>();
+        for(size_t i = 0; i < this->Size(1)*this->Size(2); i++)
+        {
+
+            std::valarray<T>        slice = (*dst_data)[std::slice(i,this->Size(3),this->Size(1)*this->Size(2))];
+            std::valarray<bool> msk_slice = msk[std::slice(i,this->Size(3),this->Size(1)*this->Size(2))];
+
+            switch(method)
+            {
+                case overlay::sum:
+                    (*res_data)[i] = ((std::valarray<T>)slice[!msk_slice]).sum();
+                    break;
+                case overlay::min:
+                    (*res_data)[i] = ((std::valarray<T>)slice[!msk_slice]).min();
+                    break;
+                case overlay::max:
+                    (*res_data)[i] = ((std::valarray<T>)slice[!msk_slice]).max();
+                    break;
+                case overlay::mean:
+                    (*res_data)[i] = static_cast<T>(static_cast<double>(((std::valarray<T>)slice[!msk_slice]).sum())/static_cast<double>(((std::valarray<T>)slice[!msk_slice]).size()));
+                    break;
+                case overlay::median:
+                {
+                    std::vector<double> sorted;
+                    for(size_t j = 0; j < slice.size(); j++)
+                    {
+                        if(!msk_slice[j])
+                            sorted.push_back( static_cast<double>(slice[j]) );
+                    }
+                    std::sort(sorted.begin(), sorted.end());
+                    double pos = 0.5 * static_cast<double>(sorted.size()-1);
+                    size_t idx = static_cast<size_t>( pos + 0.5 );
+                    double dpos= pos - static_cast<double>(idx);
+
+                    double pp_value = 0.0;
+
+                    if(idx +1 < sorted.size())
+                        pp_value = sorted[idx] + dpos * (sorted[idx+1] - sorted[idx]);
+                    else
+                        pp_value = sorted[idx];
+
+                    (*res_data)[i] = static_cast<T>(pp_value);
+                    break;
+                }
+                default:
+                    throw FITSexception(BAD_OPTION,"FITSimg","Overlay","Unsupported overlay method");
+            }
+
+        }
+
+        return std::make_shared< FITSimg<T> >(result);
+    }
+    
 #pragma endregion
 #pragma region * data operation
     
