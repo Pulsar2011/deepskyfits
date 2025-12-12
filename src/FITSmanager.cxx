@@ -609,6 +609,24 @@ namespace DSL
     
         return std::shared_ptr<FITScube>(img);
     }
+
+    const std::shared_ptr<FITScube> FITSmanager::GetImage(const std::string& iname)
+    {
+        CFITSIOGuard cfits; // hold across HDU move + type query + object construction
+
+        // Move to HDU by name
+        int hdutype = 0;
+        fits_movnam_hdu(fptr.get(), IMAGE_HDU, (char*) iname.c_str(), 0, &fits_status);
+        if(fits_status)
+            throw FITSexception(fits_status,"FITSmanager","GetImage","IMAGE "+iname+" NOT FOUND BY NAME");
+
+        // get current HDU index
+        int hdublck = 0;
+        fits_get_hdu_num(fptr.get(), &hdublck);
+
+        // now call GetImageAtIndex to do the rest
+        return GetImageAtIndex(hdublck);
+    }
     
 #pragma endregion
 #pragma region * Accessing FITS table

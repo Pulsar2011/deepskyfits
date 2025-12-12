@@ -100,6 +100,7 @@ namespace DSL
 #pragma region * Accessing FITS image
         const std::shared_ptr<FITScube> GetPrimary();
         const std::shared_ptr<FITScube> GetImageAtIndex(const int&);
+        const std::shared_ptr<FITScube> GetImage(const std::string&);
         
 #pragma endregion
 #pragma region * Accessing FITS table
