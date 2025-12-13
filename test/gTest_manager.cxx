@@ -540,7 +540,18 @@ TYPED_TEST(FITSimgTest, modif_fitsfile)
     ASSERT_NE(data_r2, nullptr);
     ASSERT_NEAR(((*data_r2)-(*data2)).sum(), 0.0, 1e-12);
 
+    std::shared_ptr<FITScube> imgptr3 = fm2.GetImage("SECOND_IMAGE");
+    ASSERT_NE(imgptr3, nullptr);
+    ASSERT_EQ(imgptr3->Size(1), N);
+    ASSERT_EQ(imgptr3->Size(2), N);
+    auto data_r3 = imgptr3->template GetData<T>();
+    ASSERT_NE(data_r3, nullptr);
+    ASSERT_NEAR(((*data_r3)-(*data2)).sum(), 0.0, 1e-12);
+
     fm2.Close();
+    imgptr2.reset();
+    imgptr3.reset();
+    imgptr.reset();
 
     std::remove(this->MakeFilename().c_str());
 
