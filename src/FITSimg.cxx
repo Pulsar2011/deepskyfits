@@ -114,7 +114,7 @@ class FITSmanager;
      */
     FITScube::FITScube(const std::shared_ptr<fitsfile>& fptr):fwcs()
     {
-        CFITSIOGuard cfits; // serialize CFITSIO for all calls in this ctor
+        
         init();
 
 
@@ -697,7 +697,7 @@ class FITSmanager;
      */
     void FITScube::Write(const std::shared_ptr<fitsfile>& fptr)
     {
-        CFITSIOGuard cfits; // serialize file creation + writes
+        
         if(fptr == nullptr || fptr.use_count() < 1)
         {
             throw FITSexception(NULL_INPUT_PTR,"FITScube","Write","received nullptr");
@@ -715,7 +715,7 @@ class FITSmanager;
      */
     void FITScube::Write(std::string fileName, bool replace)
     {
-        CFITSIOGuard cfits; // serialize file creation + writes
+        
         if(replace)
             fileName.insert(0,"!");
         else if(fileName[0] == '!')

@@ -75,9 +75,8 @@ namespace DSL
      */
     void FITSmanager::explore()
     {
-        CFITSIOGuard cfits; // serialize CFITSIO globally
-        std::unique_lock<std::shared_mutex> lk(fptr_mtx); // exclusive: we update state
 
+        std::unique_lock<std::shared_mutex> lk(fptr_mtx); // exclusive: we update state
         if(!fptr || fptr.use_count() == 0)
         {
             num_hdu = 0;
@@ -237,7 +236,6 @@ namespace DSL
 
     const std::string FITSmanager::GetFileName(fitsfile *inFits) const
     {
-        CFITSIOGuard cfits; // CFITSIO call below
         if(inFits == NULL)
             return std::string();
         
@@ -306,67 +304,67 @@ namespace DSL
         
         // CREATE FITS FILE ON HDD
         int status = 0;
-        fitsfile *fptr = NULL;
-        if(fits_create_file(&fptr, (char*) fileName.c_str(), &status ))
+        fitsfile *raw = NULL;
+        if(fits_create_file(&raw, (char*) fileName.c_str(), &status ))
         {
-            if(fptr != NULL)
+            if(raw != NULL)
             {
-                fits_close_file(fptr, &status);
-                delete fptr;
+                fits_close_file(raw, &status);
+                delete raw;
             }
-            fptr = NULL;
+            raw = NULL;
             
             throw FITSexception(status,"FITSmanager","Create","FILE : "+fileName);
         }
         
         // CREATE EMPTY PRIMARY HEADER
-        if(fits_create_imgll(fptr, USHORT_IMG, 0, NULL, &status))
+        if(fits_create_imgll(raw, USHORT_IMG, 0, NULL, &status))
         {
-            if(fptr != NULL)
+            if(raw != NULL)
             {
-                fits_close_file(fptr, &status);
-                delete fptr;
+                fits_close_file(raw, &status);
+                delete raw;
             }
-            fptr = NULL;
+            raw = NULL;
             throw FITSexception(status,"FITSmanager","Create","FILE : "+fileName);
         }
         
         // APPEND Appropriate KEYWORDS
         std::string fits_comment = std::string("FITS created with DST library ")+ DSF::gGIT::version();
-        if(fits_write_comment(fptr, (char*) fits_comment.c_str(), &status))
+        if(fits_write_comment(raw, (char*) fits_comment.c_str(), &status))
         {
-            if(fptr != NULL)
+            if(raw != NULL)
             {
-                fits_close_file(fptr, &status);
-                delete fptr;
+                fits_close_file(raw, &status);
+                delete raw;
             }
-            fptr = NULL;
+            raw = NULL;
             throw FITSexception(status,"FITSmanager","Create","FILE : "+fileName);
         }
         
-        if(fits_write_date(fptr, &status ))
+        if(fits_write_date(raw, &status ))
         {
-            if(fptr != NULL)
+            if(raw != NULL)
             {
-                fits_close_file(fptr, &status);
-                delete fptr;
+                fits_close_file(raw, &status);
+                delete raw;
             }
-            fptr = NULL;
+            raw = NULL;
             throw FITSexception(status,"FITSmanager","Create","FILE : "+fileName);
         }
         
-        if(fits_flush_file(fptr, &status ))
+        if(fits_flush_file(raw, &status ))
         {
-            if(fptr != NULL)
+            if(raw != NULL)
             {
-                fits_close_file(fptr, &status);
-                delete fptr;
+                fits_close_file(raw, &status);
+                delete raw;
             }
-            fptr = NULL;
+            raw = NULL;
             throw FITSexception(status,"FITSmanager","Create","FILE : "+fileName);
         }
         
-        FITSmanager new_file(*fptr);
+        FITSmanager new_file(*raw);
         new_file.MoveToPrimary();
         return new_file;
 
@@ -436,7 +434,6 @@ namespace DSL
     
     void FITSmanager::CloseFile(fitsfile* in)
     {
-
         char ffname[999];
         int status = 0;
 
@@ -515,8 +512,6 @@ namespace DSL
     
     const std::shared_ptr<FITScube> FITSmanager::GetImageAtIndex(const int& hdu_index)
     {
-        CFITSIOGuard cfits; // hold across HDU move + type query + object construction
-
         int hdu_type = MoveToHDU(hdu_index); // already under both guards via call above
 
         if(fits_status)
@@ -612,17 +607,18 @@ namespace DSL
 
     const std::shared_ptr<FITScube> FITSmanager::GetImage(const std::string& iname)
     {
-        CFITSIOGuard cfits; // hold across HDU move + type query + object construction
-
-        // Move to HDU by name
-        int hdutype = 0;
-        fits_movnam_hdu(fptr.get(), IMAGE_HDU, (char*) iname.c_str(), 0, &fits_status);
-        if(fits_status)
-            throw FITSexception(fits_status,"FITSmanager","GetImage","IMAGE "+iname+" NOT FOUND BY NAME");
-
-        // get current HDU index
         int hdublck = 0;
-        fits_get_hdu_num(fptr.get(), &hdublck);
+        {
+            std::unique_lock<std::shared_mutex> lk(fptr_mtx);
+
+            // Move to HDU by name
+            fits_movnam_hdu(fptr.get(), IMAGE_HDU, (char*) iname.c_str(), 0, &fits_status);
+            if(fits_status)
+                throw FITSexception(fits_status,"FITSmanager","GetImage","IMAGE "+iname+" NOT FOUND BY NAME");
+
+            // get current HDU index
+            fits_get_hdu_num(fptr.get(), &hdublck);
+        }
 
         // now call GetImageAtIndex to do the rest
         return GetImageAtIndex(hdublck);
@@ -637,9 +633,15 @@ namespace DSL
      @return pointer to the FITStable.
      */
     const std::shared_ptr<FITStable> FITSmanager::GetTableAtIndex(const int& iHDU)
-    {      
-        CFITSIOGuard guard;
-        return std::shared_ptr<FITStable>(new FITStable(fptr, iHDU));
+    {   
+        // copy shared_ptr under shared lock to keep pointer alive while we use it
+        std::shared_ptr<fitsfile> local;
+        {
+            std::shared_lock<std::shared_mutex> lk(fptr_mtx);
+            local = fptr;
+        }
+
+        return std::shared_ptr<FITStable>(new FITStable(local, iHDU));
     }
     
     /**
@@ -649,29 +651,36 @@ namespace DSL
      */
     const std::shared_ptr<FITStable> FITSmanager::GetTable(std::string tname)
     {
-        CFITSIOGuard guard;
-        return std::shared_ptr<FITStable>(new FITStable(fptr, tname));
+        // copy shared_ptr under shared lock to keep pointer alive while we use it
+        std::shared_ptr<fitsfile> local;
+        {
+            std::shared_lock<std::shared_mutex> lk(fptr_mtx);
+            local = fptr;
+        }
+
+        return std::shared_ptr<FITStable>(new FITStable(local, tname));
     }
     
    void FITSmanager::InsertTable(const std::shared_ptr<FITStable>& table)
     {
-        // Creating a table mutates file -> exclusive lock
-        CFITSIOGuard guard;   
-
+        // Take a shared lock to safely read fptr
+        std::shared_lock<std::shared_mutex> rlk(fptr_mtx);
         if(!fptr)
         {
+            rlk.unlock();
             fits_status = SHARED_NULPTR;
             throw FITSexception(fits_status,"FITSmanager","CreateTable","CAN'T CREATE TABLE : NULL FILEPTR");
         }
+        // release read lock before calling functions that may acquire unique locks
+        rlk.unlock();
 
         // Check either the table already exists:
         std::shared_ptr<FITStable> existing_table = nullptr;
-        
         try
         {
             existing_table = GetTable(table->GetName());
         }
-        catch(const std::exception& e)
+        catch(const std::exception& )
         {
             existing_table = nullptr;
         }
@@ -689,66 +698,70 @@ namespace DSL
 
     void FITSmanager::UpdateTable(const std::shared_ptr<FITStable>& table)
     {
-        // Creating a table mutates file -> exclusive lock
-        CFITSIOGuard guard;   
-
-        if(!fptr)
+        // Safely read fptr under shared lock
         {
-            fits_status = SHARED_NULPTR;
-            throw FITSexception(fits_status,"FITSmanager","UpdateTable","CAN'T CREATE TABLE : NULL FILEPTR");
+            std::shared_lock<std::shared_mutex> rlk(fptr_mtx);
+            if(!fptr)
+            {
+                fits_status = SHARED_NULPTR;
+                throw FITSexception(fits_status,"FITSmanager","UpdateTable","CAN'T CREATE TABLE : NULL FILEPTR");
+            }
         }
 
-        std::string tname = table->GetName();
-        int hdublck = 0;
-        ttype hdutype = table->getTableType();
-
-        int hdutype_int = 0;
-        
-        if(hdutype == BINARY_TBL)
-            hdutype_int = BINARY_TBL;
-        else if(hdutype == ASCII_TBL)
-            hdutype_int = ASCII_TBL;
-
-        if(hdutype != BINARY_TBL && hdutype != ASCII_TBL)
         {
-            fits_status = NOT_ATABLE;
-            throw FITSexception(fits_status,"FITSmanager","UpdateTable","TABLE "+tname+" TYPE IS INVALID");
-        }
+            std::shared_lock<std::shared_mutex> lk(fptr_mtx);
+            std::string tname = table->GetName();
+            int hdublck = 0;
+            ttype hdutype = table->getTableType();
 
-        if(tname != "" && tname != "NO NAME")
-        {
-            fits_movnam_hdu(fptr.get(), hdutype_int, (char*) tname.c_str(), 0, &fits_status);
+            int hdutype_int = 0;
+            
+            if(hdutype == BINARY_TBL)
+                hdutype_int = BINARY_TBL;
+            else if(hdutype == ASCII_TBL)
+                hdutype_int = ASCII_TBL;
+
+            if(hdutype != BINARY_TBL && hdutype != ASCII_TBL)
+            {
+                fits_status = NOT_ATABLE;
+                throw FITSexception(fits_status,"FITSmanager","UpdateTable","TABLE "+tname+" TYPE IS INVALID");
+            }
+
+            if(tname != "" && tname != "NO NAME")
+            {
+                fits_movnam_hdu(fptr.get(), hdutype_int, (char*) tname.c_str(), 0, &fits_status);
+                if(fits_status)
+                    throw FITSexception(fits_status,"FITSmanager","UpdateTable","TABLE "+tname+" NOT FOUND BY NAME");
+
+                fits_get_hdu_num(fptr.get(), &hdublck);
+            
+            }
+            else if(table->HDU().Exists("HDUBLKNO"))
+            {
+                hdublck = static_cast<int>(table->HDU().GetUInt16ValueForKey("HDUBLKNO"));
+                fits_movabs_hdu(fptr.get(), hdublck, &hdutype_int, &fits_status);
+            }
+            else
+            {
+                throw std::invalid_argument("\033[31m[FITSmanager::UpdateTable]\033[0m table "+tname+" unidentified.");
+            }
+
+            if(fits_status || (hdutype != BINARY_TBL && hdutype != ASCII_TBL))
+            {
+                std::stringstream ss;
+                ss<<"TABLE "+tname+" HDU BLOCK #"+std::to_string(hdublck)+" NOT FOUND";
+                throw FITSexception(fits_status,"FITSmanager","UpdateTable",ss.str());
+            }
+
+            std::cerr<<"\033[31m[FITSmanager::UpdateTable]\033[0m table "<<tname<<"[\033[31m"<<hdublck<<"\033[0m] will be deleted and replaced with new table."<<std::endl;
+            fits_delete_hdu(fptr.get(), &hdutype_int, &fits_status);
+
             if(fits_status)
-                throw FITSexception(fits_status,"FITSmanager","UpdateTable","TABLE "+tname+" NOT FOUND BY NAME");
-
-            fits_get_hdu_num(fptr.get(), &hdublck);
-        
-        }
-        else if(table->HDU().Exists("HDUBLKNO"))
-        {
-            hdublck = static_cast<int>(table->HDU().GetUInt16ValueForKey("HDUBLKNO"));
-            fits_movabs_hdu(fptr.get(), hdublck, &hdutype_int, &fits_status);
-        }
-        else
-        {
-            throw std::invalid_argument("\033[31m[FITSmanager::UpdateTable]\033[0m table "+tname+" unidentified.");
-        }
-
-        if(fits_status || (hdutype != BINARY_TBL && hdutype != ASCII_TBL))
-        {
-            std::stringstream ss;
-            ss<<"TABLE "+tname+" HDU BLOCK #"+std::to_string(hdublck)+" NOT FOUND";
-            throw FITSexception(fits_status,"FITSmanager","UpdateTable",ss.str());
-        }
-
-        std::cerr<<"\033[31m[FITSmanager::UpdateTable]\033[0m table "<<tname<<"[\033[31m"<<hdublck<<"\033[0m] will be deleted and replaced with new table."<<std::endl;
-        fits_delete_hdu(fptr.get(), &hdutype_int, &fits_status);
-        
-        if(fits_status)
-        {
-            std::stringstream ss;
-            ss<<"TABLE "+tname+" HDU BLOCK #"+std::to_string(hdublck)+" CANNOT BE DELETED";
-            throw FITSexception(fits_status,"FITSmanager","UpdateTable",ss.str());
+            {
+                std::stringstream ss;
+                ss<<"TABLE "+tname+" HDU BLOCK #"+std::to_string(hdublck)+" CANNOT BE DELETED";
+                throw FITSexception(fits_status,"FITSmanager","UpdateTable",ss.str());
+            }
         }
 
         // Move to the end of the file to append the new table
@@ -764,7 +777,6 @@ namespace DSL
 
     int FITSmanager::MoveToHDU(const int& hdu_index)
     {
-        CFITSIOGuard cfits; // serialize current-HDU movement
         std::unique_lock<std::shared_mutex> lk(fptr_mtx);
 
         if(!fptr)
@@ -810,22 +822,24 @@ namespace DSL
      */
     void FITSmanager::AppendImage(FITScube &img)
     {
-        CFITSIOGuard cfits; // serialize all CFITSIO ops below
-        std::unique_lock<std::shared_mutex> lk(fptr_mtx);
-
-        if(!fptr)
         {
-            fits_status = SHARED_NULPTR;
-            throw FITSexception(fits_status,"FITSmanager","GetHeaderAtIndex","CAN'T GET HEADER FROM NULL POINTER");
+            // Read fptr under shared lock for null check
+            std::shared_lock<std::shared_mutex> rlk(fptr_mtx);
+            if(!fptr)
+            {
+                fits_status = SHARED_NULPTR;
+                throw FITSexception(fits_status,"FITSmanager","GetHeaderAtIndex","CAN'T GET HEADER FROM NULL POINTER");
+            }
         }
         
         if(img.GetBitPerPixel() == 0)
         {
             throw std::invalid_argument("\033[31m[FITSmanager::AppendImage]\033[0minvalid BITPIX");
-            return;
         }
 
+        std::unique_lock<std::shared_mutex> lk(fptr_mtx);
         fits_status = 0;
+
         
         if((verbose & verboseLevel::VERBOSE_DETAIL)== verboseLevel::VERBOSE_DETAIL)
             std::cout<<"\033[31m[FITSmanager::AppendImage]\033[0m: Append image of "<<img.GetDimension()<<" axis (";
@@ -902,56 +916,58 @@ namespace DSL
         
         try
         {
-        switch (val.type()) {
-            case fChar :
-                if(val.value().size() < 68)
-                {
-                    if(ffukys(fptr.get(), const_cast<char*>( key.c_str() ), const_cast<char*>( val.value().c_str() ), comment, &fits_status ))
+            switch (val.type()) {
+                case fChar :
+                    if(val.value().size() < 68)
                     {
-                        throw FITSexception(fits_status,"FITSmanager","AppendKey");
+                        std::shared_lock<std::shared_mutex> lk(fptr_mtx);
+                        if(ffukys(fptr.get(), const_cast<char*>( key.c_str() ), const_cast<char*>( val.value().c_str() ), comment, &fits_status ))
+                        {
+                            throw FITSexception(fits_status,"FITSmanager","AppendKey");
+                        }
                     }
-                }
-                else
-                {
-                    if(ffukys(fptr.get(), const_cast<char*>( key.c_str() ), const_cast<char*>( val.value().c_str() ), comment, &fits_status ))
+                    else
                     {
-                        throw FITSexception(fits_status,"FITSmanager","AppendKey");
+                        std::shared_lock<std::shared_mutex> lk(fptr_mtx);
+                        if(ffukys(fptr.get(), const_cast<char*>( key.c_str() ), const_cast<char*>( val.value().c_str() ), comment, &fits_status ))
+                        {
+                            throw FITSexception(fits_status,"FITSmanager","AppendKey");
+                        }
                     }
-                }
-                break;
-                
-            case fShort :
-                AppendKeyToHeader(HDU, key, TSHORT, val.value(), val.comment());
-                break;
-                
-            case fInt :
-                AppendKeyToHeader(HDU, key, TINT, val.value(), val.comment());
-                break;
-                
-            case fLong :
-                AppendKeyToHeader(HDU, key, TLONG, val.value(), val.comment());
-                break;
-                
-            case fLongLong :
-                AppendKeyToHeader(HDU, key, TLONGLONG, val.value(), val.comment());
-                break;
-                
-            case fBool :
-                AppendKeyToHeader(HDU, key, TBYTE, val.value(), val.comment());
-                break;
-                
-            case fFloat :
-                AppendKeyToHeader(HDU, key, TFLOAT, val.value(), val.comment());
-                break;
-                
-            case fDouble :
-                AppendKeyToHeader(HDU, key, TDOUBLE, val.value(), val.comment());
-                break;
-                
-            default:
-                AppendKeyToHeader(HDU, key, TSTRING, val.value(), val.comment());
-                break;
-        }
+                    break;
+
+                case fShort :
+                    AppendKeyToHeader(HDU, key, TSHORT, val.value(), val.comment());
+                    break;
+
+                case fInt :
+                    AppendKeyToHeader(HDU, key, TINT, val.value(), val.comment());
+                    break;
+
+                case fLong :
+                    AppendKeyToHeader(HDU, key, TLONG, val.value(), val.comment());
+                    break;
+
+                case fLongLong :
+                    AppendKeyToHeader(HDU, key, TLONGLONG, val.value(), val.comment());
+                    break;
+
+                case fBool :
+                    AppendKeyToHeader(HDU, key, TBYTE, val.value(), val.comment());
+                    break;
+
+                case fFloat :
+                    AppendKeyToHeader(HDU, key, TFLOAT, val.value(), val.comment());
+                    break;
+
+                case fDouble :
+                    AppendKeyToHeader(HDU, key, TDOUBLE, val.value(), val.comment());
+                    break;
+
+                default:
+                    AppendKeyToHeader(HDU, key, TSTRING, val.value(), val.comment());
+                    break;
+            }
         }
         catch(std::exception& e)
         {
@@ -1000,6 +1016,7 @@ namespace DSL
     {
         // writing metadata -> exclusive lock
         std::unique_lock<std::shared_mutex> lk(fptr_mtx);
+        
         fits_status = 0;
         
         if(!fptr or fptr.use_count() < 1)

@@ -369,7 +369,7 @@ namespace DSL
     template< >
     void FITStable::read(FITScolumn<FITSform::complex>* data,  const std::shared_ptr<fitsfile>& fptr,  const size_t& row)
     {
-        CFITSIOGuard cfits; // protect CFITSIO globally
+        
         long nrows = 0; 
         int tbl_status = 0;
         fits_get_num_rows(fptr.get(), &nrows, &tbl_status);
@@ -420,7 +420,7 @@ namespace DSL
     template< >
     void FITStable::read(FITScolumn<FITSform::dblcomplex>* data,  const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
-        CFITSIOGuard cfits;
+        
 
         long nrows = 0; 
         int tbl_status = 0;
@@ -466,7 +466,7 @@ namespace DSL
     template< >
     void FITStable::read( FITScolumn<std::string>* data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
-        CFITSIOGuard cfits;
+        
 
         long nrows = 0; 
         int tbl_status = 0;
@@ -533,7 +533,7 @@ namespace DSL
     template< >
     void FITStable::readVector(FITScolumn< FITSform::complexVector> * data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
-        CFITSIOGuard cfits;
+        
 
         long nrows = 0; 
         int tbl_status = 0;
@@ -580,7 +580,7 @@ namespace DSL
     template< >
     void FITStable::readVector(FITScolumn< FITSform::dblcomplexVector> * data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
-        CFITSIOGuard cfits;
+        
 
         long nrows = 0; 
         int tbl_status = 0;
@@ -628,7 +628,7 @@ namespace DSL
     template< >
     void FITStable::readVector(FITScolumn< std::vector<std::string> >* data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
-        CFITSIOGuard cfits;
+        
 
         long nrows = 0; 
         int tbl_status = 0;
@@ -703,7 +703,7 @@ namespace DSL
     template< >
     void FITScolumn< uint32_t >::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        CFITSIOGuard cfits;
+        
 
         const auto& data = this->values<uint32_t>();
         if(fptr == nullptr)
@@ -742,7 +742,7 @@ namespace DSL
     template< >
     void FITScolumn< FITSform::complex >::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        CFITSIOGuard cfits;
+        
 
         const auto& data = this->values<FITSform::complex>();
         if(fptr == nullptr)
@@ -781,7 +781,7 @@ namespace DSL
     template< >
     void FITScolumn<FITSform::dblcomplex>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        CFITSIOGuard cfits;
+        
 
         const auto& data = this->values<FITSform::dblcomplex>();
         if(fptr == nullptr)
@@ -820,7 +820,7 @@ namespace DSL
     template< >
     void FITScolumn<std::string>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        CFITSIOGuard cfits;
+        
 
         const auto& data = this->values<std::string>();
         if(fptr == nullptr)
@@ -859,7 +859,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::int8Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        CFITSIOGuard cfits;
+        
 
         const auto& data = this->values<FITSform::int8Vector>();
         if(!fptr)
@@ -897,7 +897,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::uint8Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        CFITSIOGuard cfits;
+        
         
         const auto& data = this->values<FITSform::uint8Vector>();
         if(!fptr)
@@ -935,7 +935,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::int16Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        CFITSIOGuard cfits;
+        
 
         const auto& data = this->values<FITSform::int16Vector>();
         if(!fptr)
@@ -974,7 +974,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::uint16Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        CFITSIOGuard cfits;
+        
 
         const auto& data = this->values<FITSform::uint16Vector>();
         if(!fptr)
@@ -1012,7 +1012,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::int32Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        CFITSIOGuard cfits;
+        
 
         const auto& data = this->values<FITSform::int32Vector>();
 
@@ -1077,7 +1077,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::uint32Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        CFITSIOGuard cfits;
+        
 
         const auto& data = this->values<FITSform::uint32Vector>();
 
@@ -1142,7 +1142,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::int64Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        CFITSIOGuard cfits;
+        
 
         const auto& data = this->values<FITSform::int64Vector>();
         if(!fptr)
@@ -1181,7 +1181,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::uint64Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        CFITSIOGuard cfits;
+        
 
         const auto& data = this->values<FITSform::uint64Vector>();
 
@@ -1214,7 +1214,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::floatVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        CFITSIOGuard cfits;
+        
 
         const auto& data = this->values<FITSform::floatVector>();
         
@@ -1254,7 +1254,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::doubleVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        CFITSIOGuard cfits;
+        
 
         const auto& data = this->values<FITSform::doubleVector>();
 
@@ -1294,7 +1294,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::complexVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        CFITSIOGuard cfits;
+        
 
         const auto& data = this->values<FITSform::complexVector>();
         if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<complexVector>","write");
@@ -1335,7 +1335,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::dblcomplexVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        CFITSIOGuard cfits;
+        
 
         const auto& data = this->values<FITSform::dblcomplexVector>();
 
@@ -1385,7 +1385,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::stringVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        CFITSIOGuard cfits;
+        
 
         const auto& data = this->values<FITSform::stringVector>();
 
@@ -1424,7 +1424,7 @@ namespace DSL
     template<>
     void FITScolumn<bool>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        CFITSIOGuard cfits;
+        
 
         const auto& data = this->values<bool>();
 
@@ -1490,7 +1490,7 @@ namespace DSL
     template<>
     void FITScolumn< FITSform::boolVector >::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        CFITSIOGuard cfits;
+        
 
         const auto& data = this->values<FITSform::boolVector>();
 
@@ -1566,7 +1566,7 @@ namespace DSL
     template<>
     void FITStable::read(FITScolumn<bool>* data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
-        CFITSIOGuard cfits;
+        
 
         if(!fptr)
             throw FITSexception(FILE_NOT_OPENED,"FITStable","read<bool>");
@@ -1655,7 +1655,7 @@ namespace DSL
     template<>
     void FITStable::readVector(FITScolumn<FITSform::boolVector>* data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
     {
-        CFITSIOGuard cfits;
+        
         
         if(!fptr)
             throw FITSexception(FILE_NOT_OPENED,"FITStable","readVector<bool>");
@@ -1773,7 +1773,7 @@ namespace DSL
     FITStable::FITStable(const std::shared_ptr<fitsfile>& fits,
                         const int& iHDU):ftbl_type(ttype::tbinary),hdu(FITShdu()),nrows_cache(0)
     {
-        CFITSIOGuard cfits; // protect CFITSIO globally
+        
         int tbl_status = 0;
 
         if(fits == nullptr || fits.use_count() == 0)
@@ -1853,7 +1853,7 @@ namespace DSL
     FITStable::FITStable(const std::shared_ptr<fitsfile>& fits,
                          const std::string& extname):ftbl_type(ttype::tbinary),hdu(FITShdu()),nrows_cache(0)
     {
-        CFITSIOGuard cfits; // protect CFITSIO globally
+        
         int tbl_status = 0;
 
         if(fits == nullptr || fits.use_count() == 0)
@@ -1926,7 +1926,7 @@ namespace DSL
      */
     void FITStable::load(const std::shared_ptr<fitsfile>& fptr, const size_t & start)
     {
-        CFITSIOGuard cfits;
+        
         int tbl_status = 0;
 
         if(fptr == nullptr || fptr.use_count() == 0)
@@ -1955,7 +1955,7 @@ namespace DSL
      */
     std::unique_ptr<FITSform> FITStable::readColumn(const std::shared_ptr<fitsfile>& fptr, const size_t& n, const size_t& start)
     {
-        CFITSIOGuard cfits;
+        
         int tbl_status = 0;
 
         if(fptr == nullptr || fptr.use_count() == 0)
@@ -2546,7 +2546,7 @@ namespace DSL
      */
     void FITStable::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& start)
     {
-        CFITSIOGuard cfits; // serialize CFITSIO operations
+        
         int tbl_status = 0;
 
         const int tfields = static_cast<int>(ncols());
