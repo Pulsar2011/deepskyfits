@@ -520,7 +520,10 @@ namespace DSL
         int  nKey    = 0;
         int  status  = 0, cflags = 0;
         
-        cflags = fits_hdr2str(fptr.get(), 0, NULL, 0, &header, &nKey, &status);
+        {
+            CFITSIOGuard  guard;
+            cflags = fits_hdr2str(fptr.get(), 0, NULL, 0, &header, &nKey, &status);
+        }
         
         if(cflags || header == NULL)
         {
@@ -1078,9 +1081,9 @@ namespace DSL
      *  @details Write FITS header to the current HDU
      *  @param fptr : HDU where this header will be written
      */
-    void FITShdu::Write(const std::shared_ptr<fitsfile>& fptr) const
+    void FITShdu::Write(const std::shared_ptr<fitsfile>& _fptr_) const
     {
-        if(fptr == NULL)
+        if(_fptr_ == NULL)
         {
             throw std::invalid_argument("\033[31m[FITShdu::Write]\033[0mreceived nullptr");
             return;
@@ -1088,6 +1091,12 @@ namespace DSL
         
         if((verbose&verboseLevel::VERBOSE_HDU)==verboseLevel::VERBOSE_HDU)
             std::cout<<"\033[31m[FITShdu::Write]\033[0m"<<std::endl;
+
+        std::shared_ptr<fitsfile> fptr;
+        {
+            CFITSIOGuard  guard;
+            fptr = _fptr_;
+        }
         
         FITSDictionary::const_iterator it;
         
@@ -1225,8 +1234,14 @@ namespace DSL
      *  @param it : FITSDictionary iterator encapsulating KEYWORD, VALUE and COMMENT filed of the FITS Header keyword
      *  @param fptr : HDU where this header will be written
      */
-    void FITShdu::WriteCharValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& fptr) const
+    void FITShdu::WriteCharValueForKey(FITSDictionary::const_iterator it, const std::shared_ptr<fitsfile>& _fptr_) const
     {
+        std::shared_ptr<fitsfile> fptr;
+        {
+            CFITSIOGuard  guard;
+            fptr = _fptr_;
+        }
+
         if(fptr == nullptr || fptr.use_count() < 1)
             throw FITSexception(NULL_INPUT_PTR,"FITShdu","WriteCharValueForKey","received nullptr");
         
@@ -1275,8 +1290,11 @@ namespace DSL
 
         int status = 0;
 
-        if( fits_update_key(fptr.get(), TLOGICAL, keybuf.data(), &val, cmtbuf.data(), &status ) )
-            throw FITSexception(status,"FITShdu","Write");
+        {
+            CFITSIOGuard  guard;
+            if( fits_update_key(fptr.get(), TLOGICAL, keybuf.data(), &val, cmtbuf.data(), &status ) )
+                throw FITSexception(status,"FITShdu","Write");
+        }
         
         return;
     }
@@ -1305,8 +1323,11 @@ namespace DSL
 
         int status = 0;
 
-        if( fits_update_key(fptr.get(), TSHORT, keybuf.data(), &val, cmtbuf.data(), &status ) )
-            throw FITSexception(status,"FITShdu","Write");
+        {
+            CFITSIOGuard  guard;
+            if( fits_update_key(fptr.get(), TSHORT, keybuf.data(), &val, cmtbuf.data(), &status ) )
+                throw FITSexception(status,"FITShdu","Write");
+        }
 
         return;
     }
@@ -1334,8 +1355,11 @@ namespace DSL
 
         int status = 0;
 
-        if( fits_update_key(fptr.get(), TSHORT, keybuf.data(), &val, cmtbuf.data(), &status ) )
-            throw FITSexception(status,"FITShdu","Write");
+        {
+            CFITSIOGuard  guard;
+            if( fits_update_key(fptr.get(), TSHORT, keybuf.data(), &val, cmtbuf.data(), &status ) )
+                throw FITSexception(status,"FITShdu","Write");
+        }
 
         return;
     }
@@ -1363,8 +1387,11 @@ namespace DSL
 
         int status = 0;
 
-        if(fits_update_key(fptr.get(), TINT, keybuf.data(), &val, cmtbuf.data(), &status ) )
-            throw FITSexception(status,"FITShdu","Write");
+        {
+            CFITSIOGuard  guard;
+            if(fits_update_key(fptr.get(), TINT, keybuf.data(), &val, cmtbuf.data(), &status ) )
+                throw FITSexception(status,"FITShdu","Write");
+        }
 
         return;
     }
@@ -1392,8 +1419,11 @@ namespace DSL
 
         int status = 0;
 
-        if(fits_update_key(fptr.get(), TINT, keybuf.data(), &val, cmtbuf.data(), &status ) )
-            throw FITSexception(status,"FITShdu","Write");
+        {
+            CFITSIOGuard  guard;
+            if(fits_update_key(fptr.get(), TINT, keybuf.data(), &val, cmtbuf.data(), &status ) )
+                throw FITSexception(status,"FITShdu","Write");
+        }
 
         return;
     }
@@ -1421,8 +1451,11 @@ namespace DSL
 
         int status = 0;
 
-        if( fits_update_key(fptr.get(), TLONG, keybuf.data(), &val, cmtbuf.data(), &status ) )
-            throw FITSexception(status,"FITShdu","Write");
+        {
+            CFITSIOGuard  guard;
+            if( fits_update_key(fptr.get(), TLONG, keybuf.data(), &val, cmtbuf.data(), &status ) )
+                throw FITSexception(status,"FITShdu","Write");
+        }
 
         return;
     }
@@ -1450,8 +1483,11 @@ namespace DSL
 
         int status = 0;
 
-        if( fits_update_key(fptr.get(), TULONG, keybuf.data(), &val, cmtbuf.data(), &status ) )
-            throw FITSexception(status,"FITShdu","Write");
+        {
+            CFITSIOGuard  guard;
+            if( fits_update_key(fptr.get(), TULONG, keybuf.data(), &val, cmtbuf.data(), &status ) )
+                throw FITSexception(status,"FITShdu","Write");
+        }
 
         return;
     }
@@ -1479,8 +1515,11 @@ namespace DSL
 
         int status = 0;
 
-        if( fits_update_key(fptr.get(), TLONGLONG, keybuf.data(), &val, cmtbuf.data(), &status ) )
-            throw FITSexception(status,"FITShdu","Write");
+        {
+            CFITSIOGuard  guard;
+            if( fits_update_key(fptr.get(), TLONGLONG, keybuf.data(), &val, cmtbuf.data(), &status ) )
+                throw FITSexception(status,"FITShdu","Write");
+        }
 
         return;
     }
@@ -1508,8 +1547,11 @@ namespace DSL
 
         int status = 0;
 
-        if( fits_update_key(fptr.get(), TULONGLONG, keybuf.data(), &val, cmtbuf.data(), &status ) )
-            throw FITSexception(status,"FITShdu","Write");
+        {
+            CFITSIOGuard  guard;
+            if( fits_update_key(fptr.get(), TULONGLONG, keybuf.data(), &val, cmtbuf.data(), &status ) )
+                throw FITSexception(status,"FITShdu","Write");
+        }
         
         return;
     }
@@ -1538,8 +1580,11 @@ namespace DSL
 
         int status = 0;
 
-        if( fits_update_key(fptr.get(), TFLOAT, keybuf.data(), &val, cmtbuf.data(), &status ) )
+        {
+            CFITSIOGuard  guard;
+            if( fits_update_key(fptr.get(), TFLOAT, keybuf.data(), &val, cmtbuf.data(), &status ) )
                 throw FITSexception(status,"FITShdu","Write");
+        }
         
         return;
     }
@@ -1570,8 +1615,11 @@ namespace DSL
 
         int status = 0;
 
-        if( fits_update_key(fptr.get(), TDOUBLE, keybuf.data(), &val, cmtbuf.data(), &status ) )
+        {
+            CFITSIOGuard  guard;
+            if( fits_update_key(fptr.get(), TDOUBLE, keybuf.data(), &val, cmtbuf.data(), &status ) )
                 throw FITSexception(status,"FITShdu","Write");
+        }
         
         return;
     }

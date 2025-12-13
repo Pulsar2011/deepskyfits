@@ -367,9 +367,14 @@ namespace DSL
      * @throws FITSexception on CFITSIO error.
      */
     template< >
-    void FITStable::read(FITScolumn<FITSform::complex>* data,  const std::shared_ptr<fitsfile>& fptr,  const size_t& row)
+    void FITStable::read(FITScolumn<FITSform::complex>* data,  const std::shared_ptr<fitsfile>& _fptr_,  const size_t& row)
     {
-        
+        std::shared_ptr<fitsfile> fptr;   
+        {
+            CFITSIOGuard  guard;
+            fptr=_fptr_;
+        }
+
         long nrows = 0; 
         int tbl_status = 0;
         fits_get_num_rows(fptr.get(), &nrows, &tbl_status);
@@ -418,9 +423,13 @@ namespace DSL
      * @throws FITSexception on CFITSIO error.
      */
     template< >
-    void FITStable::read(FITScolumn<FITSform::dblcomplex>* data,  const std::shared_ptr<fitsfile>& fptr, const size_t& row)
+    void FITStable::read(FITScolumn<FITSform::dblcomplex>* data,  const std::shared_ptr<fitsfile>& _fptr_, const size_t& row)
     {
-        
+        std::shared_ptr<fitsfile> fptr;
+        {
+            CFITSIOGuard  guard;
+            fptr=_fptr_;
+        }
 
         long nrows = 0; 
         int tbl_status = 0;
@@ -464,9 +473,13 @@ namespace DSL
      * @throws FITSexception on CFITSIO error.
      */
     template< >
-    void FITStable::read( FITScolumn<std::string>* data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
+    void FITStable::read( FITScolumn<std::string>* data, const std::shared_ptr<fitsfile>& _fptr_, const size_t& row)
     {
-        
+        std::shared_ptr<fitsfile> fptr;
+        {
+            CFITSIOGuard  guard;
+            fptr=_fptr_;
+        }
 
         long nrows = 0; 
         int tbl_status = 0;
@@ -531,9 +544,13 @@ namespace DSL
      * @param row 1-based first row.
      */
     template< >
-    void FITStable::readVector(FITScolumn< FITSform::complexVector> * data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
+    void FITStable::readVector(FITScolumn< FITSform::complexVector> * data, const std::shared_ptr<fitsfile>& _fptr_, const size_t& row)
     {
-        
+        std::shared_ptr<fitsfile> fptr;
+        {
+            CFITSIOGuard  guard;
+            fptr=_fptr_;
+        }
 
         long nrows = 0; 
         int tbl_status = 0;
@@ -578,9 +595,13 @@ namespace DSL
      * @param row 1-based first row.
      */
     template< >
-    void FITStable::readVector(FITScolumn< FITSform::dblcomplexVector> * data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
+    void FITStable::readVector(FITScolumn< FITSform::dblcomplexVector> * data, const std::shared_ptr<fitsfile>& _fptr_, const size_t& row)
     {
-        
+        std::shared_ptr<fitsfile> fptr;
+        {
+            CFITSIOGuard  guard;
+            fptr=_fptr_;
+        }
 
         long nrows = 0; 
         int tbl_status = 0;
@@ -626,9 +647,13 @@ namespace DSL
      * @throws FITSexception on CFITSIO error.
      */
     template< >
-    void FITStable::readVector(FITScolumn< std::vector<std::string> >* data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
+    void FITStable::readVector(FITScolumn< std::vector<std::string> >* data, const std::shared_ptr<fitsfile>& _fptr_, const size_t& row)
     {
-        
+        std::shared_ptr<fitsfile> fptr;
+        {
+            CFITSIOGuard  guard;
+            fptr=_fptr_;
+        }
 
         long nrows = 0; 
         int tbl_status = 0;
@@ -703,7 +728,7 @@ namespace DSL
     template< >
     void FITScolumn< uint32_t >::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        
+        std::unique_lock<std::shared_mutex> lk(this->data_mtx);
 
         const auto& data = this->values<uint32_t>();
         if(fptr == nullptr)
@@ -742,7 +767,7 @@ namespace DSL
     template< >
     void FITScolumn< FITSform::complex >::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        
+        std::unique_lock<std::shared_mutex> lk(this->data_mtx);
 
         const auto& data = this->values<FITSform::complex>();
         if(fptr == nullptr)
@@ -781,7 +806,7 @@ namespace DSL
     template< >
     void FITScolumn<FITSform::dblcomplex>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        
+        std::unique_lock<std::shared_mutex> lk(this->data_mtx);
 
         const auto& data = this->values<FITSform::dblcomplex>();
         if(fptr == nullptr)
@@ -820,7 +845,7 @@ namespace DSL
     template< >
     void FITScolumn<std::string>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        
+        std::unique_lock<std::shared_mutex> lk(this->data_mtx);
 
         const auto& data = this->values<std::string>();
         if(fptr == nullptr)
@@ -859,7 +884,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::int8Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        
+        std::unique_lock<std::shared_mutex> lk(this->data_mtx);
 
         const auto& data = this->values<FITSform::int8Vector>();
         if(!fptr)
@@ -897,7 +922,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::uint8Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        
+        std::unique_lock<std::shared_mutex> lk(this->data_mtx);
         
         const auto& data = this->values<FITSform::uint8Vector>();
         if(!fptr)
@@ -935,7 +960,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::int16Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        
+        std::unique_lock<std::shared_mutex> lk(this->data_mtx);
 
         const auto& data = this->values<FITSform::int16Vector>();
         if(!fptr)
@@ -974,7 +999,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::uint16Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        
+        std::unique_lock<std::shared_mutex> lk(this->data_mtx);
 
         const auto& data = this->values<FITSform::uint16Vector>();
         if(!fptr)
@@ -1012,7 +1037,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::int32Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        
+        std::unique_lock<std::shared_mutex> lk(this->data_mtx);
 
         const auto& data = this->values<FITSform::int32Vector>();
 
@@ -1077,7 +1102,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::uint32Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        
+        std::unique_lock<std::shared_mutex> lk(this->data_mtx);
 
         const auto& data = this->values<FITSform::uint32Vector>();
 
@@ -1142,7 +1167,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::int64Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        
+        std::unique_lock<std::shared_mutex> lk(this->data_mtx);
 
         const auto& data = this->values<FITSform::int64Vector>();
         if(!fptr)
@@ -1181,7 +1206,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::uint64Vector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        
+        std::unique_lock<std::shared_mutex> lk(this->data_mtx);
 
         const auto& data = this->values<FITSform::uint64Vector>();
 
@@ -1214,7 +1239,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::floatVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        
+        std::unique_lock<std::shared_mutex> lk(this->data_mtx);
 
         const auto& data = this->values<FITSform::floatVector>();
         
@@ -1254,7 +1279,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::doubleVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        
+        std::unique_lock<std::shared_mutex> lk(this->data_mtx);
 
         const auto& data = this->values<FITSform::doubleVector>();
 
@@ -1294,7 +1319,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::complexVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        
+        std::unique_lock<std::shared_mutex> lk(this->data_mtx);
 
         const auto& data = this->values<FITSform::complexVector>();
         if(!fptr) throw FITSexception(FILE_NOT_OPENED,"FITScolumn<complexVector>","write");
@@ -1335,7 +1360,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::dblcomplexVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        
+        std::unique_lock<std::shared_mutex> lk(this->data_mtx);
 
         const auto& data = this->values<FITSform::dblcomplexVector>();
 
@@ -1385,7 +1410,7 @@ namespace DSL
     template<>
     void FITScolumn<FITSform::stringVector>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        
+        std::unique_lock<std::shared_mutex> lk(this->data_mtx);
 
         const auto& data = this->values<FITSform::stringVector>();
 
@@ -1424,7 +1449,7 @@ namespace DSL
     template<>
     void FITScolumn<bool>::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        
+        std::unique_lock<std::shared_mutex> lk(this->data_mtx);
 
         const auto& data = this->values<bool>();
 
@@ -1490,7 +1515,7 @@ namespace DSL
     template<>
     void FITScolumn< FITSform::boolVector >::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& first_row)
     {
-        
+        std::unique_lock<std::shared_mutex> lk(this->data_mtx);
 
         const auto& data = this->values<FITSform::boolVector>();
 
@@ -1564,9 +1589,13 @@ namespace DSL
      * @param row 1-based first row.
      */
     template<>
-    void FITStable::read(FITScolumn<bool>* data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
+    void FITStable::read(FITScolumn<bool>* data, const std::shared_ptr<fitsfile>& _fptr_, const size_t& row)
     {
-        
+        std::shared_ptr<fitsfile> fptr;
+        {
+            CFITSIOGuard guard;
+            fptr = _fptr_;
+        }
 
         if(!fptr)
             throw FITSexception(FILE_NOT_OPENED,"FITStable","read<bool>");
@@ -1653,9 +1682,13 @@ namespace DSL
      * @param row 1-based first row.
      */
     template<>
-    void FITStable::readVector(FITScolumn<FITSform::boolVector>* data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
+    void FITStable::readVector(FITScolumn<FITSform::boolVector>* data, const std::shared_ptr<fitsfile>& _fptr_, const size_t& row)
     {
-        
+        std::shared_ptr<fitsfile> fptr;
+        {
+            CFITSIOGuard guard;
+            fptr = _fptr_;
+        }
         
         if(!fptr)
             throw FITSexception(FILE_NOT_OPENED,"FITStable","readVector<bool>");
@@ -1770,20 +1803,26 @@ namespace DSL
      @throw invalid_argument if the HDU block you wish to access does not exist.
      @throw logic_error if the HDU block you wish to access neither contains a FITS BINARY nor a FITS ASCII table.
      */
-    FITStable::FITStable(const std::shared_ptr<fitsfile>& fits,
+    FITStable::FITStable(const std::shared_ptr<fitsfile>& _fits_,
                         const int& iHDU):ftbl_type(ttype::tbinary),hdu(FITShdu()),nrows_cache(0)
     {
         
         int tbl_status = 0;
 
-        if(fits == nullptr || fits.use_count() == 0)
+        if(_fits_ == nullptr || _fits_.use_count() == 0)
         {
             tbl_status = FILE_NOT_OPENED;
             throw FITSexception(tbl_status,"FITStable","ctor","Input fitsfile pointer is null.");
         }
 
         int hdu_type = ANY_HDU;
-        int fhdu_num = 0;        
+        int fhdu_num = 0; 
+        
+        std::shared_ptr<fitsfile> fits;
+        {
+            CFITSIOGuard guard;
+            fits = _fits_;
+        }
         
         //Get current HDU position
         if(!fits_get_hdu_num(fits.get(), &fhdu_num))
@@ -1850,19 +1889,25 @@ namespace DSL
      @throw invalid_argument if the HDU block you wish to access does not exist.
      @throw logic_error if the HDU block you wish to access neither contains a FITS BINARY nor a FITS ASCII table.
      */
-    FITStable::FITStable(const std::shared_ptr<fitsfile>& fits,
+    FITStable::FITStable(const std::shared_ptr<fitsfile>& _fits_,
                          const std::string& extname):ftbl_type(ttype::tbinary),hdu(FITShdu()),nrows_cache(0)
     {
         
         int tbl_status = 0;
 
-        if(fits == nullptr || fits.use_count() == 0)
+        if(_fits_ == nullptr || _fits_.use_count() == 0)
         {
             tbl_status = FILE_NOT_OPENED;
             throw FITSexception(tbl_status,"FITStable","ctor","Input fitsfile pointer is null.");
         }
 
         int hdu_type = ASCII_TBL;
+
+        std::shared_ptr<fitsfile> fits;
+        {
+            CFITSIOGuard guard;
+            fits = _fits_;
+        }
 
         //Move to desired HDU block
         if(fits_movnam_hdu(fits.get(), hdu_type, const_cast<char*>(extname.c_str()), 0, &tbl_status))
@@ -1926,10 +1971,15 @@ namespace DSL
      */
     void FITStable::load(const std::shared_ptr<fitsfile>& fptr, const size_t & start)
     {
-        
+        std::shared_ptr<fitsfile> fits;
+        {
+            CFITSIOGuard guard;
+            fits = fptr;
+        }
+
         int tbl_status = 0;
 
-        if(fptr == nullptr || fptr.use_count() == 0)
+        if(fits == nullptr || fits.use_count() == 0)
         {
             tbl_status = FILE_NOT_OPENED;
             throw FITSexception(tbl_status,"FITStable","load","Input fitsfile pointer is null.");
@@ -1937,12 +1987,12 @@ namespace DSL
 
         int ncols =0 ;
 
-        if(ffgncl(fptr.get(), &ncols, &tbl_status))
+        if(ffgncl(fits.get(), &ncols, &tbl_status))
             throw FITSexception(tbl_status,"FITStable","getNcols");
         
         for(size_t n = 1; n <= static_cast<size_t>(ncols); n++)
         {
-            fcolumns.push_back(readColumn(fptr,n,start));
+            fcolumns.push_back(readColumn(fits,n,start));
         }
     }
 
@@ -1953,9 +2003,15 @@ namespace DSL
      * @param start 1-based first row.
      * @return Owned FITSform pointer (unique_ptr).
      */
-    std::unique_ptr<FITSform> FITStable::readColumn(const std::shared_ptr<fitsfile>& fptr, const size_t& n, const size_t& start)
+    std::unique_ptr<FITSform> FITStable::readColumn(const std::shared_ptr<fitsfile>& _fptr_, const size_t& n, const size_t& start)
     {
         
+        std::shared_ptr<fitsfile> fptr;
+        {
+            CFITSIOGuard guard;
+            fptr = _fptr_;
+        }
+
         int tbl_status = 0;
 
         if(fptr == nullptr || fptr.use_count() == 0)
@@ -2544,7 +2600,7 @@ namespace DSL
      @param tform The data to be written
      @param start The row index to which one whish to start writting data
      */
-    void FITStable::write(const std::shared_ptr<fitsfile>& fptr, const int64_t& start)
+    void FITStable::write(const std::shared_ptr<fitsfile>& _fptr_, const int64_t& start)
     {
         
         int tbl_status = 0;
@@ -2576,6 +2632,13 @@ namespace DSL
         }
 
         int hdu_num=0;
+
+        std::shared_ptr <fitsfile> fptr;
+        {
+            CFITSIOGuard guard;
+            fptr = _fptr_;
+        }
+
         //1- Move to the corret HDU if it exist in the corresponding FITS file. Create new table otherwize
         if(hdu.Exists("EXTNAME") && hdu.GetValueForKey("EXTNAME") != "NO NAME")
         {

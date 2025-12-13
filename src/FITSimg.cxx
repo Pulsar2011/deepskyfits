@@ -112,10 +112,16 @@ class FITSmanager;
      *  @details Read current HDU of the fitsfile to extract a 2D images
      *  @param fptr: Pointer to the fitfile
      */
-    FITScube::FITScube(const std::shared_ptr<fitsfile>& fptr):fwcs()
+    FITScube::FITScube(const std::shared_ptr<fitsfile>& _fptr_):fwcs()
     {
         
         init();
+
+        std::shared_ptr<fitsfile> fptr;
+        {
+            CFITSIOGuard  guard;
+            fptr = _fptr_;
+        }
 
 
         if(fptr == nullptr || fptr.use_count() < 1)

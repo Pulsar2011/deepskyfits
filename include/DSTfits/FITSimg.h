@@ -1054,6 +1054,7 @@ namespace DSL
     void FITSimg<T>::ReadArray(const std::shared_ptr<fitsfile>& fptr)
     {
         
+        CFITSIOGuard  guard;
         if(fptr == nullptr || fptr.use_count() < 1)
             return;
             
@@ -1299,6 +1300,12 @@ namespace DSL
             throw std::invalid_argument("\033[31m[FITSimg::WriteDataCube]\033[0mreceived nullptr");
         }
 
+        std::shared_ptr<fitsfile> local;
+        {
+            CFITSIOGuard guard;
+            local = fptr;
+        }
+
         if (mask.sum() > 0 && !(std::is_floating_point_v<T> ? std::isnan(static_cast<long double>(BLANK)) : false))
         {
             hdu.ValueForKey("BLANK", BLANK);
@@ -1359,8 +1366,7 @@ namespace DSL
             std::cout<<std::endl;
         }
 
-        //if( fits_write_pixll(fptr.get(), DATA_TYPE, fpixel.data(), array_size, outbuf.data(), &img_status) )
-        if( fits_write_img(fptr.get(), DATA_TYPE, (LONGLONG)1, array_size, outbuf.data(), &img_status) )
+        if( fits_write_img(local.get(), DATA_TYPE, (LONGLONG)1, array_size, outbuf.data(), &img_status) )
         {
             throw FITSexception(img_status,"FITSimg","WriteDataCube");
         }
@@ -1374,10 +1380,16 @@ namespace DSL
      *  @param fptr: Pointer to the fitfile
      */
     template< typename T >
-    FITSimg<T>::FITSimg(const std::shared_ptr<fitsfile>& fptr): FITScube(fptr)
+    FITSimg<T>::FITSimg(const std::shared_ptr<fitsfile>& _fptr_): FITScube(_fptr_)
     {
         
         img_init();
+
+        std::shared_ptr<fitsfile> fptr;
+        {
+            CFITSIOGuard guard;
+            fptr = _fptr_;
+        }
 
         if(fptr == nullptr || fptr.use_count() < 1)
             throw FITSexception(NOT_IMAGE,"FITSimg<T>","ctor"," received nullptr");

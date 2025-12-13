@@ -1096,8 +1096,14 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
      @return FITScolumn<T> instance that contains FITS column prperties as well as std::map<size_t,T> container with the requested data.
      */
     template< typename T>
-    void FITStable::read(FITScolumn<T>* data, const std::shared_ptr<fitsfile>& fptr, const size_t& row)
-    {      
+    void FITStable::read(FITScolumn<T>* data, const std::shared_ptr<fitsfile>& _fptr_, const size_t& row)
+    {   
+        std::shared_ptr<fitsfile> fptr;
+        {
+            CFITSIOGuard  guard;
+            fptr=_fptr_;
+        }
+
         long nrows = 0; 
         int tbl_status = 0;
 
@@ -1287,8 +1293,15 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
      @return FITScolumn<std::vector<T>> instance that contains FITS column prperties as well as std::map<size_t,std::vector<T>> container with the requested data.
      */
     template< typename T>
-    void FITStable::readVector(FITScolumn< std::vector<T> >* data,  const std::shared_ptr<fitsfile>& fptr,  const size_t& row)
+    void FITStable::readVector(FITScolumn< std::vector<T> >* data,  const std::shared_ptr<fitsfile>& _fptr_,  const size_t& row)
     {
+
+        std::shared_ptr<fitsfile> fptr;
+        {
+            CFITSIOGuard  guard;
+            fptr=_fptr_;
+        }
+
         long nrows = 0; 
         int tbl_status = 0;
         fits_get_num_rows(fptr.get(), &nrows, &tbl_status);
