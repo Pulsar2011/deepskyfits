@@ -38,7 +38,16 @@ namespace DSL
     struct CFITSIOGuard
     {
         std::unique_lock<std::recursive_timed_mutex> lk;
-        CFITSIOGuard() : lk(g_cfitsio_mutex) {}
+        CFITSIOGuard(std::chrono::milliseconds timeout = std::chrono::milliseconds(5000))
+        {
+            // Attempt to acquire the global CFITSIO lock with a timeout to avoid hangs
+            if(!g_cfitsio_mutex.try_lock_for(timeout))
+            {
+                // Construct a minimal exception explaining lock contention
+                throw std::runtime_error("CFITSIOGuard timeout: possible CFITSIO deadlock");
+            }
+            lk = std::unique_lock<std::recursive_timed_mutex>(g_cfitsio_mutex, std::adopt_lock);
+        }
     };
 
     typedef std::vector<double> pixelCoords;

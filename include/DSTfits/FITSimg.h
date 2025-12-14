@@ -2107,7 +2107,7 @@ namespace DSL
 
         if(idx +1 < sorted.size())
             pp_value = sorted[idx] + dpos * (sorted[idx+1] - sorted[idx]);
-        else
+        else if(idx < sorted.size())
             pp_value = sorted[idx];
 
         return pp_value;
@@ -2348,8 +2348,9 @@ namespace DSL
 
                     if(idx +1 < sorted.size())
                         pp_value = sorted[idx] + dpos * (sorted[idx+1] - sorted[idx]);
-                    else
+                    else if (idx < sorted.size())
                         pp_value = sorted[idx];
+
 
                     (*res_data)[i] = static_cast<T>(pp_value);
                     break;
