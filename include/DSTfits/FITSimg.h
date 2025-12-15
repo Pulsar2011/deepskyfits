@@ -33,6 +33,10 @@
 #include "FITSdata.h" // <- add include for FitsArrayBase / FitsArray
 #include "FITSwcs.h"
 #include "DSF_version.h"
+#if __cplusplus >= 201703L && defined(__cpp_lib_execution) && !defined(_LIBCPP_VERSION)
+#include <execution>
+#endif
+
 
 namespace DSL
 {
@@ -301,6 +305,15 @@ namespace DSL
             WithTypedData<T>([&](std::valarray<T>& arr){ ptr = &arr; });
             return ptr;
         }
+
+        /**
+         * @brief Cast this image cube to a different storage type U.
+         * @tparam U Destination pixel type.
+         * @return New FITScube holding a copy converted to U.
+         * @throws FITSexception if underlying storage is already U or unsupported.
+         */
+        template<typename U>
+        std::shared_ptr<FITScube> cast() const;
 
 #pragma endregion
 #pragma region * I/O
@@ -947,6 +960,161 @@ namespace DSL
     };
     
 #pragma endregion
+
+#pragma region - FITScube class implementation
+
+    template<typename U>
+    std::shared_ptr<FITScube> FITScube::cast() const
+    {
+        if(!data)
+            throw FITSexception(SHARED_NULPTR, "FITScube","cast", "no data in memory");
+    
+        // 1) Reject no-op cast (already stored as U)
+        bool alreadyU = false;
+        alreadyU = WithTypedData<U>([&](std::valarray<U>&){ /* matched */ });
+        if(alreadyU)
+            throw FITSexception(SHARED_BADARG, "FITScube::cast", "source already has the requested storage type");
+    
+        // 2) Create destination image with same axes
+        std::shared_ptr< FITSimg<U> > dst = std::make_shared< FITSimg<U> >(Naxis);
+    
+        // 3) Copy relevant header keywords (skip type/size-specific ones)
+        auto shouldCopyKey = [](const std::string& k)->bool
+        {
+            if( k == "BITPIX" ||
+                k == "BSCALE" ||
+                k == "BZERO"  ||
+                k == "BLANK"  ||
+                k == "NAXIS"  ||
+                k == "EXTEND" ||
+                k == "PCOUNT" ||
+                k == "GCOUNT" ||
+                k.find("NAXIS") != std::string::npos)
+                return false;
+        
+            return true;
+        };
+    
+        for(FITSDictionary::const_iterator it = hdu.begin(); it != hdu.end(); ++it)
+        {
+            if(!shouldCopyKey(it->first))
+                continue;
+
+            dst->HDU().ValueForKey(it->first, it->second.value(), it->second.type(), it->second.comment());
+        }
+    
+        // 4) Convert array from actual source type to U
+        bool copied = false;
+    
+        auto copyFrom = [&](auto tag)->bool
+        {
+            using V = std::decay_t<decltype(tag)>;
+
+            // source must match V
+            const std::valarray<V>* srcArr = this->GetData<V>();
+            if (!srcArr)
+                return false;
+
+            // destination must be U (FITSimg<U> already allocates typed storage)
+            std::valarray<U>* dstArr = dst->template GetData<U>();
+            if (!dstArr)
+                throw FITSexception(SHARED_NULPTR, "FITScube","cast", "destination typed storage missing");
+
+            if( dstArr->size() != srcArr->size() )
+                throw FITSexception(SHARED_BADARG, "FITScube","cast", "source and destination size mismatch");
+
+            // clamp helper to convert V -> U safely
+            auto clamp_to_U = [](auto x, bool& overflow)->U
+            {
+                using V = std::decay_t<decltype(x)>;
+                overflow = false;
+
+                // handle NaN/Inf for floating sources
+                if constexpr (std::is_floating_point_v<V>)
+                {
+                    if (!std::isfinite(static_cast<long double>(x)))
+                    {
+                        overflow = true;
+                        if constexpr (std::is_floating_point_v<U>)
+                            return std::numeric_limits<U>::quiet_NaN();
+                        else
+                            return U{}; // 0 for integers
+                    }
+                }
+
+                long double vld = static_cast<long double>(x);
+
+                // if U is integral and source is float, round before clamping
+                if constexpr (std::is_integral_v<U> && std::is_floating_point_v<V>)
+                    vld = std::llround(vld);
+
+                const long double umax = static_cast<long double>(std::numeric_limits<U>::max());
+                const long double umin = static_cast<long double>(std::numeric_limits<U>::lowest());
+
+                if (vld > umax) { vld = umax; overflow = true; }
+                if (vld < umin) { vld = umin; overflow = true; }
+
+                return static_cast<U>(vld);
+            };
+
+            const size_t n = srcArr->size();
+
+#if __cplusplus >= 201703L && defined(__cpp_lib_execution) && !defined(_LIBCPP_VERSION)
+            std::vector<size_t> idx(n);
+            std::iota(idx.begin(), idx.end(), size_t{0});
+
+            std::for_each(std::execution::par, idx.begin(), idx.end(), [&](size_t i)
+            {
+                bool ov = false;
+                (*dstArr)[i] = clamp_to_U((*srcArr)[i], ov);
+                dst->mask[i] = this->mask[i] || ov;
+            });
+#else
+            // Fallback: portable std::async chunking
+            const size_t hw = std::max<size_t>(1, std::thread::hardware_concurrency());
+            const size_t chunks = hw;
+            const size_t chunkSize = (n + chunks - 1) / chunks;
+
+            std::vector<std::future<void>> futs;
+            futs.reserve(chunks);
+
+            for (size_t c = 0; c < chunks; ++c) {
+                const size_t begin = c * chunkSize;
+                const size_t end   = std::min(n, begin + chunkSize);
+
+                futs.emplace_back(std::async(std::launch::async, [&, begin, end]{
+                    for (size_t i = begin; i < end; ++i) {
+                        bool ov = false;
+                        (*dstArr)[i] = clamp_to_U((*srcArr)[i], ov);
+                        dst->mask[i] = this->mask[i] || ov;
+                    }
+                }));
+            }
+            for (auto& f : futs) f.get();
+#endif
+            return true;
+        };
+    
+        copied = copyFrom(uint8_t{} ) || copyFrom(int8_t{} )  ||
+                 copyFrom(uint16_t{}) || copyFrom(int16_t{})  ||
+                 copyFrom(uint32_t{}) || copyFrom(int32_t{})  ||
+                 copyFrom(uint64_t{}) || copyFrom(int64_t{})  ||
+#ifdef Darwinx86_64
+                 copyFrom(size_t{})   ||
+#endif
+                 copyFrom(float{})    || copyFrom(double{});
+    
+        if(!copied)
+            throw FITSexception(SHARED_BADARG, "FITScube::cast", "unsupported or unknown source storage type");
+    
+        // 6) Reload WCS on the destination (uses copied header)
+        dst->reLoadWCS();
+    
+        return std::static_pointer_cast<FITScube>(dst);
+    }
+
+#pragma endregion
+
 #pragma region - FITSimg class implementation
     
 #pragma region * Initialization

@@ -2143,3 +2143,138 @@ TEST(FITSimg, WorldCoordinatesMatrix)
     EXPECT_NO_THROW(ff.Close());
     EXPECT_FALSE(ff.isOpen());
 }
+
+TEST(FITSimgCast, Cast_INT16_to_DOUBLE_and_back)
+{
+        verbose = verboseLevel::VERBOSE_NONE;
+
+        const size_t W = 5, H = 5;
+        FITSimg<int16_t> src(2, {W, H});
+        auto sdata = src.GetData<int16_t>();
+        ASSERT_NE(sdata, nullptr);
+        ASSERT_EQ(src.Size(1), W);
+        ASSERT_EQ(src.Size(2), H);
+        ASSERT_EQ(src.Nelements(), W * H);
+
+        // Fill values in allowed int16_t range
+        // Pattern: value = i + j*W - 50 (kept small)
+        for (size_t j = 0; j < H; ++j)
+                for (size_t i = 0; i < W; ++i)
+                        (*sdata)[i + j * W] = static_cast<int16_t>(int(i + j * W) - 50);
+
+        // Set header keys to verify propagation
+        src.HDU().ValueForKey("BSCALE", (double)1.0);
+        src.HDU().ValueForKey("BZERO", (double)0.0);
+        src.HDU().ValueForKey("CRPIX1", (double)2.0);
+        src.HDU().ValueForKey("CRPIX2", (double)3.0);
+        src.HDU().ValueForKey("OBJECT", std::string("CastTest"), fChar);
+        src.HDU().ValueForKey("MYNUM", (double)42.0);
+
+        // Cast to double
+        std::shared_ptr<FITScube> dcast = src.cast<double>();
+        ASSERT_NE(dcast, nullptr);
+        EXPECT_EQ(dcast->Size(1), W);
+        EXPECT_EQ(dcast->Size(2), H);
+
+        auto ddata = dcast->GetData<double>();
+        ASSERT_NE(ddata, nullptr);
+        ASSERT_EQ(ddata->size(), sdata->size());
+
+        // Header propagation checks
+        // Custom and standard keys should be preserved
+        EXPECT_DOUBLE_EQ(dcast->HDU().GetDoubleValueForKey("BSCALE"), 1.0);
+        EXPECT_DOUBLE_EQ(dcast->HDU().GetDoubleValueForKey("BZERO"), 0.0);
+        EXPECT_DOUBLE_EQ(dcast->HDU().GetDoubleValueForKey("CRPIX1"), 2.0);
+        EXPECT_DOUBLE_EQ(dcast->HDU().GetDoubleValueForKey("CRPIX2"), 3.0);
+        EXPECT_EQ(dcast->HDU().GetValueForKey("OBJECT"), std::string("CastTest"));
+        EXPECT_DOUBLE_EQ(dcast->HDU().GetDoubleValueForKey("MYNUM"), 42.0);
+
+        // Data value checks (promotion without scaling)
+        for (size_t k = 0; k < ddata->size(); ++k)
+                EXPECT_DOUBLE_EQ((*ddata)[k], static_cast<double>((*sdata)[k]));
+
+        // Cast back to int16_t
+        std::shared_ptr<FITScube> scast = dcast->cast<int16_t>();
+        ASSERT_NE(scast, nullptr);
+        EXPECT_EQ(scast->Size(1), W);
+        EXPECT_EQ(scast->Size(2), H);
+
+        auto s2data = scast->GetData<int16_t>();
+        ASSERT_NE(s2data, nullptr);
+        ASSERT_EQ(s2data->size(), sdata->size());
+
+        // Header propagation checks (still preserved)
+        EXPECT_DOUBLE_EQ(scast->HDU().GetDoubleValueForKey("BSCALE"), 1.0);
+        EXPECT_DOUBLE_EQ(scast->HDU().GetDoubleValueForKey("BZERO"), 0.0);
+        EXPECT_DOUBLE_EQ(scast->HDU().GetDoubleValueForKey("CRPIX1"), 2.0);
+        EXPECT_DOUBLE_EQ(scast->HDU().GetDoubleValueForKey("CRPIX2"), 3.0);
+        EXPECT_EQ(scast->HDU().GetValueForKey("OBJECT"), std::string("CastTest"));
+        EXPECT_DOUBLE_EQ(scast->HDU().GetDoubleValueForKey("MYNUM"), 42.0);
+
+        // Data equality after round-trip
+        for (size_t k = 0; k < s2data->size(); ++k)
+                EXPECT_EQ((*s2data)[k], (*sdata)[k]);
+}
+
+TEST(FITSimgCast, Cast_UINT32_to_UINT16_clamping)
+{
+        verbose = verboseLevel::VERBOSE_NONE;
+
+        const size_t W = 5, H = 5;
+        FITSimg<uint32_t> src(2, {W, H});
+        auto sdata = src.GetData<uint32_t>();
+        ASSERT_NE(sdata, nullptr);
+
+        // Fill with values including overflows for uint16_t
+        // Sequence in first 10 cells then repeat:
+        // 0, 65535, 70000, 1000000, 42, 12345, 65534, 999999999, 1, 65536, ...
+        const uint32_t seq[] = {
+                0u, 65535u, 70000u, 1000000u, 42u,
+                12345u, 65534u, 999999999u, 1u, 65536u
+        };
+        const size_t S = sizeof(seq)/sizeof(seq[0]);
+        for (size_t k = 0; k < src.Nelements(); ++k)
+                (*sdata)[k] = seq[k % S];
+
+        // Set header keys to verify propagation
+        src.HDU().ValueForKey("BSCALE", (double)1.0);
+        src.HDU().ValueForKey("BZERO", (double)0.0);
+        src.HDU().ValueForKey("MYNUM", (double)7.0);
+
+        // Cast to uint16_t
+        std::shared_ptr<FITScube> ccast = src.cast<uint16_t>();
+        ASSERT_NE(ccast, nullptr);
+        EXPECT_EQ(ccast->Size(1), W);
+        EXPECT_EQ(ccast->Size(2), H);
+
+        auto cdata = ccast->GetData<uint16_t>();
+        ASSERT_NE(cdata, nullptr);
+        ASSERT_EQ(cdata->size(), sdata->size());
+
+        // Header propagation checks
+        EXPECT_DOUBLE_EQ(ccast->HDU().GetDoubleValueForKey("BSCALE"), 1.0);
+        EXPECT_DOUBLE_EQ(ccast->HDU().GetDoubleValueForKey("BZERO"), 32768);
+        EXPECT_DOUBLE_EQ(ccast->HDU().GetDoubleValueForKey("MYNUM"), 7.0);
+
+        // Clamping checks
+        const uint16_t U16_MAX = std::numeric_limits<uint16_t>::max();
+        const uint16_t U16_MIN = std::numeric_limits<uint16_t>::min();
+
+        for (size_t k = 0; k < cdata->size(); ++k)
+        {
+                const uint32_t v = (*sdata)[k];
+                uint16_t expected;
+                if (v > U16_MAX)
+                {
+                    expected = U16_MAX;
+                    EXPECT_TRUE(ccast->Masked(k)); // should be masked due to overflow
+                }
+                else
+                    expected = static_cast<uint16_t>(v);
+                EXPECT_EQ((*cdata)[k], expected);
+                 
+                // ensure no negative case since uint32_t input (kept for completeness)
+                EXPECT_GE((*cdata)[k], U16_MIN);
+                EXPECT_LE((*cdata)[k], U16_MAX);
+        }
+}
