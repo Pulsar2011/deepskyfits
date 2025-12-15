@@ -597,13 +597,11 @@ TEST(ColumnViewTest, StatisticalComputations_inParralel)
     
     float sum = 0.0f;
     float sumsq = 0.0f;
-    float sum3  = 0.0f;
     float min = std::numeric_limits<float>::max();
     float max = std::numeric_limits<float>::lowest();
 
     float f_sum = 0.0f;
     float f_sumsq = 0.0f;
-    float f_sum3  = 0.0f;
     float f_min = std::numeric_limits<float>::max();
     float f_max = std::numeric_limits<float>::lowest();
     float f_N=0.0f;
@@ -616,7 +614,6 @@ TEST(ColumnViewTest, StatisticalComputations_inParralel)
         
         sum += sample;
         sumsq += sample * sample;
-        sum3  += sample * sample * sample;
 
         min = (sample < min) ? sample : min;
         max = (sample > max) ? sample : max;
@@ -625,7 +622,6 @@ TEST(ColumnViewTest, StatisticalComputations_inParralel)
         {
             f_sum   += sample;
             f_sumsq += sample * sample;
-            f_sum3  += sample * sample * sample;
             
             f_min = (sample < f_min) ? sample : f_min;
             f_max = (sample > f_max) ? sample : f_max;
@@ -640,13 +636,11 @@ TEST(ColumnViewTest, StatisticalComputations_inParralel)
     double variance = (sumsq /dN) - (mean * mean);
     double stddev = std::sqrt(variance);
     double rms = std::sqrt(sumsq / dN);
-    double skewness = ((sum3 / dN) - 3 * mean * variance - mean * mean * mean) / (stddev * stddev * stddev);
 
     double f_mean = f_sum / f_N;
     double f_variance = (f_sumsq /f_N) - (f_mean * f_mean);
     double f_stddev = std::sqrt(f_variance);
     double f_rms = std::sqrt(f_sumsq / f_N);
-    double f_skewness = ((f_sum3 / f_N) - 3 * f_mean * f_variance - f_mean * f_mean * f_mean) / (f_stddev * f_stddev * f_stddev);
 
     FITStable table;
     table.InsertColumn(std::make_shared< FITScolumn<float> >(col));

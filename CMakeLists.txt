@@ -211,10 +211,11 @@ ExternalProject_Add(
 
 #-------------------- Configuration de la bibliothèque WCSFIT
 
-set(WCSLIB_VERSION 8.4)
+set(WCSLIB_VERSION 8.5)
 set(WCSLIB_URLS
     "https://www.atnf.csiro.au/people/mcalabre/WCS/wcslib-${WCSLIB_VERSION}.tar.bz2"
     "https://www.atnf.csiro.au/computing/software/wcs/WCS/wcslib-${WCSLIB_VERSION}.tar.bz2"
+    "https://www.atnf.csiro.au/computing/software/wcs/wcslib-releases/wcslib-${WCSLIB_VERSION}.tar.bz2"
 )
 string(REPLACE ";" " " WCSLIB_URLS_SP "${WCSLIB_URLS}")
 set(WCSLIB_INSTALL_DIR ${CMAKE_SOURCE_DIR}/build/wcslib)
@@ -256,9 +257,9 @@ ExternalProject_Add(
 )
 
 add_custom_target(tofits
-    COMMAND /usr/bin/env bash -c "${CMAKE_SOURCE_DIR}/build/wcslib/bin/tofits <${CMAKE_SOURCE_DIR}/wcslib/wcslib-8.4/C/test/DSS.keyrec> ${CMAKE_SOURCE_DIR}/build/testdata/DSS.fits"
+    COMMAND /usr/bin/env bash -c "${CMAKE_SOURCE_DIR}/build/wcslib/bin/tofits <${CMAKE_SOURCE_DIR}/wcslib/wcslib-${WCSLIB_VERSION}/C/test/DSS.keyrec> ${CMAKE_SOURCE_DIR}/build/testdata/DSS.fits"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    COMMENT "Run tofit: ${CMAKE_SOURCE_DIR}/build/wcslib/bin/tofits <${CMAKE_SOURCE_DIR}/wcslib/wcslib-8.4/C/test/DSS.keyrec> ${CMAKE_SOURCE_DIR}/build/testdata/DSS.fits"
+    COMMENT "Run tofit: ${CMAKE_SOURCE_DIR}/build/wcslib/bin/tofits <${CMAKE_SOURCE_DIR}/wcslib/wcslib-${WCSLIB_VERSION}/C/test/DSS.keyrec> ${CMAKE_SOURCE_DIR}/build/testdata/DSS.fits"
     VERBATIM
 )
 
