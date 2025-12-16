@@ -490,7 +490,7 @@ namespace DSL
         nrows_cache = static_cast<size_t>(nrows);
 
         const int64_t nrow   = (static_cast<int64_t>(nrows) - (row-1));
-       // const int64_t width  = static_cast<int64_t>(data->getWidth()); // chars per string
+        const int64_t width  = static_cast<int64_t>(data->getWidth()); // chars per string
 
         // Read each row independently
         // Allocate array of pointers (one per string in this row)
@@ -500,8 +500,8 @@ namespace DSL
 
         for(int64_t s = 0; s < nrow; ++s)
         {
-            auto buf = std::make_unique<char[]>(static_cast<size_t>(nrow + 1));
-            buf[nrow] = '\0';
+            auto buf = std::make_unique<char[]>(static_cast<size_t>(width + 1));
+            buf[width] = '\0';
             ptrs[static_cast<size_t>(s)] = buf.get();
             storage.emplace_back(std::move(buf));
         }
@@ -511,7 +511,7 @@ namespace DSL
                   static_cast<int>(data->getPosition()),
                   static_cast<LONGLONG>(row), /* firstrow */
                   1,                              /* firstelem */
-                  nrow,                             /* nelem rows to read: 1 row */
+                  static_cast<LONGLONG>(nrow),    /* nelem rows to read: 1 row */
                   nullptr,                        /* nulval */
                   ptrs.data(),                    /* array of char* (nstr entries) */
                   nullptr,                        /* anynull */
@@ -523,7 +523,8 @@ namespace DSL
         // Build the vector for this row
         for(int64_t s = 0; s < nrow; ++s)
         {
-            std::string this_str(ptrs[static_cast<size_t>(s)]);
+            std::string this_str(ptrs[static_cast<size_t>(s)],
+                                      static_cast<size_t>(width));
             auto end = this_str.find_last_not_of(' ');
             if(end != std::string::npos)
                 this_str.erase(end + 1);
@@ -666,19 +667,22 @@ namespace DSL
         const int64_t nrow   = (static_cast<int64_t>(nrows) - (row-1));
         //const int64_t nstr   = static_cast<int64_t>(data->getNelem()); // strings per row
         const int64_t width  = static_cast<int64_t>(data->getWidth()); // chars per string
+        const int64_t repeat = static_cast<int64_t>(data->getNelem()); // strings per row
+
+        const int64_t nstr = repeat / width; // number of strings per row
 
         // Read each row independently
         for(int64_t r = 0; r < nrow; ++r)
         {
             // Allocate array of pointers (one per string in this row)
-            std::vector<char*> ptrs(static_cast<size_t>(width), nullptr);
+            std::vector<char*> ptrs(static_cast<size_t>(nstr), nullptr);
             std::vector<std::unique_ptr<char[]>> storage;
-            storage.reserve(static_cast<size_t>(width));
+            storage.reserve(static_cast<size_t>(nstr));
 
-            for(int64_t s = 0; s < width; ++s)
+            for(int64_t s = 0; s < nstr; ++s)
             {
                 auto buf = std::make_unique<char[]>(static_cast<size_t>(width + 1));
-                buf[width] = '\0';
+                buf[static_cast<size_t>(width)] = '\0';
                 ptrs[static_cast<size_t>(s)] = buf.get();
                 storage.emplace_back(std::move(buf));
             }
@@ -688,7 +692,7 @@ namespace DSL
                       static_cast<int>(data->getPosition()),
                       static_cast<LONGLONG>(row + r), /* firstrow */
                       1,                              /* firstelem */
-                      width,                             /* nelem rows to read: 1 row */
+                      static_cast<LONGLONG>(nstr),    /* nelem rows to read: 1 row */
                       nullptr,                        /* nulval */
                       ptrs.data(),                    /* array of char* (nstr entries) */
                       nullptr,                        /* anynull */
@@ -699,11 +703,11 @@ namespace DSL
 
             // Build the vector for this row
             std::vector<std::string> out;
-            out.reserve(static_cast<size_t>(width));
-            for(int64_t s = 0; s < width; ++s)
+            out.reserve(static_cast<size_t>(nstr));
+            for(int64_t s = 0; s < nstr; ++s)
             {
                 std::string this_str(ptrs[static_cast<size_t>(s)],
-                                     ptrs[static_cast<size_t>(s)] + static_cast<size_t>(width));
+                                          static_cast<size_t>(width));
                 auto end = this_str.find_last_not_of(' ');
                 if(end != std::string::npos)
                     this_str.erase(end + 1);
