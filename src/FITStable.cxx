@@ -669,7 +669,7 @@ namespace DSL
         const int64_t width  = static_cast<int64_t>(data->getWidth()); // chars per string
         const int64_t repeat = static_cast<int64_t>(data->getNelem()); // strings per row
 
-        const int64_t nstr = repeat / width; // number of strings per row
+        const int64_t nstr = repeat; // number of strings per row
 
         // Read each row independently
         for(int64_t r = 0; r < nrow; ++r)
@@ -1423,8 +1423,9 @@ namespace DSL
         if(data.size() < 1)
             throw FITSexception(NOT_TABLE,"FITScolumn<stringVector>","write");
 
-        const int64_t nstr  = getNelem(); // strings per row
+        const int64_t nelem  = getNelem(); // strings per row
         const int64_t width  = getWidth();   // chars per string
+        const int64_t nstr   = nelem; // total chars per row
 
         size_t row = 0;
         int tbl_status = 0;
@@ -1457,7 +1458,7 @@ namespace DSL
                 ptrs.push_back(const_cast<char*>(storage.back().c_str()));
             }
 
-            // Write the whole row’s vector in one call
+            // Write the whole row's vector in one call
             if(ffpcls(fptr.get(),
                       static_cast<int>(getPosition()),
                       static_cast<LONGLONG>(row+1),   // firstrow
@@ -2294,7 +2295,7 @@ namespace DSL
                         }
                         else
                         {
-                            FITScolumn< FITSform::stringVector >* tform = new FITScolumn<FITSform::stringVector>(std::string(TFIELD),static_cast<dtype>(data_type),trepeat,twidth,tscale,tzero,std::string(tunit),n);
+                            FITScolumn< FITSform::stringVector >* tform = new FITScolumn<FITSform::stringVector>(std::string(TFIELD),static_cast<dtype>(data_type),trepeat/twidth,twidth,tscale,tzero,std::string(tunit),n);
                             readVector<std::string>(tform, fptr, start);
                             return std::unique_ptr<FITSform>(tform);
                         }

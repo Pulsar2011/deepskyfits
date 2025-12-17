@@ -523,6 +523,7 @@ namespace DSL
          * @throws std::bad_any_cast if value type mismatches.
          */
         virtual void push_back(const std::any& value) = 0;
+        virtual void updateAt(const size_t& pos, const std::any& value) = 0;
         virtual std::unique_ptr<FITSform> clone() const = 0; // add
         virtual void sortOn(const std::vector<size_t>& order) = 0;
 
@@ -663,6 +664,34 @@ namespace DSL
                 Update(*pv);
                 allocateStorageIfNeeded<T>();
                 FITSform::values<T>().push_back(*pv);
+            }
+            else
+            {
+                throw std::bad_any_cast();
+            }
+#endif
+        }
+
+        /**
+         * @brief Append one value to this column (type-erased).
+         * @param value std::any wrapping a T value.
+         * @throws std::bad_any_cast if value type mismatches.
+         */
+        void updateAt(const size_t& pos, const std::any& value) override
+        {
+            // Unique lock: we mutate the column storage
+            std::unique_lock<std::shared_mutex> lk(this->data_mtx);
+#if __cplusplus < 201703L
+            const T& v = any_cast_any<T>(value);
+            Update(v);
+            allocateStorageIfNeeded<T>();
+            FITSform::values<T>()[pos] = v;
+#else
+            if (const T* pv = std::any_cast<T>(&value))
+            {
+                Update(*pv);
+                allocateStorageIfNeeded<T>();
+                FITSform::values<T>()[pos] = (*pv);
             }
             else
             {
@@ -1055,7 +1084,8 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
             if(col == fcolumns.end())
                 throw FITSexception(COL_NOT_FOUND,"FITStable","InsertAt","Column '"+cname+"' not found.");
             
-            (*col)->values<T>()[pos] = val;
+            //(*col)->values<T>()[pos] = val;
+            (*col)->updateAt(pos, val );
             return;
         }
         
@@ -1716,18 +1746,18 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
     template< typename T >
     void FITScolumn<T>::Update(const std::vector<std::string>& vstr)
     {
-        int64_t maxSize  = 0;
+        int64_t maxNelem  = 0;
         int64_t maxWidth = 0;
         int64_t nelem   = getNelem();
         int64_t width   = getWidth();
         
+        maxNelem  = static_cast<int64_t>(vstr.size());
         for(size_t i = 0; i < vstr.size(); i++)
         {
-            maxSize  = static_cast<int64_t>(vstr.size());
             maxWidth = (static_cast<int64_t>(vstr[i].size()) > maxWidth) ? static_cast<int64_t>(vstr[i].size()) : maxWidth;
         }
         
-        nelem = (maxSize > nelem) ? maxSize : nelem;
+        nelem = (maxNelem > nelem) ? maxNelem : nelem;
         width = (maxWidth > width) ? maxWidth : width;
         
         FITSform::setWidth(width);

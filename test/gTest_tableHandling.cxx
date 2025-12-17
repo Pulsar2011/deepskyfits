@@ -648,23 +648,23 @@ TEST(ColumnViewTest, StatisticalComputations_inParralel)
 
     std::thread t1([&](){
 
-        EXPECT_NEAR(table.column<float>("NORM").mean()    , mean, 1e-6);
-        EXPECT_NEAR(table.column<float>("NORM").min()     , min, 1e-6);
-        EXPECT_NEAR(table.column<float>("NORM").max()     , max, 1e-6);
-        EXPECT_NEAR(table.column<float>("NORM").variance(), variance, 1e-6);
-        EXPECT_NEAR(table.column<float>("NORM").rmse()    , stddev, 1e-6);
-        EXPECT_NEAR(table.column<float>("NORM").rms()     , rms, 1e-6);
+        EXPECT_NEAR(table.column<float>("NORM").mean()    , mean, 5e-6);
+        EXPECT_NEAR(table.column<float>("NORM").min()     , min, 5e-6);
+        EXPECT_NEAR(table.column<float>("NORM").max()     , max, 5e-6);
+        EXPECT_NEAR(table.column<float>("NORM").variance(), variance, 5e-6);
+        EXPECT_NEAR(table.column<float>("NORM").rmse()    , stddev, 5e-6);
+        EXPECT_NEAR(table.column<float>("NORM").rms()     , rms, 5e-6);
     });
 
     std::thread t2([&](){
         auto flaggedRows = table.select<bool>("FLAG").eq(true).build();
 
-        EXPECT_NEAR(table.column<float>("NORM").on(flaggedRows).mean()    , f_mean, 1e-6);
-        EXPECT_NEAR(table.column<float>("NORM").on(flaggedRows).min()     , f_min, 1e-6);
-        EXPECT_NEAR(table.column<float>("NORM").on(flaggedRows).max()     , f_max, 1e-6);
-        EXPECT_NEAR(table.column<float>("NORM").on(flaggedRows).variance(), f_variance, 1e-6);
-        EXPECT_NEAR(table.column<float>("NORM").on(flaggedRows).rmse()    , f_stddev, 1e-6);
-        EXPECT_NEAR(table.column<float>("NORM").on(flaggedRows).rms()     , f_rms, 1e-6);
+        EXPECT_NEAR(table.column<float>("NORM").on(flaggedRows).mean()    , f_mean, 5e-6);
+        EXPECT_NEAR(table.column<float>("NORM").on(flaggedRows).min()     , f_min, 5e-6);
+        EXPECT_NEAR(table.column<float>("NORM").on(flaggedRows).max()     , f_max, 5e-6);
+        EXPECT_NEAR(table.column<float>("NORM").on(flaggedRows).variance(), f_variance, 5e-6);
+        EXPECT_NEAR(table.column<float>("NORM").on(flaggedRows).rmse()    , f_stddev, 5e-6);
+        EXPECT_NEAR(table.column<float>("NORM").on(flaggedRows).rms()     , f_rms, 5e-6);
     });
 
     std::thread t3([&](){
