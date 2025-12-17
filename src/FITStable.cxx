@@ -1423,23 +1423,50 @@ namespace DSL
         if(data.size() < 1)
             throw FITSexception(NOT_TABLE,"FITScolumn<stringVector>","write");
 
+        const int64_t nstr  = getNelem(); // strings per row
         const int64_t width  = getWidth();   // chars per string
+
         size_t row = 0;
         int tbl_status = 0;
 
-        for(col_map::const_iterator it = data.cbegin(); it != data.cend(); ++it, ++row)
+        // Per-row stable storage to keep char* alive during the CFITSIO call
+        std::vector<std::string> storage;
+        storage.reserve(static_cast<size_t>(nstr));
+        std::vector<char*> ptrs;
+        ptrs.reserve(static_cast<size_t>(nstr));
+
+        for(auto it = data.cbegin(); it != data.cend(); ++it, ++row)
         {
             if(row < static_cast<size_t>(first_row-1)) continue;
 
-            for(size_t k = 0; k < static_cast<size_t>(getNelem()); ++k)
-            {
-                std::string tmp = (k < it->size() && !it->at(k).empty()) ? it->at(k) : "NULL";
-                tmp.resize(static_cast<size_t>(width), ' ');
-                char* buf = const_cast<char*>(tmp.c_str());
+            storage.clear();
+            ptrs.clear();
 
-                if(ffpcls(fptr.get(), static_cast<int>(getPosition()), static_cast<LONGLONG>(row+1),
-                          static_cast<LONGLONG>(k+1), 1, &buf, &tbl_status))
-                    throw FITSexception(tbl_status,"FITScolumn<stringVector>","write");
+            // Prepare nstr strings padded to width and collect char* pointers
+            for(int64_t k = 0; k < nstr; ++k)
+            {
+                std::string tmp = (k < static_cast<int64_t>(it->size()) && !it->at(static_cast<size_t>(k)).empty())
+                                  ? it->at(static_cast<size_t>(k))
+                                  : "NULL";
+                if(tmp.size() > static_cast<size_t>(width))
+                    tmp.resize(static_cast<size_t>(width));     // truncate
+                else
+                    tmp.resize(static_cast<size_t>(width), ' '); // pad with spaces
+
+                storage.emplace_back(std::move(tmp));
+                ptrs.push_back(const_cast<char*>(storage.back().c_str()));
+            }
+
+            // Write the whole row’s vector in one call
+            if(ffpcls(fptr.get(),
+                      static_cast<int>(getPosition()),
+                      static_cast<LONGLONG>(row+1),   // firstrow
+                      1,                               // firstelem
+                      static_cast<LONGLONG>(nstr),     // nelem = number of strings
+                      ptrs.data(),
+                      &tbl_status))
+            {
+                throw FITSexception(tbl_status,"FITScolumn<stringVector>","write");
             }
         }
     }
