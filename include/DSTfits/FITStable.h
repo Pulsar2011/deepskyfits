@@ -1092,7 +1092,7 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
 #pragma endregion
 #pragma endregion
 #pragma region -- Diagnoze
-        void Dump( std::ostream& );
+        void Dump( std::ostream& ) const;
 #pragma endregion
 
 #pragma region -- Saving to file

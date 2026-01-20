@@ -2778,7 +2778,7 @@ namespace DSL
      @details Print out information related to this FITStable.
      @param out output stream one which to send the information.
      */
-    void FITStable::Dump( std::ostream& out)
+    void FITStable::Dump( std::ostream& out) const
     {
         
         out<<"\033[31m --- "<< (hdu.Exists("EXTNAME")? hdu.GetValueForKey("EXTNAME") : "NO NAME")<<" --- \033[0m"<<std::endl;
