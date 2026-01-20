@@ -33,6 +33,7 @@
 #include <numeric>
 #include <execution>
 #include <shared_mutex>
+#include <unordered_map> 
 
 
 #include "FITShdu.h"
@@ -101,6 +102,7 @@ namespace DSL
     class FITStable;
     class FITSform;
     class RowSet;
+    class RowIterator;
 
     template<typename T>
     class RowSetBuilder;
@@ -278,6 +280,8 @@ namespace DSL
     // Grant ColumnView<T> access to protected synchronization (data_mtx) and storage helpers.
     template<typename T>
     friend class ColumnView;
+
+    friend class RowIterator;
 
 #pragma endregion
 #pragma region -- definition
@@ -506,6 +510,20 @@ namespace DSL
             if(!s)
                 throw std::bad_cast();
             return s->ref();
+        }
+
+        /**
+         * @brief Runtime payload type held by this column (scalar or vector).
+         * @details This reports the concrete C++ type used for the in-memory buffer
+         *          (e.g. int32_t vs std::vector<int32_t>). Useful for generic export
+         *          code such as CSV writers.
+         * @return std::type_index of the payload type; typeid(void) if no storage.
+         */
+        std::type_index payloadType() const
+        {
+            std::shared_lock<std::shared_mutex> lk(data_mtx);
+            if(!fdata) return std::type_index(typeid(void));
+            return fdata->type();
         }
 
 #pragma endregion
@@ -795,6 +813,7 @@ template<> void FITScolumn<FITSform::stringVector>    ::write(const std::shared_
 template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_ptr<fitsfile>&, const int64_t&);
     
 #pragma endregion
+
 #pragma region - FITStable class definition
     /**
      * @class FITStable
@@ -817,7 +836,6 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         ColumnFilterExpr<T> operator()(const std::string& columnName);
 
     private:
-#pragma endregion
 #pragma region -- private member
         const volatile ttype ftbl_type;
         FITShdu hdu;                              //!< Header of the table
@@ -892,7 +910,7 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         /**
          * @brief List column metadata as {name, TFORM, unit} triples.
          */
-        const clist    listColumns();
+        const clist    listColumns() const;
 
         /**
          * @brief Access column descriptor by name.
@@ -1007,6 +1025,42 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         }
 
         /**
+         * @brief Get iterator to first row.
+         */
+        RowIterator begin();
+
+        /**
+         * @brief Get iterator past last row.
+         */
+        RowIterator end();
+
+        /**
+         * @brief Get const iterator to first row.
+         */
+        RowIterator begin() const;
+
+        /**
+         * @brief Get const iterator past last row.
+         */
+        RowIterator end() const;
+
+        /**
+         * @brief Access value at current row for a named column.
+         * \tparam T Expected column type.
+         * \param columnName Column name.
+         * \param it Row iterator.
+         * \return Reference to value at iterator's row.
+         */
+        template<typename T>
+        T& at(const std::string& columnName, const RowIterator& it);
+
+        /**
+         * @brief Access value at current row for a named column (const).
+         */
+        template<typename T>
+        const T& at(const std::string& columnName, const RowIterator& it) const;
+
+        /**
          * @brief Apply a global permutation to reorder all columns consistently.
          * @param order New-to-old index mapping; must be a permutation of [0..n-1].
          * @throws std::logic_error on size mismatch, duplicates, or out-of-range.
@@ -1111,10 +1165,13 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
          * @throws FITSexception on CFITSIO error.
          */
         void write(const std::string&, const int64_t&, bool replace=false);
+
+        void toCSV( std::ostream& out, const char delimiter=',') const;
 #pragma endregion
 
     };
 #pragma endregion
+
 #pragma region - FITStable Template implementation
     
     /**
@@ -1703,6 +1760,7 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
     FITScolumn<T>::~FITScolumn()
     {}
 #pragma endregion
+#pragma region -- Updating column definition based on data
 
     template< typename T >
     template<typename InputIt>
@@ -1802,6 +1860,8 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
     
     
 #pragma endregion
+#pragma endregion
+
 #pragma region -- diagnose
     template< typename T >
     void FITScolumn<T>::Dump( std::ostream& fout) const
@@ -2043,8 +2103,150 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
             ++idx;
         }
     }
+
+#pragma endregion
+#pragma region - RowIterator class definition
+
+/**
+ * @brief Row-wise iterator that maintains synchronized column iterators.
+ * @details More efficient than index-based access for large tables.
+ */
+class RowIterator
+{
+    protected:
+        FITStable* table_;
+        size_t row_idx_;
     
-    #pragma region - RowSet / ColumnView helpers
+        // Separate caches to avoid std::any type collisions between iterator/const_iterator
+        mutable std::unordered_map<std::string, std::any> iter_cache_mut_;
+        mutable std::unordered_map<std::string, std::any> iter_cache_const_;
+    
+        template<typename T>
+        typename std::vector<T>::iterator& getOrInitIteratorMut(const std::string& columnName)
+        {
+            auto it = iter_cache_mut_.find(columnName);
+            if(it == iter_cache_mut_.end())
+            {
+                auto& col = *(table_->getColumn(columnName));
+                auto& values = col.values<T>(); // throws std::bad_cast on mismatch
+            
+                if(row_idx_ >= values.size())
+                    throw std::out_of_range("RowIterator: row index out of range");
+            
+                iter_cache_mut_[columnName] = (values.begin() + static_cast<std::ptrdiff_t>(row_idx_));
+                return std::any_cast<typename std::vector<T>::iterator&>(iter_cache_mut_[columnName]);
+            }
+        
+            return std::any_cast<typename std::vector<T>::iterator&>(it->second);
+        }
+    
+        template<typename T>
+        typename std::vector<T>::const_iterator getOrInitIteratorConst(const std::string& columnName)   const
+        {
+            auto it = iter_cache_const_.find(columnName);
+            if(it == iter_cache_const_.end())
+            {
+                auto& col = *(table_->getColumn(columnName));
+            
+                // IMPORTANT: values<T>() const returns empty on mismatch.
+                // Force the throwing path for type checking:
+                auto& values_mut = const_cast<FITSform&>(col).values<T>(); // throws std::bad_cast on   mismatch
+            
+                if(row_idx_ >= values_mut.size())
+                    throw std::out_of_range("RowIterator: row index out of range");
+            
+                iter_cache_const_[columnName] = (values_mut.cbegin() + static_cast<std::ptrdiff_t>  (row_idx_));
+                return std::any_cast<typename std::vector<T>::const_iterator>(iter_cache_const_ [columnName]);
+            }
+        
+            return std::any_cast<typename std::vector<T>::const_iterator>(it->second);
+        }
+    
+        void clearCaches()
+        {
+            iter_cache_mut_.clear();
+            iter_cache_const_.clear();
+        }
+    
+    public:
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type   = std::ptrdiff_t;
+        using value_type        = size_t;
+    
+        RowIterator(FITStable* table, size_t idx)
+            : table_(table), row_idx_(idx) {}
+    
+        size_t index() const { return row_idx_; }
+    
+        template<typename T>
+        T& at(const std::string& columnName)
+        {
+            // Lock while we obtain the iterator and dereference it.
+            // (Note: returning a reference after releasing the lock is not thread-safe under mutation.)
+            auto& form = *(table_->getColumn(columnName));
+            std::shared_lock<std::shared_mutex> lk(form.data_mtx);
+        
+            auto& it = getOrInitIteratorMut<T>(columnName);
+            return *it;
+        }
+    
+        template<typename T>
+        const T& at(const std::string& columnName) const
+        {
+            auto& form = *(table_->getColumn(columnName));
+            std::shared_lock<std::shared_mutex> lk(form.data_mtx);
+        
+            auto it = getOrInitIteratorConst<T>(columnName);
+            return *it;
+        }
+    
+        RowIterator& operator++()
+        {
+            ++row_idx_;
+            clearCaches();
+            return *this;
+        }
+    
+        RowIterator operator++(int)
+        {
+            RowIterator tmp = *this;
+            ++(*this);
+            return tmp;
+        }
+    
+        size_t operator*() const { return row_idx_; }
+    
+        bool operator==(const RowIterator& other) const
+        {
+            return table_ == other.table_ && row_idx_ == other.row_idx_;
+        }
+    
+        bool operator!=(const RowIterator& other) const
+        {
+            return !(*this == other);
+        }
+};
+
+    inline RowIterator FITStable::begin()       { return RowIterator(this, 0); }
+    inline RowIterator FITStable::end()         { return RowIterator(this, nrows()); }
+    inline RowIterator FITStable::begin() const { return RowIterator(const_cast<FITStable*>(this), 0); }
+    inline RowIterator FITStable::end() const   { return RowIterator(const_cast<FITStable*>(this), nrows()); }
+
+    template<typename T>
+    T& FITStable::at(const std::string& columnName, const RowIterator& it)
+    {
+        return it.at<T>(columnName);
+    }
+
+    template<typename T>
+    const T& FITStable::at(const std::string& columnName, const RowIterator& it) const
+    {
+        return it.at<T>(columnName);
+    }
+    
+#pragma endregion
+    
+#pragma region - RowSet / ColumnView helpers
     namespace detail
     {
         template<typename T> struct is_std_vector : std::false_type {};

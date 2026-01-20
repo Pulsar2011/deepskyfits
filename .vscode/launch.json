@@ -94,5 +94,17 @@
         "MIMode": "lldb",
         "preLaunchTask": "make gtest"
     }
+    ,
+    {
+        "type": "lldb-dap",
+        "request": "launch",
+        "name": "gTest_tableHandling (LLDB)",
+        "program": "${workspaceRoot}/build/exe/gTest_tableHandling",
+        "args": [],
+        "env": [],
+        "cwd": "${workspaceRoot}",
+        "MIMode": "lldb",
+        "preLaunchTask": "make gtest"
+    }
     ]
 }

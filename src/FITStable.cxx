@@ -2342,6 +2342,8 @@ namespace DSL
     const std::unique_ptr<FITSform>& FITStable::getColumn(const std::string& cname) const
     {
         columns_list::const_iterator it = findColumnByName_const(cname);
+        if(it == fcolumns.cend())
+            throw std::out_of_range("FITStable::getColumn: Column '" + cname + "' does not exist in the FITS table.");
         return (*it);
     }
 
@@ -2376,13 +2378,15 @@ namespace DSL
     {
         if(fcolumns.empty()) return 0;
 
-        nrows_cache = 0;
-        for(columns_list::const_iterator n = fcolumns.cbegin(); n != fcolumns.cend(); n++)
+        // Compute locally to keep read-only iteration thread-safe.
+        // (nrows_cache is updated by read/write/mutation paths; keeping nrows()
+        // free of writes avoids data races when multiple threads iterate.)
+        size_t maxRows = 0;
+        for(columns_list::const_iterator n = fcolumns.cbegin(); n != fcolumns.cend(); ++n)
         {
-            nrows_cache = (nrows_cache < n->get()->size()) ? n->get()->size() : nrows_cache;
+            maxRows = (maxRows < n->get()->size()) ? n->get()->size() : maxRows;
         }
-
-        return nrows_cache;
+        return maxRows;
     }
 
     /**
@@ -2400,7 +2404,7 @@ namespace DSL
      @details Retrive column name and column datatype of all columns of the FITS table.
      @return The list of column with their index, name and embeded datatype.
      */
-    const FITStable::clist FITStable::listColumns()
+    const FITStable::clist FITStable::listColumns() const
     {      
         std::vector< std::vector<std::string> > list;
         for(columns_list::const_iterator n = fcolumns.cbegin(); n != fcolumns.cend(); n++)
@@ -2807,6 +2811,223 @@ namespace DSL
         
         out<<"\033[34m   `- \033[34mDONE\033[0m"<<std::endl;
         
+    }
+
+    void FITStable::toCSV(std::ostream& out, const char delimiter) const
+    {
+        auto csvEscape = [delimiter](const std::string& s) -> std::string
+        {
+            const bool needQuote = (s.find(delimiter) != std::string::npos) ||
+                                   (s.find('"')      != std::string::npos) ||
+                                   (s.find('\n')     != std::string::npos) ||
+                                   (s.find('\r')     != std::string::npos);
+            if(!needQuote) return s;
+
+            std::string out;
+            out.reserve(s.size() + 2);
+            out.push_back('"');
+            for(const char c : s)
+            {
+                if(c == '"') out += "\"\"";
+                else out.push_back(c);
+            }
+            out.push_back('"');
+            return out;
+        };
+
+        auto joinVector = [](const auto& v, const auto& elementToString) -> std::string
+        {
+            std::ostringstream oss;
+            oss << '{';
+            for(size_t i = 0; i < v.size(); ++i)
+            {
+                if(i) oss << ';';
+                oss << elementToString(v[i]);
+            }
+            oss << '}';
+            return oss.str();
+        };
+
+        // Header (names + units)
+        const FITStable::clist meta = this->listColumns();
+
+        for(size_t i = 0; i < meta.size(); ++i)
+        {
+            if(i) out << delimiter;
+            out << csvEscape(meta[i][0]);
+        }
+        out << std::endl;
+
+        for(size_t i = 0; i < meta.size(); ++i)
+        {
+            if(i) out << delimiter;
+            const std::string& unit = meta[i][2];
+            out << csvEscape(unit.empty() ? std::string() : ("[" + unit + "]"));
+        }
+        out << std::endl;
+
+        // Data
+        for(auto it = this->begin(); it != this->end(); ++it)
+        {
+            const RowIterator& row = it;
+            for(size_t c = 0; c < meta.size(); ++c)
+            {
+                if(c) out << delimiter;
+
+                const std::string& colName = meta[c][0];
+                const auto& colPtr = this->getColumn(colName);
+                const FITSform& col = *colPtr;
+                const std::type_index payload = col.payloadType();
+
+                std::string cell;
+                switch(col.getType())
+                {
+                    case tsbyte:
+                        if(payload == std::type_index(typeid(FITSform::int8Vector)))
+                            cell = joinVector(row.at<FITSform::int8Vector>(colName), [](int8_t v){ return std::to_string(static_cast<int>(v)); });
+                        else
+                            cell = std::to_string(static_cast<int>(row.at<int8_t>(colName)));
+                        break;
+
+                    case tbyte:
+                        if(payload == std::type_index(typeid(FITSform::uint8Vector)))
+                            cell = joinVector(row.at<FITSform::uint8Vector>(colName), [](uint8_t v){ return std::to_string(static_cast<unsigned int>(v)); });
+                        else
+                            cell = std::to_string(static_cast<unsigned int>(row.at<uint8_t>(colName)));
+                        break;
+
+                    case tshort:
+                        if(payload == std::type_index(typeid(FITSform::int16Vector)))
+                            cell = joinVector(row.at<FITSform::int16Vector>(colName), [](int16_t v){ return std::to_string(static_cast<int>(v)); });
+                        else
+                            cell = std::to_string(static_cast<int>(row.at<int16_t>(colName)));
+                        break;
+
+                    case tushort:
+                        if(payload == std::type_index(typeid(FITSform::uint16Vector)))
+                            cell = joinVector(row.at<FITSform::uint16Vector>(colName), [](uint16_t v){ return std::to_string(static_cast<unsigned int>(v)); });
+                        else
+                            cell = std::to_string(static_cast<unsigned int>(row.at<uint16_t>(colName)));
+                        break;
+
+                    case tint:
+                    case tlong:
+                        if(payload == std::type_index(typeid(FITSform::int32Vector)))
+                            cell = joinVector(row.at<FITSform::int32Vector>(colName), [](int32_t v){ return std::to_string(static_cast<long long>(v)); });
+                        else
+                            cell = std::to_string(static_cast<long long>(row.at<int32_t>(colName)));
+                        break;
+
+                    case tuint:
+                    case tulong:
+                        if(payload == std::type_index(typeid(FITSform::uint32Vector)))
+                            cell = joinVector(row.at<FITSform::uint32Vector>(colName), [](uint32_t v){ return std::to_string(static_cast<unsigned long long>(v)); });
+                        else
+                            cell = std::to_string(static_cast<unsigned long long>(row.at<uint32_t>(colName)));
+                        break;
+
+                    case tlonglong:
+                        if(payload == std::type_index(typeid(FITSform::int64Vector)))
+                            cell = joinVector(row.at<FITSform::int64Vector>(colName), [](int64_t v){ return std::to_string(static_cast<long long>(v)); });
+                        else
+                            cell = std::to_string(static_cast<long long>(row.at<int64_t>(colName)));
+                        break;
+
+                    case tulonglong:
+                        if(payload == std::type_index(typeid(FITSform::uint64Vector)))
+                            cell = joinVector(row.at<FITSform::uint64Vector>(colName), [](uint64_t v){ return std::to_string(static_cast<unsigned long long>(v)); });
+                        else
+                            cell = std::to_string(static_cast<unsigned long long>(row.at<uint64_t>(colName)));
+                        break;
+
+                    case tfloat:
+                        if(payload == std::type_index(typeid(FITSform::floatVector)))
+                        {
+                            const auto& v = row.at<FITSform::floatVector>(colName);
+                            cell = joinVector(v, [](float x){ std::ostringstream oss; oss << x; return oss.str(); });
+                        }
+                        else
+                        {
+                            std::ostringstream oss; oss << row.at<float>(colName); cell = oss.str();
+                        }
+                        break;
+
+                    case tdouble:
+                        if(payload == std::type_index(typeid(FITSform::doubleVector)))
+                        {
+                            const auto& v = row.at<FITSform::doubleVector>(colName);
+                            cell = joinVector(v, [](double x){ std::ostringstream oss; oss << x; return oss.str(); });
+                        }
+                        else
+                        {
+                            std::ostringstream oss; oss << row.at<double>(colName); cell = oss.str();
+                        }
+                        break;
+
+                    case tstring:
+                        if(payload == std::type_index(typeid(FITSform::stringVector)))
+                            cell = joinVector(row.at<FITSform::stringVector>(colName), [](const std::string& s){ return s; });
+                        else
+                            cell = row.at<std::string>(colName);
+                        break;
+
+                    case tbit:
+                    case tlogical:
+                        if(payload == std::type_index(typeid(FITSform::boolVector)))
+                            cell = joinVector(row.at<FITSform::boolVector>(colName), [](bool b){ return std::string(b ? "T" : "F"); });
+                        else
+                            cell = row.at<bool>(colName) ? "T" : "F";
+                        break;
+
+                    case tcplx:
+                        if(payload == std::type_index(typeid(FITSform::complexVector)))
+                        {
+                            const auto& v = row.at<FITSform::complexVector>(colName);
+                            cell = joinVector(v, [](const FITSform::complex& z)
+                            {
+                                std::ostringstream oss;
+                                oss << '(' << z.first << ',' << z.second << ')';
+                                return oss.str();
+                            });
+                        }
+                        else
+                        {
+                            const FITSform::complex z = row.at<FITSform::complex>(colName);
+                            std::ostringstream oss;
+                            oss << '(' << z.first << ',' << z.second << ')';
+                            cell = oss.str();
+                        }
+                        break;
+
+                    case tdbcplx:
+                        if(payload == std::type_index(typeid(FITSform::dblcomplexVector)))
+                        {
+                            const auto& v = row.at<FITSform::dblcomplexVector>(colName);
+                            cell = joinVector(v, [](const FITSform::dblcomplex& z)
+                            {
+                                std::ostringstream oss;
+                                oss << '(' << z.first << ',' << z.second << ')';
+                                return oss.str();
+                            });
+                        }
+                        else
+                        {
+                            const FITSform::dblcomplex z = row.at<FITSform::dblcomplex>(colName);
+                            std::ostringstream oss;
+                            oss << '(' << z.first << ',' << z.second << ')';
+                            cell = oss.str();
+                        }
+                        break;
+
+                    default:
+                        cell.clear();
+                        break;
+                }
+
+                out << csvEscape(cell);
+            }
+            out << std::endl;
+        }
     }
 
 #pragma endregion

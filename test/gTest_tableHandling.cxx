@@ -134,6 +134,39 @@ TEST(ColumnHandleTest, WhereChainAppliesAcrossColumns)
     }
 }
 
+TEST(ToCSVTest, ExportsScalarAndVectorCells)
+{
+    FITStable table;
+
+    auto colScalar = std::make_shared<FITScolumn<int32_t>>("SCALAR", tint, "px", 1);
+    colScalar->push_back(1);
+    colScalar->push_back(2);
+    table.InsertColumn(colScalar);
+
+    auto colVec = std::make_shared<FITScolumn<FITSform::int32Vector>>("VEC", tint, "adu", 2);
+    colVec->push_back(FITSform::int32Vector{1, 2, 3});
+    colVec->push_back(FITSform::int32Vector{42,8,5});
+    table.InsertColumn(colVec);
+
+    auto colStr = std::make_shared<FITScolumn< std::string> >("STR", tstring, "", 3);
+    colStr->push_back(std::string("hello"));
+    colStr->push_back(std::string("plain"));
+    table.InsertColumn(colStr);
+
+    std::ostringstream oss;
+    table.toCSV(oss, '\t');
+
+    std::cout<<oss.str();
+
+    const std::string expected =
+        "SCALAR\tVEC\tSTR\n"
+        "[px]\t[adu]\t\n"
+        "1\t{1;2;3}\thello\n"
+        "2\t{42;8;5}\tplain\n";
+
+    EXPECT_EQ(expected, oss.str());
+}
+
 TEST(ColumnViewTest, SortAscendingPreservesAlignment)
 {
     FITStable table = CreateSampleTable();
@@ -680,4 +713,359 @@ TEST(ColumnViewTest, StatisticalComputations_inParralel)
     t2.join();
     t3.join();
 
+}
+
+// Add these tests after the existing tests
+
+TEST(RowIteratorTest, BasicIteration)
+{
+    FITStable table = CreateSampleTable();
+    
+    size_t count = 0;
+    for(auto it = table.begin(); it != table.end(); ++it)
+    {
+        EXPECT_EQ(count, it.index());
+        EXPECT_EQ(count, *it);
+        ++count;
+    }
+    EXPECT_EQ(table.nrows(), count);
+}
+
+TEST(RowIteratorTest, RangeBasedForLoop)
+{
+    FITStable table = CreateSampleTable();
+    
+    std::vector<size_t> indices;
+    for(auto it : table)
+    {
+        indices.push_back(it);
+    }
+    
+    EXPECT_EQ(table.nrows(), indices.size());
+    for(size_t i = 0; i < indices.size(); ++i)
+    {
+        EXPECT_EQ(i, indices[i]);
+    }
+}
+
+TEST(RowIteratorTest, AccessMultipleColumns)
+{
+    FITStable table = CreateSampleTable();
+    
+    // Reference data
+    auto ints = table.column<int32_t>("COL_INT").data();
+    auto doubles = table.column<double>("COL_DOUBLE").data();
+    auto strings = table.column<std::string>("COL_STR").data();
+    
+    size_t idx = 0;
+    for(auto it = table.begin(); it != table.end(); ++it)
+    {
+        EXPECT_EQ(ints[idx], it.at<int32_t>("COL_INT"));
+        EXPECT_DOUBLE_EQ(doubles[idx], it.at<double>("COL_DOUBLE"));
+        EXPECT_EQ(strings[idx], it.at<std::string>("COL_STR"));
+        ++idx;
+    }
+    EXPECT_EQ(table.nrows(), idx);
+}
+
+TEST(RowIteratorTest, ModifyThroughIterator)
+{
+    FITStable table = CreateSampleTable();
+    
+    // Multiply all ints by 2
+    for(auto it = table.begin(); it != table.end(); ++it)
+    {
+        it.at<int32_t>("COL_INT") *= 2;
+    }
+    
+    // Verify changes
+    auto original = CreateSampleTable();
+    auto originalInts = original.column<int32_t>("COL_INT").data();
+    auto modifiedInts = table.column<int32_t>("COL_INT").data();
+    
+    ASSERT_EQ(originalInts.size(), modifiedInts.size());
+    for(size_t i = 0; i < originalInts.size(); ++i)
+    {
+        EXPECT_EQ(originalInts[i] * 2, modifiedInts[i]);
+    }
+}
+
+TEST(RowIteratorTest, ConditionalAccess)
+{
+    FITStable table = CreateSampleTable();
+    
+    std::vector<double> positiveDoubles;
+    for(auto it = table.begin(); it != table.end(); ++it)
+    {
+        int32_t intVal = it.at<int32_t>("COL_INT");
+        if(intVal > 0)
+        {
+            positiveDoubles.push_back(it.at<double>("COL_DOUBLE"));
+        }
+    }
+    
+    // Verify against filter-based approach
+    auto positiveRows = table.select<int32_t>("COL_INT").gt(0).build();
+    EXPECT_EQ(positiveRows.size(), positiveDoubles.size());
+}
+
+TEST(RowIteratorTest, IteratorCaching)
+{
+    FITStable table = CreateSampleTable();
+    
+    // Access same column multiple times per row - should use cached iterator
+    for(auto it = table.begin(); it != table.end(); ++it)
+    {
+        double d1 = it.at<double>("COL_DOUBLE");
+        double d2 = it.at<double>("COL_DOUBLE");
+        EXPECT_DOUBLE_EQ(d1, d2);
+        
+        // Access different column
+        int32_t i1 = it.at<int32_t>("COL_INT");
+        
+        // Access first column again
+        double d3 = it.at<double>("COL_DOUBLE");
+        EXPECT_DOUBLE_EQ(d1, d3);
+    }
+}
+
+TEST(RowIteratorTest, MixedAccessPatterns)
+{
+    FITStable table = CreateSampleTable();
+    
+    for(auto it = table.begin(); it != table.end(); ++it)
+    {
+        size_t idx = it.index();
+        
+        // Alternating access pattern
+        if(idx % 2 == 0)
+        {
+            it.at<int32_t>("COL_INT");
+        }
+        else
+        {
+            it.at<double>("COL_DOUBLE");
+        }
+        
+        // Always access string
+        it.at<std::string>("COL_STR");
+    }
+    // Just verify it completes without error
+    SUCCEED();
+}
+
+TEST(RowIteratorTest, PartialIteration)
+{
+    FITStable table = CreateSampleTable();
+    
+    auto it = table.begin();
+    EXPECT_EQ(0u, it.index());
+    
+    ++it;
+    EXPECT_EQ(1u, it.index());
+    EXPECT_EQ(-1, it.at<int32_t>("COL_INT"));
+    
+    ++it;
+    ++it;
+    EXPECT_EQ(3u, it.index());
+    EXPECT_EQ(4, it.at<int32_t>("COL_INT"));
+    
+    // Skip to near end
+    while(it.index() < table.nrows() - 1)
+        ++it;
+    
+    EXPECT_EQ(table.nrows() - 1, it.index());
+    EXPECT_EQ(10, it.at<int32_t>("COL_INT"));
+}
+
+TEST(RowIteratorTest, PostIncrement)
+{
+    FITStable table = CreateSampleTable();
+    
+    auto it = table.begin();
+    auto old = it++;
+    
+    EXPECT_EQ(0u, old.index());
+    EXPECT_EQ(1u, it.index());
+    
+    EXPECT_EQ(-5, old.at<int32_t>("COL_INT"));
+    EXPECT_EQ(-1, it.at<int32_t>("COL_INT"));
+}
+
+TEST(RowIteratorTest, EqualityComparison)
+{
+    FITStable table = CreateSampleTable();
+    
+    auto it1 = table.begin();
+    auto it2 = table.begin();
+    EXPECT_TRUE(it1 == it2);
+    EXPECT_FALSE(it1 != it2);
+    
+    ++it2;
+    EXPECT_FALSE(it1 == it2);
+    EXPECT_TRUE(it1 != it2);
+    
+    ++it1;
+    EXPECT_TRUE(it1 == it2);
+    
+    auto end1 = table.end();
+    auto end2 = table.end();
+    EXPECT_TRUE(end1 == end2);
+}
+
+TEST(RowIteratorTest, EmptyTable)
+{
+    FITStable table;
+    auto col = std::make_shared<FITScolumn<int32_t>>("EMPTY", tint, "", 1);
+    table.InsertColumn(col);
+    
+    EXPECT_EQ(table.begin(), table.end());
+    
+    // Should not enter loop
+    for(auto it = table.begin(); it != table.end(); ++it)
+    {
+        FAIL() << "Should not iterate over empty table";
+    }
+}
+
+TEST(RowIteratorTest, SingleRowTable)
+{
+    FITStable table;
+    auto col = std::make_shared<FITScolumn<int32_t>>("SINGLE", tint, "", 1);
+    col->push_back(42);
+    table.InsertColumn(col);
+    
+    size_t count = 0;
+    for(auto it = table.begin(); it != table.end(); ++it)
+    {
+        EXPECT_EQ(0u, it.index());
+        EXPECT_EQ(42, it.at<int32_t>("SINGLE"));
+        ++count;
+    }
+    EXPECT_EQ(1u, count);
+}
+
+TEST(RowIteratorTest, LargeTablePerformance)
+{
+    FITStable table;
+    auto col = std::make_shared<FITScolumn<double>>("LARGE", tdouble, "", 1);
+    
+    const size_t N = 100000;
+    for(size_t i = 0; i < N; ++i)
+    {
+        col->push_back(static_cast<double>(i));
+    }
+    table.InsertColumn(col);
+    
+    // Iterate and verify
+    size_t idx = 0;
+    for(auto it = table.begin(); it != table.end(); ++it)
+    {
+        EXPECT_DOUBLE_EQ(static_cast<double>(idx), it.at<double>("LARGE"));
+        ++idx;
+    }
+    EXPECT_EQ(N, idx);
+}
+
+TEST(RowIteratorTest, WrongTypeThrows)
+{
+    FITStable table = CreateSampleTable();
+    
+    auto it = table.begin();
+    EXPECT_THROW(it.at<double>("COL_INT"), std::bad_cast);
+    EXPECT_THROW(it.at<int32_t>("COL_DOUBLE"), std::bad_cast);
+    EXPECT_THROW(it.at<float>("COL_STR"), std::bad_cast);
+}
+
+TEST(RowIteratorTest, InvalidColumnNameThrows)
+{
+    FITStable table = CreateSampleTable();
+    
+    auto it = table.begin();
+    EXPECT_THROW(it.at<int32_t>("NONEXISTENT"), std::out_of_range);
+}
+
+TEST(RowIteratorTest, ThreadSafetyReadOnly)
+{
+    FITStable table = CreateSampleTable();
+    
+    std::vector<std::thread> threads;
+    std::atomic<bool> failed{false};
+    
+    for(int t = 0; t < 4; ++t)
+    {
+        threads.emplace_back([&table, &failed]()
+        {
+            try
+            {
+                for(int iter = 0; iter < 1000; ++iter)
+                {
+                    for(auto it = table.begin(); it != table.end(); ++it)
+                    {
+                        volatile int32_t i = it.at<int32_t>("COL_INT");
+                        volatile double d = it.at<double>("COL_DOUBLE");
+                        (void)i; (void)d;
+                    }
+                }
+            }
+            catch(...)
+            {
+                failed = true;
+            }
+        });
+    }
+    
+    for(auto& t : threads)
+        t.join();
+    
+    EXPECT_FALSE(failed);
+}
+
+TEST(RowIteratorTest, CombineWithFilters)
+{
+    FITStable table = CreateSampleTable();
+    
+    auto positiveRows = table.select<int32_t>("COL_INT").gt(0).build();
+    
+    // Manually iterate and check membership
+    std::vector<int32_t> positiveVals;
+    for(auto it = table.begin(); it != table.end(); ++it)
+    {
+        size_t idx = it.index();
+        if(std::binary_search(positiveRows.indices().begin(), 
+                              positiveRows.indices().end(), idx))
+        {
+            positiveVals.push_back(it.at<int32_t>("COL_INT"));
+        }
+    }
+    
+    // All collected values should be positive
+    for(int32_t val : positiveVals)
+    {
+        EXPECT_GT(val, 0);
+    }
+    EXPECT_EQ(positiveRows.size(), positiveVals.size());
+}
+
+TEST(RowIteratorTest, ModifyMultipleColumnsPerRow)
+{
+    FITStable table = CreateSampleTable();
+    
+    // Add 10 to ints, subtract 1 from doubles
+    for(auto it = table.begin(); it != table.end(); ++it)
+    {
+        it.at<int32_t>("COL_INT") += 10;
+        it.at<double>("COL_DOUBLE") -= 1.0;
+    }
+    
+    // Verify
+    auto original = CreateSampleTable();
+    for(auto it = table.begin(); it != table.end(); ++it)
+    {
+        size_t idx = it.index();
+        EXPECT_EQ(original.column<int32_t>("COL_INT").data()[idx] + 10,
+                  it.at<int32_t>("COL_INT"));
+        EXPECT_DOUBLE_EQ(original.column<double>("COL_DOUBLE").data()[idx] - 1.0,
+                         it.at<double>("COL_DOUBLE"));
+    }
 }
