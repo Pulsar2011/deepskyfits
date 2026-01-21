@@ -102,17 +102,6 @@ At the core of image handling are FITScube and its typed implementation FITSimg<
 #### Storage model and rationale
 Using flattened std::valarray for both pixels and masks gives predictable performance and expressive slicing. It's easy to address N‑D data through 1‑D indices, and operations like Window, Layer, and Rebin rely on std::gslice to copy contiguous blocks efficiently. Although std::valarray is less commonly used than std::vector, its element‑wise semantics and slicing make it well‑suited to numerical image processing.
 
-#### Logic behind selection/filtering
-Working with tables usually starts by choosing a column, building a set of matching rows, and then operating on those rows. A RowSet is simply a list of row indices that satisfy your predicates (for example, "MAG < 20 and FLAG == 0"). You create it with select<T>("COL") and chain comparisons; combining sets with && and || lets you intersect or union selections naturally. ColumnView<T> then gives you typed access to a column's in‑memory data, and can be restricted to a RowSet to read or update only the selected rows. If you need to stay type‑erased until the last moment, ColumnHandle provides a fluent entry point to obtain typed views and apply selections. Finally, when you sort or reorder rows, reorderRows applies one global permutation to all columns, keeping the table consistent.
-- ColumnView<T> gives typed, read/write access to a column's in-memory data (std::vector<T>) with optional RowSet restriction. It throws if the column's dtype doesn't match T.
-- RowSet represents a set of row indices. You build it with select<T>("COL") and chain predicates; sets support && (intersection) and || (union).
-- ColumnHandle provides a fluent entry point to create typed views, apply RowSet selections, and perform updates without exposing the underlying storage.
-- reorderRows enforces a single global permutation across all columns. It validates:
-  - size(order) == nrows,
-  - indices are within [0..nrows-1],
-  - no duplicates,
-  - all columns share the same row count.
-
 #### Examples: creating, manipulating, and exporting FITS images
 - Construct and inspect an image:
 ```c++
