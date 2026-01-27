@@ -98,11 +98,25 @@ ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 
 #-------------------- DARWIN specifics
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-	# Mac OS X specific code
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -fPIC -flto=thin -mcpu=native -mtune=native -ffp-contract=on -fomit-frame-pointer")
-
-	set(OperatingSystem "Mac OS X")
-	ADD_DEFINITIONS(-DDarwinx86_64)
+    # macOS specific code with architecture distinction
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+        # Apple Silicon (ARM64)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -fPIC -flto=thin -mcpu=native -mtune=native -ffp-contract=on -fomit-frame-pointer")
+        set(OperatingSystem "Mac OS X")
+        ADD_DEFINITIONS(-DDarwin -DDarwinarm64)
+        set(CMAKE_OSX_ARCHITECTURES "arm64")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64")
+        # Apple Intel (x86_64)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -m64 -fPIC -flto=thin -mcpu=native -mtune=native -ffp-contract=on -fomit-frame-pointer")
+        set(OperatingSystem "Mac OS X")
+        ADD_DEFINITIONS(-DDarwin -DDarwinx86_64)
+        set(CMAKE_OSX_ARCHITECTURES "x86_64")
+    else()
+        # Fallback
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -fPIC -flto=thin -mcpu=native -mtune=native -ffp-contract=on -fomit-frame-pointer")
+        set(OperatingSystem "Mac OS X")
+        ADD_DEFINITIONS(-DDarwin)
+    endif()
 ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 option(WITH_DEBUG "Activate debug mode" OFF)
@@ -400,7 +414,7 @@ endif(DOXYGEN_FOUND)
 
 #-------------------- ADD DISTCLEAN CUSTOM TARGET
 
-ADD_CUSTOM_TARGET (distclean @echo cleaning for source distribution)
+add_custom_target(distclean)
 set(DISTCLEANED
 cmake.depends
 cmake.check_depends
@@ -426,14 +440,16 @@ CMakeFiles
 ./include/Minuit2
 )
 
-ADD_CUSTOM_COMMAND(
-DEPENDS clean
-COMMENT "distribution clean"
-COMMAND rm ARGS    -Rf ${DISTCLEANED}
-COMMAND test -e install_manifest.txt || xargs ARGS rm -f < install_manifest.txt
-COMMAND test -e install_manifest.txt || rm ARGS -f install_manifest.txt
-TARGET  distclean
+add_custom_target(
+    distclean_run
+    COMMENT "distribution clean"
+    COMMAND ${CMAKE_COMMAND} -E echo "distribution clean"
+    COMMAND rm -Rf ${DISTCLEANED}
+    COMMAND /usr/bin/env bash -c "test -e install_manifest.txt && xargs rm -f < install_manifest.txt || true"
+    COMMAND /usr/bin/env bash -c "test -e install_manifest.txt && rm -f install_manifest.txt || true"
+    VERBATIM
 )
+add_dependencies(distclean distclean_run)
 
 
 #-------------------- Installation proceedure

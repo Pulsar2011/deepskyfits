@@ -33,14 +33,14 @@ class FITSimgStatsTest : public ::testing::Test
         std::string MakeFilename() const
         {
             std::ostringstream ss;
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
             ss << "build/testdata/stat_test_" << typeid(T).name() << ".fits";
 #else
             ss << "testdata/stat_test_" << typeid(T).name() << ".fits";
 #endif
             return ss.str();
         }
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         void EnsureOutDir() const { std::filesystem::create_directories("build/testdata"); }
 #else
         void EnsureOutDir() const { std::filesystem::create_directories("testdata"); }
@@ -78,7 +78,7 @@ TEST(FITSimg, Create_BYTE)
     EXPECT_EQ(img[N*N/2]  ,NN2);
     EXPECT_EQ(img[N*N-1]  ,NN );
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     img.Write("build/testdata/test_byte.fits", true);
     FITSmanager ff("build/testdata/test_byte.fits");
 #else
@@ -144,7 +144,7 @@ TEST(FITSimg, Create_SBYTE)
     EXPECT_EQ(img[N*N/2]  ,NN2);
     EXPECT_EQ(img[N*N-1]  ,NN );
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     img.Write("build/testdata/test_sbyte.fits", true);
     FITSmanager ff("build/testdata/test_sbyte.fits");
 #else
@@ -209,7 +209,7 @@ TEST(FITSimg, Create_SHORT)
     EXPECT_EQ(img[N*N/2],  NN2);
     EXPECT_EQ(img[N*N-1]  ,NN );
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     img.Write("build/testdata/test_short.fits", true);
     FITSmanager ff("build/testdata/test_short.fits");
 #else
@@ -281,7 +281,7 @@ TEST(FITSimg, Create_USHORT)
     EXPECT_EQ(img[N*N/2],  NN2);
     EXPECT_EQ(img[N*N-1]  ,NN );
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     img.Write("build/testdata/test_ushort.fits", true);
     FITSmanager ff("build/testdata/test_ushort.fits");
 #else
@@ -347,7 +347,7 @@ TEST(FITSimg, Create_LONG)
     EXPECT_EQ(img[N*N/2]  , NN2 );
     EXPECT_EQ(img[N*N-1]  , NN  );
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     img.Write("build/testdata/test_long.fits", true);
     FITSmanager ff("build/testdata/test_long.fits");
 #else
@@ -414,7 +414,7 @@ TEST(FITSimg, Create_ULONG)
     EXPECT_EQ(img[N*N/2]  , NN2 );
     EXPECT_EQ(img[N*N-1]  , NN  );
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     img.Write("build/testdata/test_ulong.fits", true);
     FITSmanager ff("build/testdata/test_ulong.fits");
 #else
@@ -480,7 +480,7 @@ TEST(FITSimg, Create_LONGLONG)
     EXPECT_EQ(img[N*N/2],  NN2);
     EXPECT_EQ(img[N*N-1]  ,NN );
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     img.Write("build/testdata/test_longlong.fits", true);
     FITSmanager ff("build/testdata/test_longlong.fits");
 #else
@@ -547,7 +547,7 @@ TEST(FITSimg, Create_ULONGLONG)
     EXPECT_EQ(img[N*N/2],  NN2);
     EXPECT_EQ(img[N*N-1]  ,NN );
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     img.Write("build/testdata/test_ulonglong.fits", true);
     FITSmanager ff("build/testdata/test_ulonglong.fits");
 #else
@@ -603,7 +603,7 @@ TEST(FITSimg, Create_FLOAT)
     EXPECT_EQ(img[N*N/2],  (float) 129);
     EXPECT_EQ(img[N*N-1]  ,(float) 256);
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     img.Write("build/testdata/test_float.fits", true);
     FITSmanager ff("build/testdata/test_float.fits");
 #else
@@ -661,7 +661,7 @@ TEST(FITSimg, Create_DOUBLE)
     EXPECT_EQ(img[N*N/2],  (double) 129);
     EXPECT_EQ(img[N*N-1]  ,(double) 256);
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     img.Write("build/testdata/test_double.fits", true);
     FITSmanager ff("build/testdata/test_double.fits");
 #else
@@ -741,7 +741,7 @@ TEST(FITSimg, Create_SHORT2FLOAT)
     img.Bzero( (double)0.0);
     img.BitPerPixel(SHORT_IMG,FLOAT_IMG);
     
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     img.Write("build/testdata/test_short2float.fits", true);
     FITSmanager ff("build/testdata/test_short2float.fits");
 #else
@@ -821,7 +821,7 @@ TEST(FITSimg, Create_LONG2DOUBLE)
     img.Bzero( (double)0.0);
     img.BitPerPixel(LONG_IMG,DOUBLE_IMG);
     
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     img.Write("build/testdata/test_long2double.fits", true);
     FITSmanager ff("build/testdata/test_long2double.fits");
 #else
@@ -910,7 +910,7 @@ TEST(FITSimg, Read_SHORT)
 {
     verbose = verboseLevel::VERBOSE_NONE;
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     std::string src = "build/testdata/testkeys.fits";
 #else
     std::string src = "testdata/testkeys.fits";
@@ -942,7 +942,7 @@ TEST(FITSimg, Test_Crop)
 {
     verbose = verboseLevel::VERBOSE_NONE;
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     std::string src = "build/testdata/testkeys.fits";
 #else
     std::string src = "testdata/testkeys.fits";
@@ -1010,7 +1010,7 @@ TEST(FITSimg, Test_RebinningWCS)
 {
     verbose = verboseLevel::VERBOSE_NONE;
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     std::string src = "build/testdata/testkeys.fits";
 #else
     std::string src = "testdata/testkeys.fits";
@@ -1052,7 +1052,7 @@ TEST(FITSimg, Naming)
 {
     verbose = verboseLevel::VERBOSE_NONE;
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     std::string src = "build/testdata/testkeys.fits";
 #else
     std::string src = "testdata/testkeys.fits";
@@ -1408,7 +1408,7 @@ class FITSimgMixTest : public ::testing::Test
         using value_type = typename Pair::T;
         using other_type = typename Pair::D;
         static size_t N() { return 10; }
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         void EnsureOutDir() const { std::filesystem::create_directories("build/testdata"); }
 #else
         void EnsureOutDir() const { std::filesystem::create_directories("testdata");}
@@ -2063,7 +2063,7 @@ TEST(FITSimg, WorldCoordinates)
 {
     verbose = verboseLevel::VERBOSE_NONE;
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     std::string src = "build/testdata/testkeys.fits";
 #else
     std::string src = "testdata/testkeys.fits";
@@ -2113,7 +2113,7 @@ TEST(FITSimg, WorldCoordinatesMatrix)
 {
     verbose = verboseLevel::VERBOSE_NONE;
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     std::string src = "build/testdata/testkeys.fits";
 #else
     std::string src = "testdata/testkeys.fits";

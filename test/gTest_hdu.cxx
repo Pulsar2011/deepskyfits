@@ -387,7 +387,7 @@ TEST(FITShdu_Constructor, FromString)
 
 TEST(FITShdu_Constructor, FromFitsFile)
 {
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager ff("build/testdata/rosat_pspc_rdf2_3_bk1.fits");
 #else
     FITSmanager ff("testdata/rosat_pspc_rdf2_3_bk1.fits");
@@ -517,7 +517,7 @@ TEST(FITShdu_Dump, NoCrash)
 TEST(FITShdu_Modifier, ModifyFitsHeader)
 {
     // Prepare test fixture: remove existing destination and copy source fixture into build/testdata
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     const std::string src_path = "build/testdata/rosat_pspc_rdf2_3_bk1.fits";
     const std::string dst_path = "build/testdata/rosat_pspc_rdf2_3_bk1_cpy.fits";
 #else
@@ -537,7 +537,7 @@ TEST(FITShdu_Modifier, ModifyFitsHeader)
     srcfs.close();
     dstfs.close();
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager ff("build/testdata/rosat_pspc_rdf2_3_bk1_cpy.fits",false);
 #else
     FITSmanager ff("testdata/rosat_pspc_rdf2_3_bk1_cpy.fits",false);
@@ -565,7 +565,7 @@ TEST(FITShdu_Modifier, ModifyFitsHeader)
     hdu.Write(hdu_ref);
     ff.Close();
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager fr("build/testdata/rosat_pspc_rdf2_3_bk1_cpy.fits",true);
 #else
     FITSmanager fr("testdata/rosat_pspc_rdf2_3_bk1_cpy.fits",true);

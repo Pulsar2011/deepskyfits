@@ -941,7 +941,7 @@ template class FITSimg<int32_t>;
 template class FITSimg<uint32_t>;
 template class FITSimg<int64_t>;
 template class FITSimg<uint64_t>;
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
 template class FITSimg<size_t>;
 #endif
 template class FITSimg<float>;

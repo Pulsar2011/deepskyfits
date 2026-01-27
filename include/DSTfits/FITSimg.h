@@ -337,7 +337,7 @@ namespace DSL
         virtual void SetPixelValue(const  int32_t&, const std::vector<size_t>&) =0;
         virtual void SetPixelValue(const uint64_t&, const std::vector<size_t>&) =0;
         virtual void SetPixelValue(const  int64_t&, const std::vector<size_t>&) =0;
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         virtual void SetPixelValue(const   size_t&, const std::vector<size_t>&) =0;
 #endif
         virtual void SetPixelValue(const    float&, const std::vector<size_t>&) =0;
@@ -350,7 +350,7 @@ namespace DSL
         virtual void SetPixelValue(const  int32_t&, const size_t&)        =0;
         virtual void SetPixelValue(const uint64_t&, const size_t&)        =0;
         virtual void SetPixelValue(const  int64_t&, const size_t&)        =0;
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         virtual void SetPixelValue(const   size_t&, const size_t&)        =0;
 #endif
         virtual void SetPixelValue(const    float&, const size_t&)        =0;
@@ -365,7 +365,7 @@ namespace DSL
         virtual void Bscale(const  int32_t& )  =0;
         virtual void Bscale(const uint64_t& )  =0;
         virtual void Bscale(const  int64_t& )  =0;
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         virtual void Bscale(const size_t&   )  =0;
 #endif
         virtual void Bscale(const float&    )  =0;
@@ -379,7 +379,7 @@ namespace DSL
         virtual void Bzero(const  int32_t& )   =0;
         virtual void Bzero(const uint64_t& )   =0;
         virtual void Bzero(const  int64_t& )   =0;
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         virtual void Bzero(const size_t&   )   =0;
 #endif
         virtual void Bzero(const float&    )   =0;
@@ -393,7 +393,7 @@ namespace DSL
         virtual void Blank(const  int32_t& )   =0;
         virtual void Blank(const uint64_t& )   =0;
         virtual void Blank(const  int64_t& )   =0;
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         virtual void Blank(const size_t&   )   =0;
 #endif
         virtual void Blank(const float&    )   =0;
@@ -411,7 +411,7 @@ namespace DSL
         virtual void operator+=(const  int32_t& val){};
         virtual void operator+=(const uint64_t& val){};
         virtual void operator+=(const  int64_t& val){};
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         virtual void operator+=(const   size_t& val){};
 #endif
         virtual void operator+=(const    float& val){};
@@ -425,7 +425,7 @@ namespace DSL
         virtual void operator+=(const std::valarray< int32_t>& val){};
         virtual void operator+=(const std::valarray<uint64_t>& val){};
         virtual void operator+=(const std::valarray< int64_t>& val){};
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         virtual void operator+=(const std::valarray<  size_t>& val){};
 #endif
         virtual void operator+=(const std::valarray<   float>& val){};
@@ -443,7 +443,7 @@ namespace DSL
         virtual void operator-=(const  int32_t& val){};
         virtual void operator-=(const uint64_t& val){};
         virtual void operator-=(const  int64_t& val){};
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         virtual void operator-=(const   size_t& val){};
 #endif
         virtual void operator-=(const    float& val){};
@@ -457,7 +457,7 @@ namespace DSL
         virtual void operator-=(const std::valarray< int32_t>& val){};
         virtual void operator-=(const std::valarray<uint64_t>& val){};
         virtual void operator-=(const std::valarray< int64_t>& val){};
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         virtual void operator-=(const std::valarray<  size_t>& val){};
 #endif
         virtual void operator-=(const std::valarray<   float>& val){};
@@ -474,7 +474,7 @@ namespace DSL
         virtual void operator*=(const  int32_t& val){};
         virtual void operator*=(const uint64_t& val){};
         virtual void operator*=(const  int64_t& val){};
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         virtual void operator*=(const   size_t& val){};
 #endif
         virtual void operator*=(const    float& val){};
@@ -488,7 +488,7 @@ namespace DSL
         virtual void operator*=(const std::valarray< int32_t>& val){};
         virtual void operator*=(const std::valarray<uint64_t>& val){};
         virtual void operator*=(const std::valarray< int64_t>& val){};
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         virtual void operator*=(const std::valarray<  size_t>& val){};
 #endif
         virtual void operator*=(const std::valarray<   float>& val){};
@@ -505,7 +505,7 @@ namespace DSL
         virtual void operator/=(const  int32_t& val){};
         virtual void operator/=(const uint64_t& val){};
         virtual void operator/=(const  int64_t& val){};
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         virtual void operator/=(const   size_t& val){};
 #endif
         virtual void operator/=(const    float& val){};
@@ -519,7 +519,7 @@ namespace DSL
         virtual void operator/=(const std::valarray< int32_t>& val){};
         virtual void operator/=(const std::valarray<uint64_t>& val){};
         virtual void operator/=(const std::valarray< int64_t>& val){};
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         virtual void operator/=(const std::valarray<  size_t>& val){};
 #endif
         virtual void operator/=(const std::valarray<   float>& val){};
@@ -605,7 +605,7 @@ namespace DSL
         void Bscale(const  int32_t& ) override ;
         void Bscale(const uint64_t& ) override ;
         void Bscale(const  int64_t& ) override ;
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         void Bscale(const size_t&   ) override ;
 #endif
         void Bscale(const float&    ) override ;
@@ -619,7 +619,7 @@ namespace DSL
         void Bzero(const  int32_t& ) override ;
         void Bzero(const uint64_t& ) override ;
         void Bzero(const  int64_t& ) override ;
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         void Bzero(const size_t&   ) override ;
 #endif
         void Bzero(const float&    ) override ;
@@ -633,7 +633,7 @@ namespace DSL
         void Blank(const  int32_t& ) override ;
         void Blank(const uint64_t& ) override ;
         void Blank(const  int64_t& ) override ;
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         void Blank(const size_t&   ) override ;
 #endif
         void Blank(const float&    ) override ;
@@ -748,7 +748,7 @@ namespace DSL
         void operator+=(const  int32_t& val) override {return operator+=< int32_t>(val);}
         void operator+=(const uint64_t& val) override {return operator+=<uint64_t>(val);}
         void operator+=(const  int64_t& val) override {return operator+=< int64_t>(val);}
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         void operator+=(const   size_t& val) override {return operator+=<  size_t>(val);}
 #endif
         void operator+=(const    float& val) override {return operator+=<   float>(val);}
@@ -765,7 +765,7 @@ namespace DSL
         void operator+=(const std::valarray< int32_t>& val) override {return operator+=< int32_t>(val);}
         void operator+=(const std::valarray<uint64_t>& val) override {return operator+=<uint64_t>(val);}
         void operator+=(const std::valarray< int64_t>& val) override {return operator+=< int64_t>(val);}
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         void operator+=(const std::valarray<  size_t>& val) override {return operator+=<  size_t>(val);}
 #endif
         void operator+=(const std::valarray<   float>& val) override {return operator+=<   float>(val);}
@@ -789,7 +789,7 @@ namespace DSL
         void operator-=(const  int32_t& val) override {return operator-=< int32_t>(val);}
         void operator-=(const uint64_t& val) override {return operator-=<uint64_t>(val);}
         void operator-=(const  int64_t& val) override {return operator-=< int64_t>(val);}
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         void operator-=(const   size_t& val) override {return operator-=<  size_t>(val);}
 #endif
         void operator-=(const    float& val) override {return operator-=<   float>(val);}
@@ -806,7 +806,7 @@ namespace DSL
         void operator-=(const std::valarray< int32_t>& val) override {return operator-=< int32_t>(val);}
         void operator-=(const std::valarray<uint64_t>& val) override {return operator-=<uint64_t>(val);}
         void operator-=(const std::valarray< int64_t>& val) override {return operator-=< int64_t>(val);}
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         void operator-=(const std::valarray<  size_t>& val) override {return operator-=<  size_t>(val);}
 #endif
         void operator-=(const std::valarray<   float>& val) override {return operator-=<   float>(val);}
@@ -830,7 +830,7 @@ namespace DSL
         void operator*=(const  int32_t& val) override {return operator*=< int32_t>(val);}
         void operator*=(const uint64_t& val) override {return operator*=<uint64_t>(val);}
         void operator*=(const  int64_t& val) override {return operator*=< int64_t>(val);}
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         void operator*=(const   size_t& val) override {return operator*=<  size_t>(val);}
 #endif
         void operator*=(const    float& val) override {return operator*=<   float>(val);}
@@ -847,7 +847,7 @@ namespace DSL
         void operator*=(const std::valarray< int32_t>& val) override {return operator*=< int32_t>(val);}
         void operator*=(const std::valarray<uint64_t>& val) override {return operator*=<uint64_t>(val);}
         void operator*=(const std::valarray< int64_t>& val) override {return operator*=< int64_t>(val);}
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         void operator*=(const std::valarray<  size_t>& val) override {return operator*=<  size_t>(val);}
 #endif
         void operator*=(const std::valarray<   float>& val) override {return operator*=<   float>(val);}
@@ -871,7 +871,7 @@ namespace DSL
         void operator/=(const  int32_t& val) override {return operator/=< int32_t>(val);};
         void operator/=(const uint64_t& val) override {return operator/=<uint64_t>(val);};
         void operator/=(const  int64_t& val) override {return operator/=< int64_t>(val);};
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         void operator/=(const   size_t& val) override {return operator/=<  size_t>(val);};
 #endif
         void operator/=(const    float& val) override {return operator/=<   float>(val);};
@@ -888,7 +888,7 @@ namespace DSL
         void operator/=(const std::valarray< int32_t>& val) override {return operator/=< int32_t>(val);}
         void operator/=(const std::valarray<uint64_t>& val) override {return operator/=<uint64_t>(val);}
         void operator/=(const std::valarray< int64_t>& val) override {return operator/=< int64_t>(val);}
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         void operator/=(const std::valarray<  size_t>& val) override {return operator/=<  size_t>(val);}
 #endif
         void operator/=(const std::valarray<   float>& val) override {return operator/=<   float>(val);}
@@ -909,7 +909,7 @@ namespace DSL
         void SetPixelValue(const  int32_t& val, const std::vector<size_t>& vPx) override {this->template SetPixelValue< int32_t>(val,vPx);}
         void SetPixelValue(const uint64_t& val, const std::vector<size_t>& vPx) override {this->template SetPixelValue<uint64_t>(val,vPx);}
         void SetPixelValue(const  int64_t& val, const std::vector<size_t>& vPx) override {this->template SetPixelValue< int64_t>(val,vPx);}
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         void SetPixelValue(const   size_t& val, const std::vector<size_t>& vPx) override {this->template SetPixelValue<  size_t>(val,vPx);}
 #endif
         void SetPixelValue(const    float& val, const std::vector<size_t>& vPx) override {this->template SetPixelValue<   float>(val,vPx);}
@@ -922,7 +922,7 @@ namespace DSL
         void SetPixelValue(const  int32_t& val, const size_t& iPx)              override {this->template SetPixelValue< int32_t>(val,iPx);}
         void SetPixelValue(const uint64_t& val, const size_t& iPx)              override {this->template SetPixelValue<uint64_t>(val,iPx);}
         void SetPixelValue(const  int64_t& val, const size_t& iPx)              override {this->template SetPixelValue< int64_t>(val,iPx);}
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         void SetPixelValue(const   size_t& val, const size_t& iPx)              override {this->template SetPixelValue<  size_t>(val,iPx);}
 #endif
         void SetPixelValue(const    float& val, const size_t& iPx)              override {this->template SetPixelValue<   float>(val,iPx);}
@@ -1099,7 +1099,7 @@ namespace DSL
                  copyFrom(uint16_t{}) || copyFrom(int16_t{})  ||
                  copyFrom(uint32_t{}) || copyFrom(int32_t{})  ||
                  copyFrom(uint64_t{}) || copyFrom(int64_t{})  ||
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
                  copyFrom(size_t{})   ||
 #endif
                  copyFrom(float{})    || copyFrom(double{});
@@ -1787,7 +1787,7 @@ namespace DSL
         hdu.ValueForKey("BSCALE",BSCALE);
     }
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     template< typename T >
     void FITSimg<T>::Bscale(const size_t& _bs )
     {
@@ -1868,7 +1868,7 @@ namespace DSL
         hdu.ValueForKey("BZERO", BZERO);
     }
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     template< typename T >
     void FITSimg<T>::Bzero(const size_t& _bs )
     {
@@ -1950,7 +1950,7 @@ namespace DSL
         hdu.ValueForKey("BLANK",BLANK);
     }
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     template< typename T >
     void FITSimg<T>::Blank(const size_t& nanVal)
     {
@@ -3258,7 +3258,7 @@ namespace DSL
         if (const auto *p_i32 = dynamic_cast<const FITSimg< int32_t> *>(&img)) { this->template operator*=(*p_i32); return; }
         if (const auto *p_u64 = dynamic_cast<const FITSimg<uint64_t> *>(&img)) { this->template operator*=(*p_u64); return; }
         if (const auto *p_i64 = dynamic_cast<const FITSimg< int64_t> *>(&img)) { this->template operator*=(*p_i64); return; }
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         if (const auto *p_sz  = dynamic_cast<const FITSimg<  size_t> *>(&img)) { this->template operator*=(*p_sz);  return; }
 #endif
         if (const auto *p_f   = dynamic_cast<const FITSimg<   float> *>(&img)) { this->template operator*=(*p_f);   return; }
@@ -3285,7 +3285,7 @@ namespace DSL
         if (const auto *p_i32 = dynamic_cast<const FITSimg< int32_t> *>(&img)) { this->template operator/=(*p_i32); return; }
         if (const auto *p_u64 = dynamic_cast<const FITSimg<uint64_t> *>(&img)) { this->template operator/=(*p_u64); return; }
         if (const auto *p_i64 = dynamic_cast<const FITSimg< int64_t> *>(&img)) { this->template operator/=(*p_i64); return; }
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         if (const auto *p_sz  = dynamic_cast<const FITSimg<  size_t> *>(&img)) { this->template operator/=(*p_sz);  return; }
 #endif
         if (const auto *p_f   = dynamic_cast<const FITSimg<   float> *>(&img)) { this->template operator/=(*p_f);   return; }
@@ -3312,7 +3312,7 @@ namespace DSL
         if (const auto *p_i32 = dynamic_cast<const FITSimg< int32_t> *>(&img)) { this->template operator+=(*p_i32); return; }
         if (const auto *p_u64 = dynamic_cast<const FITSimg<uint64_t> *>(&img)) { this->template operator+=(*p_u64); return; }
         if (const auto *p_i64 = dynamic_cast<const FITSimg< int64_t> *>(&img)) { this->template operator+=(*p_i64); return; }
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         if (const auto *p_sz  = dynamic_cast<const FITSimg<  size_t> *>(&img)) { this->template operator+=(*p_sz);  return; }
 #endif
         if (const auto *p_f   = dynamic_cast<const FITSimg<   float> *>(&img)) { this->template operator+=(*p_f);   return; }
@@ -3339,7 +3339,7 @@ namespace DSL
         if (const auto *p_i32 = dynamic_cast<const FITSimg< int32_t> *>(&img)) { this->template operator-=(*p_i32); return; }
         if (const auto *p_u64 = dynamic_cast<const FITSimg<uint64_t> *>(&img)) { this->template operator-=(*p_u64); return; }
         if (const auto *p_i64 = dynamic_cast<const FITSimg< int64_t> *>(&img)) { this->template operator-=(*p_i64); return; }
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         if (const auto *p_sz  = dynamic_cast<const FITSimg<  size_t> *>(&img)) { this->template operator-=(*p_sz);  return; }
 #endif
         if (const auto *p_f   = dynamic_cast<const FITSimg<   float> *>(&img)) { this->template operator-=(*p_f);   return; }

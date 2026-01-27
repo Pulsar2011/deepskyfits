@@ -22,7 +22,7 @@ TEST(FITS_wcs, readFromHdu)
     verbose |= verboseLevel::VERBOSE_WCS;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager fm("build/testdata/DSS.fits", true);
 #else
     FITSmanager fm("testdata/DSS.fits", true);
@@ -58,7 +58,7 @@ TEST(FITS_wcs, readFromPHdu)
     verbose |= verboseLevel::VERBOSE_WCS;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager fm("build/testdata/DSS.fits", true);
 #else
     FITSmanager fm("testdata/DSS.fits", true);
@@ -94,7 +94,7 @@ TEST(FITS_wcs, readFromFitfile)
     verbose |= verboseLevel::VERBOSE_WCS;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager fm("build/testdata/DSS.fits", true);
 #else
     FITSmanager fm("testdata/DSS.fits", true);
@@ -131,7 +131,7 @@ TEST(FITS_wcs, ConvertBackToString)
     verbose |= verboseLevel::VERBOSE_WCS;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager fm("build/testdata/DSS.fits", true);
 #else
     FITSmanager fm("testdata/DSS.fits", true);
@@ -223,7 +223,7 @@ TEST(FITS_wcs, ConvertBackToHdu)
     verbose |= verboseLevel::VERBOSE_WCS;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager fm("build/testdata/DSS.fits", true);
 #else
     FITSmanager fm("testdata/DSS.fits", true);
@@ -265,7 +265,7 @@ TEST(FITS_wcs, InvalidWcsIndex)
     verbose |= verboseLevel::VERBOSE_WCS;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager fm("build/testdata/DSS.fits", true);
 #else
     FITSmanager fm("testdata/DSS.fits", true);
@@ -460,7 +460,7 @@ TEST(FITS_wcs, COPY_CONSTRUCTOR)
     verbose = verboseLevel::VERBOSE_NONE;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager fm("build/testdata/DSS.fits", true);
 #else
     FITSmanager fm("testdata/DSS.fits", true);
@@ -507,7 +507,7 @@ TEST(FITS_wcs, SUBCOPY_CONSTRUCTOR)
     verbose = verboseLevel::VERBOSE_NONE;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager fm("build/testdata/DSS.fits", true);
 #else
     FITSmanager fm("testdata/DSS.fits", true);
@@ -558,7 +558,7 @@ TEST(FITS_wcs, SUBFRAMECOPY_CONSTRUCTOR_INT)
     //verbose |= verboseLevel::VERBOSE_DEBUG;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager fm("build/testdata/DSS.fits", true);
 #else
     FITSmanager fm("testdata/DSS.fits", true);
@@ -616,7 +616,7 @@ TEST(FITS_wcs, SUBFRAMECOPY_CONSTRUCTOR_DBL)
     //verbose |= verboseLevel::VERBOSE_DEBUG;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager fm("build/testdata/DSS.fits", true);
 #else
     FITSmanager fm("testdata/DSS.fits", true);
@@ -673,7 +673,7 @@ TEST(FITS_wcs, swapWCS)
     verbose = verboseLevel::VERBOSE_NONE;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager fm("build/testdata/DSS.fits", true);
 #else
     FITSmanager fm("testdata/DSS.fits", true);

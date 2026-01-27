@@ -73,7 +73,7 @@ TEST(FITSmanager, default_ctor)
 
 TEST(FITSmanager, ctor_file)
 {
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager fm("build/testdata/rosat_pspc_rdf2_3_bk1.fits");
 #else
     FITSmanager fm("testdata/rosat_pspc_rdf2_3_bk1.fits");
@@ -82,7 +82,7 @@ TEST(FITSmanager, ctor_file)
     ASSERT_EQ(fm.NumberOfHeader(), 1);
     ASSERT_EQ(fm.Status(), 0);
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     ASSERT_EQ(fm.GetFileName(), "build/testdata/rosat_pspc_rdf2_3_bk1.fits");
 #else
     ASSERT_EQ(fm.GetFileName(), "testdata/rosat_pspc_rdf2_3_bk1.fits");
@@ -95,7 +95,7 @@ TEST(FITSmanager, ctor_file)
     ASSERT_EQ(hdu_ref.get(), nullptr);
     ASSERT_EQ(hdu_ref.use_count(), 0);
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     ASSERT_ANY_THROW(FITSmanager("build/testdata/rosat_pspc_rdf2_3_bk1"));
 #else
     ASSERT_ANY_THROW(FITSmanager("testdata/rosat_pspc_rdf2_3_bk1"));
@@ -104,7 +104,7 @@ TEST(FITSmanager, ctor_file)
 
 TEST(FITSmanager, ctor_cpy)
 {
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager fm("build/testdata/rosat_pspc_rdf2_3_bk1.fits");
 #else
     FITSmanager fm("testdata/rosat_pspc_rdf2_3_bk1.fits");
@@ -112,7 +112,7 @@ TEST(FITSmanager, ctor_cpy)
     ASSERT_TRUE(fm.isOpen());
     ASSERT_EQ(fm.NumberOfHeader(), 1);
     ASSERT_EQ(fm.Status(), 0);
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     ASSERT_EQ(fm.GetFileName(), "build/testdata/rosat_pspc_rdf2_3_bk1.fits");
 #else
     ASSERT_EQ(fm.GetFileName(), "testdata/rosat_pspc_rdf2_3_bk1.fits");
@@ -122,7 +122,7 @@ TEST(FITSmanager, ctor_cpy)
     ASSERT_TRUE(fm_cpy.isOpen());
     ASSERT_EQ(fm_cpy.NumberOfHeader(), 1);
     ASSERT_EQ(fm_cpy.Status(), 0);
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     ASSERT_EQ(fm_cpy.GetFileName(), "build/testdata/rosat_pspc_rdf2_3_bk1.fits");
 #else
     ASSERT_EQ(fm_cpy.GetFileName(), "testdata/rosat_pspc_rdf2_3_bk1.fits");
@@ -153,7 +153,7 @@ TEST(FITSmanager, ctor_cpy)
 
 TEST(FITSmanager, ctor_fits)
 {
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager fm("build/testdata/rosat_pspc_rdf2_3_bk1.fits");
 #else
     FITSmanager fm("testdata/rosat_pspc_rdf2_3_bk1.fits");
@@ -161,7 +161,7 @@ TEST(FITSmanager, ctor_fits)
     ASSERT_TRUE(fm.isOpen());
     ASSERT_EQ(fm.NumberOfHeader(), 1);
     ASSERT_EQ(fm.Status(), 0);
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     ASSERT_EQ(fm.GetFileName(), "build/testdata/rosat_pspc_rdf2_3_bk1.fits");
 #else
     ASSERT_EQ(fm.GetFileName(), "testdata/rosat_pspc_rdf2_3_bk1.fits");
@@ -173,7 +173,7 @@ TEST(FITSmanager, ctor_fits)
     ASSERT_EQ(fm_cpy.NumberOfHeader(), 1);
     ASSERT_EQ(fm_cpy.Status(), 0);
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     ASSERT_EQ(fm_cpy.GetFileName(), "build/testdata/rosat_pspc_rdf2_3_bk1.fits");
 #else
     ASSERT_EQ(fm_cpy.GetFileName(), "testdata/rosat_pspc_rdf2_3_bk1.fits");
@@ -205,7 +205,7 @@ TEST(FITSmanager, ctor_cfitsio)
 {
     fitsfile * fits = NULL;
     int fits_status = 0;
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     EXPECT_EQ(fits_open_file(&fits, "build/testdata/rosat_pspc_rdf2_3_bk1.fits", true, &fits_status),0);
 #else
     EXPECT_EQ(fits_open_file(&fits, "testdata/rosat_pspc_rdf2_3_bk1.fits", true, &fits_status),0);
@@ -219,7 +219,7 @@ TEST(FITSmanager, ctor_cfitsio)
     ASSERT_EQ(fm.NumberOfHeader(), 1);
     ASSERT_EQ(fm.Status(), 0);
     
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     ASSERT_EQ(fm.GetFileName(), "build/testdata/rosat_pspc_rdf2_3_bk1.fits");
     ASSERT_EQ(fm.GetFileName(fits), "build/testdata/rosat_pspc_rdf2_3_bk1.fits");
     ASSERT_EQ(fm.GetFileName(hdu_ref), "build/testdata/rosat_pspc_rdf2_3_bk1.fits");
@@ -248,7 +248,7 @@ TEST(FITSmanager, open_close)
     ASSERT_EQ(fm.Status(), 0);
     ASSERT_EQ(fm.GetFileName().size(), 0);
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     fm.OpenFile("build/testdata/rosat_pspc_rdf2_3_bk1.fits");
 #else
     fm.OpenFile("testdata/rosat_pspc_rdf2_3_bk1.fits");
@@ -256,7 +256,7 @@ TEST(FITSmanager, open_close)
     ASSERT_TRUE(fm.isOpen());
     ASSERT_EQ(fm.NumberOfHeader(), 1);
     ASSERT_EQ(fm.Status(), 0);
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     ASSERT_EQ(fm.GetFileName(), "build/testdata/rosat_pspc_rdf2_3_bk1.fits");
 #else
     ASSERT_EQ(fm.GetFileName(), "testdata/rosat_pspc_rdf2_3_bk1.fits");
@@ -268,7 +268,7 @@ TEST(FITSmanager, open_close)
     ASSERT_EQ(fm.Status(), 0);
     ASSERT_EQ(fm.GetFileName().size(), 0);
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager fm2 = fm.Open("build/testdata/rosat_pspc_rdf2_3_im2.fits");
 #else
     FITSmanager fm2 = fm.Open("testdata/rosat_pspc_rdf2_3_im2.fits");
@@ -276,7 +276,7 @@ TEST(FITSmanager, open_close)
     ASSERT_TRUE(fm2.isOpen());
     ASSERT_EQ  (fm2.NumberOfHeader(), 3);
     ASSERT_EQ  (fm2.Status(), 0);
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     ASSERT_EQ  (fm2.GetFileName(), "build/testdata/rosat_pspc_rdf2_3_im2.fits");
 #else
     ASSERT_EQ  (fm2.GetFileName(), "testdata/rosat_pspc_rdf2_3_im2.fits");
@@ -305,7 +305,7 @@ TEST(FITSmanager, exception_manager)
     ASSERT_ANY_THROW(fm.AppendKeyToHeader(1, "KEY", TSTRING, "VAL", "CMT"));
     ASSERT_ANY_THROW(fm.AppendKey("KEY", TSTRING, "VAL", "CMT"));
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     fm.OpenFile("build/testdata/rosat_pspc_rdf2_3_im2.fits");
 #else
     fm.OpenFile("testdata/rosat_pspc_rdf2_3_im2.fits");
@@ -329,7 +329,7 @@ TEST(FITSmanager, move_between_hdu)
     int hdu_num=0;
     int status=0;
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager ffm("build/testdata/rosat_pspc_rdf2_3_im2.fits");
 #else
     FITSmanager ffm("testdata/rosat_pspc_rdf2_3_im2.fits");
@@ -337,7 +337,7 @@ TEST(FITSmanager, move_between_hdu)
     ASSERT_EQ(ffm.NumberOfHeader(), 3);
     
     const std::shared_ptr<fitsfile>& this_hdu = ffm.CurrentHDU();
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     ASSERT_EQ(ffm.GetFileName(this_hdu), "build/testdata/rosat_pspc_rdf2_3_im2.fits");
 #else
     ASSERT_EQ(ffm.GetFileName(this_hdu), "testdata/rosat_pspc_rdf2_3_im2.fits");
@@ -374,7 +374,7 @@ TEST(FITSmanager, move_between_hdu)
 
 TEST(FITSmanager, create_fitsfile)
 {
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     const std::string testfile = "build/testdata/test_create_fitsfile.fits";
 #else
     const std::string testfile = "testdata/test_create_fitsfile.fits";
@@ -433,7 +433,7 @@ TEST(FITSmanager, create_fitsfile)
 
 TEST(FITSmanager, ReadingImage)
 {    
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     std::string src = "build/testdata/testkeys.fits";
 #else
     std::string src = "testdata/testkeys.fits";
@@ -464,14 +464,14 @@ class FITSimgTest : public ::testing::Test
         std::string MakeFilename() const
         {
             std::ostringstream ss;
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
             ss << "build/testdata/test_" << typeid(T).name() << ".fits";
 #else
             ss << "testdata/test_" << typeid(T).name() << ".fits";
 #endif
             return ss.str();
         }
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         void EnsureOutDir() const { std::filesystem::create_directories("build/testdata"); }
 #else
         void EnsureOutDir() const { std::filesystem::create_directories("testdata"); }
@@ -559,7 +559,7 @@ TYPED_TEST(FITSimgTest, modif_fitsfile)
 
 TEST(FITStable, openTableFromFile)
 {
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager fm("build/testdata/rosat_pspc_rdf2_3_im2.fits");
 #else
     FITSmanager fm("testdata/rosat_pspc_rdf2_3_im2.fits");
@@ -622,7 +622,7 @@ TEST(FITStable, UpdateTable)
 
     {
         CFITSIOGuard guard;   
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         EXPECT_NO_THROW(table.write("build/testdata/test_fitstable.fits", 0, true));
 #else
         EXPECT_NO_THROW(table.write("testdata/test_fitstable.fits", 0, true));
@@ -630,7 +630,7 @@ TEST(FITStable, UpdateTable)
     }
 
     CFITSIOGuard guard;   
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager fm("build/testdata/test_fitstable.fits",false);
 #else
     FITSmanager fm("testdata/test_fitstable.fits",false);
@@ -658,7 +658,7 @@ TEST(FITStable, UpdateTable)
     
     ASSERT_EQ(readTable, nullptr);
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     FITSmanager fm2("build/testdata/test_fitstable.fits");
 #else
     FITSmanager fm2("testdata/test_fitstable.fits");

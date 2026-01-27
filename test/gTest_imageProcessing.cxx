@@ -240,7 +240,7 @@ TEST(FITSimgOverlay, UInt32)     { runOverlayTestsForType<uint32_t>(); }
 TEST(FITSimgOverlay, Int32)      { runOverlayTestsForType<int32_t>(); }
 TEST(FITSimgOverlay, UInt64)     { runOverlayTestsForType<uint64_t>(); }
 TEST(FITSimgOverlay, Int64)      { runOverlayTestsForType<int64_t>(); }
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
 TEST(FITSimgOverlay, SizeT)      { runOverlayTestsForType<size_t>(); }
 #endif
 TEST(FITSimgOverlay, Float)      { runOverlayTestsForType<float>(); }

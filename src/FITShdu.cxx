@@ -1779,7 +1779,7 @@ namespace DSL
         ValueForKey(keyword, value, std::string());
     }
     
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     /**
      *  Modify the value associated to a FITS keyword. If the keyword doesn't exists, a new filed is added to the disctionary with the given KEYWORD and its associated value.
      *
