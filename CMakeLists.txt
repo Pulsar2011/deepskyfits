@@ -81,7 +81,14 @@ set(BUILD_SHARED_LIBS "YES")
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 	# Linux specific code
     set(CMAKE_SYSTEM_PROCESSOR x86_64)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Wall -pipe -pthread -fexceptions -fPIC -Wno-unknown-pragmas -Wmisleading-indentation -flto -mtune=native -ffp-contract=on -fomit-frame-pointer")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Wall -pipe -pthread -fexceptions -fPIC -m64 -Wno-unknown-pragmas -Wmisleading-indentation -flto -mtune=native -ffp-contract=on -fomit-frame-pointer")
+
+    # Enable Interprocedural Optimization (LTO) when supported on Linux
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error)
+    if(ipo_supported)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+    endif()
 
 	set(OperatingSystem "Linux")
 	ADD_DEFINITIONS(-DLinuxx86_64)
