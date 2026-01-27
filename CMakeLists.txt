@@ -81,6 +81,7 @@ set(BUILD_SHARED_LIBS "YES")
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 	# Linux specific code
     set(CMAKE_SYSTEM_PROCESSOR x86_64)
+    cmake_policy(SET CMP0069 NEW)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Wall -pipe -pthread -fexceptions -fPIC -m64 -Wno-unknown-pragmas -Wmisleading-indentation -flto -mtune=native -ffp-contract=on -fomit-frame-pointer")
 
     # Enable Interprocedural Optimization (LTO) when supported on Linux
