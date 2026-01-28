@@ -22,6 +22,7 @@
 #include <stdexcept>
 #include <functional>
 #include <algorithm>
+#include <iomanip>
 
 #include <thread>
 #include <mutex>
@@ -533,13 +534,23 @@ namespace DSL
         
         void MaskPixels(const std::initializer_list<size_t>&);
         void MaskPixels(const std::valarray<bool>&);
+        inline void MaskPixel(const size_t& i ) {MaskPixels( {i} );}
+        inline void MaskPixel(const pixelCoords& xyz) {size_t i = PixelIndex(xyz); MaskPixels( {i} );}
+        inline void MaskPixel(const std::vector<size_t>& xyz) {size_t i = PixelIndex(xyz); MaskPixels( {i} );}
         
         void UnmaskPixels(const std::initializer_list<size_t>&);
         void UnmaskPixels(const std::valarray<bool>&);
+        inline void UnmaskPixel(const size_t& i ) {UnmaskPixels( {i} );}
+        inline void UnmaskPixel(const pixelCoords& xyz) {size_t i = PixelIndex(xyz); UnmaskPixels( {i} );}
+        inline void UnmaskPixel(const std::vector<size_t>& xyz) {size_t i = PixelIndex(xyz); UnmaskPixels( {i} );}
         
         bool Masked(const std::initializer_list<size_t>&) const;
         bool Masked(const std::vector<size_t>&) const;
         bool Masked(size_t) const;
+
+        inline bool isMasked(const std::initializer_list<size_t>& i) const {return Masked(i);}
+        inline bool isMasked(const std::vector<size_t>& xyz) const {return Masked(xyz);}
+        inline bool isMasked(size_t i) const {return Masked(i);}
         
         
         
@@ -3915,12 +3926,17 @@ namespace DSL
         {
             for (size_t k = 0; k < arr.size(); k++)
             {
-                std::cout<<arr[k]<<" ";
+                std::cout<<k<<" "<<std::setw(12);
 
+                std::vector<size_t> px = PixelCoordinates(k);
                 for(size_t i = 0; i < Naxis.size(); i++)
-                    std::cout<<WorldCoordinates(k)[i]<<"    ";
+                    std::cout<<px[i]<<" "<<std::setw(8);
+
+                std::vector<double> wc = WorldCoordinates(k);
+                for(size_t i = 0; i < Naxis.size(); i++)
+                    std::cout<<wc[i]<<" "<<std::setw(8);
                 
-                std::cout<<arr[k]<<"   "<<mask[k]<<std::endl;
+                std::cout<<arr[k]<<" "<<std::setw(8)<<mask[k]<<std::endl;
             };
         });
     }

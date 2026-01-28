@@ -867,7 +867,7 @@ class FITSmanager;
     }
     
     /**
-     *  @details Mask pixels according to a mask map
+     *  @details Mask pixels according to a mask list
      *  @param _map pixel mask map
      *  @Note : Pixel already masked are not unmasked
      */
@@ -896,7 +896,7 @@ class FITSmanager;
     }
     
     /**
-     *  @details Unmask a single pixel
+     *  @details Unmask pixels
      *  @param iPx coordinates of the pixel to unmask
      */
     void FITScube::UnmaskPixels(const std::initializer_list<size_t>& _l)
