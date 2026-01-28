@@ -56,7 +56,7 @@ namespace DSL
     typedef std::vector<pixelCoords> pixelVectors;
     typedef std::vector<worldCoords> worldVectors;
     
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     enum class verboseLevel: uint8_t
 #else
     enum verboseLevel
@@ -360,7 +360,7 @@ namespace DSL {
      */
     template<typename> inline constexpr bool always_false_v = false;
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     /*!
      * \brief Demangle a C++ type or symbol name (Darwin x86_64 variant).
      *

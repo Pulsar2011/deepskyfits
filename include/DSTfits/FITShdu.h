@@ -178,7 +178,7 @@ namespace DSL
         void ValueForKey(const key_code&, const std::string&, const key_type& tk, const std::string&);  //!< Set value for key
         void ValueForKey(const key_code&, const std::string&, const std::string&);                      //!< Set value for key
         void ValueForKey(const key_code&, const std::string&);                                          //!< Set value for key
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         void ValueForKey(const key_code&, const size_t&     , const std::string&);                      //!< Set value for key
 #endif
         void ValueForKey(const key_code&, const bool&       , const std::string&);                      //!< Set value for key
@@ -193,7 +193,7 @@ namespace DSL
         void ValueForKey(const key_code&, const  int32_t&   , const std::string&);                      //!< Set value for key
         void ValueForKey(const key_code&, const  int64_t&   , const std::string&);                      //!< Set value for key
        
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
         void ValueForKey(const key_code&, const size_t&   );                                            //!< Set value for key
 #endif
         void ValueForKey(const key_code&, const bool&     );                                            //!< Set value for key

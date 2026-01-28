@@ -9,7 +9,7 @@
 
 using namespace DSL;
 
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
 std::string testvurl = "./build/testdata/test_vstringtable.fits";
 std::string testurl = "./build/testdata/test_stringtable.fits";
 #else

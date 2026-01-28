@@ -548,7 +548,7 @@ TEST(PercentilTest, DoubleParallelEval)
     p.SetPercentil(0.84);
     auto min84 = vm.Minimize(p, {0.0}, {1.0}, 1000);
     ASSERT_TRUE(min84.IsValid());
-#ifdef Darwinx86_64
+#if defined(__APPLE__)
     EXPECT_NEAR(min84.UserState().Params()[0],  0.994458, 0.005);
     EXPECT_NEAR(p.Eval(min84.UserState().Params()[0]), 0.84, 5e-3);
 #else
