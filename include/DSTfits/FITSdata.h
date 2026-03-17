@@ -294,6 +294,22 @@ namespace DSL {
         std::is_same_v<U,float>   || std::is_same_v<U,double> ;
 
     /*!
+     * \brief Trait to identify types eligible for GPU dispatch.
+     *
+     * GPU backends accept all integer types up to 32 bits (signed and unsigned)
+     * and float32. 64-bit integers, size_t, and double always fall back to CPU
+     * (precision policy: no implicit downcast).
+     *
+     * \tparam U Type to check.
+     */
+    template<typename U>
+    constexpr bool is_gpu_eligible_type_v =
+        std::is_same_v<U, uint8_t>  || std::is_same_v<U, int8_t>  ||
+        std::is_same_v<U, uint16_t> || std::is_same_v<U, int16_t> ||
+        std::is_same_v<U, uint32_t> || std::is_same_v<U, int32_t> ||
+        std::is_same_v<U, float>;
+
+    /*!
      * \brief Validate that a scalar value can be safely cast from S to T.
      *
      * Performs type- and range-checks to avoid undefined behavior or silent

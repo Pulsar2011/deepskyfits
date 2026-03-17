@@ -474,7 +474,7 @@ TEST(FITS_wcs, COPY_CONSTRUCTOR)
     EXPECT_EQ(wcs2.getStatus(), WCSERR_SUCCESS);
     EXPECT_EQ(wcs2.getNumberOfWCS(), wcs1.getNumberOfWCS());
 
-    for(size_t k = 0; k < wcs1.getNumberOfWCS(); k++)
+    for(int k = 0; k < wcs1.getNumberOfWCS(); k++)
     {
         EXPECT_EQ(wcs2.getNumberOfAxis(k), wcs1.getNumberOfAxis(k));
         for(size_t i=1; i<=wcs1.getNumberOfAxis(k); i++)
@@ -518,7 +518,7 @@ TEST(FITS_wcs, SUBCOPY_CONSTRUCTOR)
     FITSwcs wcs1(hdu);
     EXPECT_EQ(wcs1.getStatus(), WCSERR_SUCCESS);
 
-    for(size_t k=0; k < wcs1.getNumberOfWCS(); k++)
+    for(int k=0; k < wcs1.getNumberOfWCS(); k++)
     {
     
         FITSwcs wcs2(wcs1,k); // Copy constructor
@@ -569,7 +569,7 @@ TEST(FITS_wcs, SUBFRAMECOPY_CONSTRUCTOR_INT)
     FITSwcs wcs1(hdu);
     EXPECT_EQ(wcs1.getStatus(), WCSERR_SUCCESS);
 
-    for(size_t k=0; k < wcs1.getNumberOfWCS(); k++)
+    for(int k=0; k < wcs1.getNumberOfWCS(); k++)
     {
     
         if(k==0)
@@ -627,7 +627,7 @@ TEST(FITS_wcs, SUBFRAMECOPY_CONSTRUCTOR_DBL)
     FITSwcs wcs1(hdu);
     EXPECT_EQ(wcs1.getStatus(), WCSERR_SUCCESS);
 
-    for(size_t k=0; k < wcs1.getNumberOfWCS(); k++)
+    for(int k=0; k < wcs1.getNumberOfWCS(); k++)
     {
     
         if(k==0)

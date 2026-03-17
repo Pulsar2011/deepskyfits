@@ -165,7 +165,7 @@ namespace DSL
 #pragma region * WCS
         inline double at(const size_t& i) const { if(data == nullptr) throw FITSexception(SHARED_NOMEM,"FITScube","at","No data in memory"); return data->get(i); }
         inline const FITSwcs& getWCS() const { return fwcs; }
-        inline size_t getNumberOfWCS() const {return fwcs.getNumberOfWCS(); }
+        inline size_t getNumberOfWCS() const {return (fwcs.getNumberOfWCS() >=0)? static_cast<size_t>(fwcs.getNumberOfWCS()) : 0; }
         
         virtual worldCoords             WorldCoordinates(const size_t&, const int& wcsIndex=0) const; //!< Get world coordinates
         virtual worldCoords             WorldCoordinates(const std::vector<size_t>&, const int& wcsIndex=0) const; //!< Get world coordinates
@@ -305,6 +305,29 @@ namespace DSL
             std::valarray<T>* ptr = nullptr;
             WithTypedData<T>([&](std::valarray<T>& arr){ ptr = &arr; });
             return ptr;
+        }
+
+        // Raw contiguous-pointer accessors for GPU upload/download.
+        // Returns a pointer directly into the valarray storage (contiguous by the C++ standard).
+        // Returns nullptr if data is absent or the stored type does not match T.
+        template<typename T>
+        const T* raw_data() const
+        {
+            const std::valarray<T>* va = GetData<T>();
+            return (va && va->size() > 0) ? &(*va)[0] : nullptr;
+        }
+
+        template<typename T>
+        T* raw_data()
+        {
+            std::valarray<T>* va = GetData<T>();
+            return (va && va->size() > 0) ? &(*va)[0] : nullptr;
+        }
+
+        // Raw pointer into the mask valarray. Returns nullptr if mask is empty.
+        const bool* raw_mask() const
+        {
+            return (mask.size() > 0) ? &mask[0] : nullptr;
         }
 
         /**
