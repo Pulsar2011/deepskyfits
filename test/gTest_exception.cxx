@@ -20,6 +20,7 @@ TEST(FITSexception, ctor_code_and_name)
     std::string s = ex.what();
     ASSERT_FALSE(s.empty())<<s;
     ASSERT_NE(s.find("ClassOnly"), std::string::npos)<<s;
+    EXPECT_EQ(ex.errorCode(), 2);
 }
 
 TEST(FITSexception, ctor_code_name_and_function)
@@ -29,6 +30,7 @@ TEST(FITSexception, ctor_code_name_and_function)
     ASSERT_FALSE(s.empty())<<s;
     ASSERT_NE(s.find("ClassX"), std::string::npos)<<s;
     ASSERT_NE(s.find("FuncY"), std::string::npos)<<s;
+    EXPECT_EQ(ex.errorCode(), 3);
 }
 
 TEST(FITSexception, what_contains_provided_info)
@@ -41,6 +43,7 @@ TEST(FITSexception, what_contains_provided_info)
     ASSERT_NE(s.find("MyClass"), std::string::npos)<<s;
     ASSERT_NE(s.find("MyFunc"), std::string::npos)<<s;
     ASSERT_NE(s.find("Something went wrong"), std::string::npos)<<s;
+    EXPECT_EQ(ex.errorCode(), 42);
 
     // should not be empty
     ASSERT_FALSE(s.empty())<<s;

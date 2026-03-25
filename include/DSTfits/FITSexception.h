@@ -37,6 +37,7 @@ namespace DSL
         FITSexception(const fitsError&, const std::string &, const std::string &, const std::string&);
         
         const char* what() const noexcept;
+        const int errorCode() const noexcept { return err; }
         
     };
 
