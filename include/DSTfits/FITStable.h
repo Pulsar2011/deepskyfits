@@ -3101,6 +3101,25 @@ class RowIterator
                 : tbl_(tbl), target_(std::move(name)) {}
 
             /*!
+             * \brief Return the FITS data type of the underlying column.
+             *
+             * Allows callers to dispatch on type at runtime without knowing T
+             * at compile time (e.g., plotting utilities that accept a type-erased handle).
+             */
+            dtype colType() const
+            {
+                return tbl_.getColumn(target_)->getType();
+            }
+
+            /*!
+             * \brief Return the repeat count (elements per row) of the column.
+             */
+            int64_t colNelem() const
+            {
+                return tbl_.getColumn(target_)->getNelem();
+            }
+
+            /*!
              * \brief Create a typed view over the entire column.
              * \tparam TargetT Scalar type expected for the column.
              * \return ColumnView<TargetT> with no selection.
