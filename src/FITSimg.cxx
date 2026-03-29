@@ -873,6 +873,11 @@ class FITSmanager;
      */
     void FITScube::MaskPixels(const std::initializer_list<size_t>& _l)
     {
+        MaskPixels(std::vector<size_t>(_l));
+    }
+
+    void FITScube::MaskPixels(const std::vector<size_t>& _l)
+    {
         for (size_t idx : _l)
         {
             if (idx < mask.size())

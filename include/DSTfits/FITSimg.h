@@ -556,6 +556,7 @@ namespace DSL
 #pragma region * Altere data
         
         void MaskPixels(const std::initializer_list<size_t>&);
+        void MaskPixels(const std::vector<size_t>&);
         void MaskPixels(const std::valarray<bool>&);
         inline void MaskPixel(const size_t& i ) {MaskPixels( {i} );}
         inline void MaskPixel(const pixelCoords& xyz) {size_t i = PixelIndex(xyz); MaskPixels( {i} );}
