@@ -434,7 +434,7 @@ class FITSmanager;
     worldCoords FITScube::WorldCoordinates(const size_t& k, const int& wcsIndex) const
     {
         auto pixels_coo = std::bind( &FITScube::PixelCoordinates, this,std::placeholders::_1);
-        return WorldCoordinates(pixels_coo(k));
+        return WorldCoordinates(pixels_coo(k),wcsIndex);
     }
     
     /**
@@ -454,7 +454,7 @@ class FITSmanager;
             idx++;
         }
         
-        worldCoords wcs = WorldCoordinates(dbl_px);
+        worldCoords wcs = WorldCoordinates(dbl_px,wcsIndex);
         dbl_px.clear();
         
         return wcs;
