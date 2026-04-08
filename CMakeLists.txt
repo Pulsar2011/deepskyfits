@@ -79,10 +79,15 @@ set(BUILD_SHARED_LIBS "YES")
 
 #-------------------- GCC specifics
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-	# Linux specific code
-    set(CMAKE_SYSTEM_PROCESSOR x86_64)
+    # Linux specific code
     cmake_policy(SET CMP0069 NEW)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Wall -pipe -pthread -fexceptions -fPIC -m64 -Wno-unknown-pragmas -Wmisleading-indentation -flto -mtune=native -ffp-contract=on -fomit-frame-pointer")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Wall -pipe -pthread -fexceptions -fPIC -Wno-unknown-pragmas -Wmisleading-indentation -flto -mtune=native -ffp-contract=on -fomit-frame-pointer")
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m64")
+        ADD_DEFINITIONS(-DLinuxx86_64)
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+        ADD_DEFINITIONS(-DLinuxaarch64)
+    endif()
 
     # Enable Interprocedural Optimization (LTO) when supported on Linux
     include(CheckIPOSupported)
@@ -91,8 +96,7 @@ IF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
         set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
     endif()
 
-	set(OperatingSystem "Linux")
-	ADD_DEFINITIONS(-DLinuxx86_64)
+    set(OperatingSystem "Linux")
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
     set(CMAKE_CXX_EXTENSIONS OFF)
 ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
@@ -222,7 +226,7 @@ ExternalProject_Add(
     cfitsio_external
     SOURCE_DIR ${CMAKE_SOURCE_DIR}/cfitsio
     BINARY_DIR ${CMAKE_SOURCE_DIR}/build/cfitsio 
-    CONFIGURE_COMMAND CC=clang ${CMAKE_SOURCE_DIR}/cfitsio/configure --enable-static --disable-shared --prefix=${CMAKE_SOURCE_DIR}/build --with-gnu-ld --with-bzip2
+    CONFIGURE_COMMAND CC=${CMAKE_C_COMPILER} CFLAGS=-fPIC ${CMAKE_SOURCE_DIR}/cfitsio/configure --enable-static --disable-shared --prefix=${CMAKE_SOURCE_DIR}/build --with-gnu-ld --with-bzip2
     BUILD_COMMAND make -j 4 libcfitsio.la
     INSTALL_COMMAND ${CMAKE_COMMAND} -E make_directory ${CFITSIO_INCLUDE_DIR}
         && ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/build/cfitsio/.libs/libcfitsio.a ${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a
@@ -271,7 +275,7 @@ ExternalProject_Add(
   PREFIX          ${CMAKE_SOURCE_DIR}/build/wcslib
   DOWNLOAD_COMMAND ""                         # download handled by download_wcslib
   UPDATE_COMMAND   ""                         # no update step
-  CONFIGURE_COMMAND ${CMAKE_COMMAND} -E chdir ${WCSLIB_SRC_DIR} ./configure --prefix=${WCSLIB_INSTALL_DIR}  --with-cfitsioinc=${CFITSIO_INCLUDE_DIR} --with-cfitsiolib=${CMAKE_SOURCE_DIR}/build/lib --disable-shared
+  CONFIGURE_COMMAND CC=${CMAKE_C_COMPILER} CFLAGS=-fPIC ${WCSLIB_SRC_DIR}/configure --prefix=${WCSLIB_INSTALL_DIR} --with-cfitsioinc=${CFITSIO_INCLUDE_DIR} --with-cfitsiolib=${CMAKE_SOURCE_DIR}/build/lib --disable-shared
   BUILD_COMMAND     ${CMAKE_MAKE_PROGRAM} -j ${CMAKE_BUILD_PARALLEL_LEVEL}
   INSTALL_COMMAND   ${CMAKE_MAKE_PROGRAM} install
   BUILD_IN_SOURCE   1
