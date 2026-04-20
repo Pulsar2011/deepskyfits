@@ -185,11 +185,12 @@ namespace DSL
 #pragma region -- private member
         const std::string fname;
         const dtype ftype;
+        bool    fFixedWidth;  // fits in the 4-byte padding gap after ftype (dtype=int, 4 bytes)
         std::string funit;
-        
+
         mutable double fscale;
         mutable double fzero;
-        
+
         int64_t frepeat;
         int64_t fwidth;
 
@@ -235,10 +236,11 @@ namespace DSL
 
 #pragma endregion
 #pragma region -- protected member function
-        inline FITSform():fname(),ftype(dtype::tnone),funit(),fscale(1),fzero(0),frepeat(1),fwidth(0),fpos(0) {};
-        
+        inline FITSform():fname(),ftype(dtype::tnone),funit(),fscale(1),fzero(0),frepeat(1),fwidth(0),fFixedWidth(false),fpos(0) {};
+
         inline void setNelem(const int64_t& n) {frepeat = n;}
         inline void setWidth(const int64_t& w) {fwidth  = w;}
+        inline void setFixedWidth(bool v)       {fFixedWidth = v;}
 
         /**
          * @brief Initialize scale/zero defaults for pseudo-unsigned types.
@@ -460,8 +462,9 @@ namespace DSL
         inline const double&      getZero() const {return fzero;}
         inline const size_t&      getPosition() const {return fpos;}
         
-        inline const int64_t&    getNelem()  const {return frepeat;}
-        inline const int64_t&    getWidth()  const {return fwidth;}
+        inline const int64_t&    getNelem()    const {return frepeat;}
+        inline const int64_t&    getWidth()    const {return fwidth;}
+        inline bool              isFixedWidth()const {return fFixedWidth;}
 
         /**
          * @brief CFITSIO storage code to use when writing this column.
@@ -649,6 +652,7 @@ namespace DSL
         FITScolumn(const std::string&, const dtype&, const double&, const double&, const std::string unit="", const size_t pos=0);
         FITScolumn(const std::string&, const dtype&, const int64_t&, const int64_t&, const std::string unit="", const size_t pos=0);
         FITScolumn(const std::string&, const dtype&, const int64_t&, const int64_t&, const double&, const double&, const std::string unit="", const size_t pos=0);
+        FITScolumn(const std::string&, const dtype&, const int64_t&, const int64_t&, const std::string unit, const size_t pos, bool fixedWidth);
         FITScolumn(const FITScolumn&);
         
         virtual ~FITScolumn();
@@ -1712,7 +1716,14 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
     {
         allocateStorageIfNeeded<T>();
     }
-    
+
+    template< typename T >
+    FITScolumn<T>::FITScolumn(const std::string& name, const dtype& type, const int64_t& r, const int64_t& w, const std::string unit, const size_t pos, bool fixedWidth):FITSform(pos,name,type,(fixedWidth ? int64_t(1) : r),w,unit)
+    {
+        setFixedWidth(fixedWidth);
+        allocateStorageIfNeeded<T>();
+    }
+
     template< typename T >
     FITScolumn<T>::FITScolumn(const std::string& name, const dtype& type, const int64_t& r, const int64_t& w, const double& s, const double& z, const std::string unit, const size_t pos):FITSform(pos,name,type,r,w,s,z,unit)
     {
@@ -1794,9 +1805,11 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
     template< typename T >
     void FITScolumn<T>::Update(const std::string& str)
     {
+        if(isFixedWidth())
+            return; // dimensions are frozen at construction for fixed-width columns
         int64_t maxSize = getWidth();
         maxSize = (static_cast<int64_t>(str.size()) >= maxSize)? static_cast<int64_t>(str.size()) : maxSize;
-        
+
         FITSform::setWidth(maxSize);
         FITSform::setNelem(1);
     }

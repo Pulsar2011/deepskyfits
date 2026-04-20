@@ -918,22 +918,11 @@ namespace DSL
         {
             switch (val.type()) {
                 case fChar :
-                    if(val.value().size() < 68)
-                    {
-                        std::shared_lock<std::shared_mutex> lk(fptr_mtx);
-                        if(ffukys(fptr.get(), const_cast<char*>( key.c_str() ), const_cast<char*>( val.value().c_str() ), comment, &fits_status ))
-                        {
-                            throw FITSexception(fits_status,"FITSmanager","AppendKey");
-                        }
-                    }
-                    else
-                    {
-                        std::shared_lock<std::shared_mutex> lk(fptr_mtx);
-                        if(ffukys(fptr.get(), const_cast<char*>( key.c_str() ), const_cast<char*>( val.value().c_str() ), comment, &fits_status ))
-                        {
-                            throw FITSexception(fits_status,"FITSmanager","AppendKey");
-                        }
-                    }
+                    // Route through the HDU-aware overload so MoveToHDU(HDU) is called
+                    // first, exactly like every other type. TSTRING is correct here:
+                    // fChar means the FITSkeyword holds a string value; numeric WCS keys
+                    // (CRVAL, CDELT, CD matrix…) are fDouble/fFloat and never reach this branch.
+                    AppendKeyToHeader(HDU, key, TSTRING, val.value(), val.comment());
                     break;
 
                 case fShort :
@@ -1053,9 +1042,9 @@ namespace DSL
                     TYPE == TINT    ||
                     TYPE == TUINT     )
             {
-                int dval = std::stol(val);
-                
-                if(fits_update_key_log(fptr.get(), const_cast<char*>( key.c_str() ),  dval, comment, &fits_status ))
+                long dval = std::stol(val);
+
+                if(fits_update_key_lng(fptr.get(), const_cast<char*>( key.c_str() ), dval, comment, &fits_status ))
                 {
                     throw FITSexception(fits_status,"FITSmanager","AppendKey");
                 }

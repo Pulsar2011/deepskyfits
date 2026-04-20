@@ -489,6 +489,69 @@ TEST(FITStable,col_tstring_ctor)
     EXPECT_EQ(status,0);
 }
 
+TEST(FITStable,col_tstring_fixedWidth)
+{
+    // ---------------------------------------------------------------
+    // Verify the fixedWidth=true constructor flag:
+    //   - isFixedWidth() returns true
+    //   - getNelem()==1 and getWidth()==declared width (frozen at construction)
+    //   - getTTYPE() returns "<width>A" (FITS fixed-width char array form)
+    //   - push_back does NOT alter nelem or width (guard in Update)
+    //   - short strings are padded with spaces on write, stripped on read-back
+    //   - long strings are truncated to width on write
+    // ---------------------------------------------------------------
+    const int64_t fixedLen = 16;
+
+    FITScolumn<std::string> col_fw("FIXED_STR", tstring, int64_t(1), fixedLen, std::string(""), size_t(1), /*fixedWidth=*/true);
+
+    // Pre-write metadata checks
+    EXPECT_TRUE (col_fw.isFixedWidth());
+    EXPECT_EQ   (col_fw.getNelem(), int64_t(1));
+    EXPECT_EQ   (col_fw.getWidth(), fixedLen);
+    EXPECT_EQ   (col_fw.getTTYPE(), std::string("16A"));
+
+    // Push back: short string (2 chars) and long string (26 chars > 16)
+    const std::string shortStr = "Hi";
+    const std::string longStr  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"; // 26 chars → truncated to 16
+    col_fw.push_back(shortStr);
+    col_fw.push_back(longStr);
+
+    // Dimensions must remain frozen after push_back
+    EXPECT_EQ(col_fw.getNelem(), int64_t(1));
+    EXPECT_EQ(col_fw.getWidth(), fixedLen);
+
+    // Insert into a table and write
+    FITStable table;
+    EXPECT_NO_THROW(table.InsertColumn(std::make_shared<FITScolumn<std::string>>(col_fw)));
+    EXPECT_EQ(table.nrows(), 2u);
+    EXPECT_EQ(table.ncols(), 1u);
+    EXPECT_NO_THROW(table.write(testurl, 0, true));
+
+    // Read back
+    fitsfile* rawFptr = nullptr;
+    int status = 0;
+    ASSERT_EQ(fits_open_file(&rawFptr, testurl.c_str(), READONLY, &status), 0);
+    std::shared_ptr<fitsfile> fptr(rawFptr, [](fitsfile*){});
+    int hdutype = 0;
+    status = 0;
+    ASSERT_EQ(fits_movabs_hdu(fptr.get(), 2, &hdutype, &status), 0);
+
+    FITStable readTable(fptr, 2);
+    auto* col = dynamic_cast<FITScolumn<std::string>*>(readTable.getColumn(1).get());
+    ASSERT_NE(col, nullptr);
+    ASSERT_EQ(col->values<std::string>().size(), 2u);
+
+    // Short string: padded on write, trailing spaces stripped on read → original value
+    EXPECT_EQ(col->values<std::string>()[0], shortStr);
+
+    // Long string: truncated to fixedLen chars on write
+    EXPECT_EQ(col->values<std::string>()[1], longStr.substr(0, static_cast<size_t>(fixedLen)));
+
+    status = 0;
+    EXPECT_EQ(fits_close_file(fptr.get(), &status), 0);
+    EXPECT_EQ(status, 0);
+}
+
 // --- Vector columns as single tests ---
 TEST(FITStable,v_tsbyte_ctor)
 {
