@@ -236,7 +236,7 @@ namespace DSL
 
 #pragma endregion
 #pragma region -- protected member function
-        inline FITSform():fname(),ftype(dtype::tnone),funit(),fscale(1),fzero(0),frepeat(1),fwidth(0),fFixedWidth(false),fpos(0) {};
+        inline FITSform():fname(),ftype(dtype::tnone),fFixedWidth(false),funit(),fscale(1),fzero(0),frepeat(1),fwidth(0),fpos(0) {};
 
         inline void setNelem(const int64_t& n) {frepeat = n;}
         inline void setWidth(const int64_t& w) {fwidth  = w;}
@@ -2133,6 +2133,8 @@ class RowIterator
         // Separate caches to avoid std::any type collisions between iterator/const_iterator
         mutable std::unordered_map<std::string, std::any> iter_cache_mut_;
         mutable std::unordered_map<std::string, std::any> iter_cache_const_;
+        // Persistent storage for mutable iterator to avoid temporary lifetime issues
+        mutable std::any last_iter_mut_;
     
         template<typename T>
         typename std::vector<T>::iterator& getOrInitIteratorMut(const std::string& columnName)
@@ -2147,10 +2149,14 @@ class RowIterator
                     throw std::out_of_range("RowIterator: row index out of range");
             
                 iter_cache_mut_[columnName] = (values.begin() + static_cast<std::ptrdiff_t>(row_idx_));
-                return std::any_cast<typename std::vector<T>::iterator&>(iter_cache_mut_[columnName]);
+                // Store in persistent member to avoid temporary lifetime issues with std::any_cast<T&>
+                last_iter_mut_ = std::any_cast<typename std::vector<T>::iterator>(iter_cache_mut_[columnName]);
+                return std::any_cast<typename std::vector<T>::iterator&>(last_iter_mut_);
             }
         
-            return std::any_cast<typename std::vector<T>::iterator&>(it->second);
+            // Store in persistent member before returning reference
+            last_iter_mut_ = std::any_cast<typename std::vector<T>::iterator>(it->second);
+            return std::any_cast<typename std::vector<T>::iterator&>(last_iter_mut_);
         }
     
         template<typename T>

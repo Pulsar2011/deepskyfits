@@ -42,7 +42,7 @@ namespace DSL
      * @param t FITS data type (dtype).
      * @param unit Optional unit string (TUNITn).
      */
-    FITSform::FITSform(const size_t& p,const std::string& name, const dtype& t, const std::string unit):fname(name),ftype(t),funit(unit),fscale(1),fzero(0),frepeat(1),fwidth(1),fFixedWidth(false),fpos(p)
+    FITSform::FITSform(const size_t& p,const std::string& name, const dtype& t, const std::string unit):fname(name),ftype(t),fFixedWidth(false),funit(unit),fscale(1),fzero(0),frepeat(1),fwidth(1),fpos(p)
     {initWithType();}
 
     /**
@@ -54,7 +54,7 @@ namespace DSL
      * @param z BZERO-like zero point to report.
      * @param unit Optional unit.
      */
-    FITSform::FITSform(const size_t& p, const std::string& name, const dtype& t, const double& s, const double& z, const std::string unit):fname(name),ftype(t),funit(unit),fscale(s),fzero(z),frepeat(1),fwidth(1),fFixedWidth(false),fpos(p)
+    FITSform::FITSform(const size_t& p, const std::string& name, const dtype& t, const double& s, const double& z, const std::string unit):fname(name),ftype(t),fFixedWidth(false),funit(unit),fscale(s),fzero(z),frepeat(1),fwidth(1),fpos(p)
     {initWithType();}
 
     /**
@@ -66,7 +66,7 @@ namespace DSL
      * @param w Element width in bytes (for strings: char width).
      * @param unit Optional unit.
      */
-    FITSform::FITSform(const size_t& p,const std::string& name, const dtype& t, const int64_t& r, const int64_t& w, const std::string unit):fname(name),ftype(t),funit(unit),fscale(1),fzero(0),frepeat(r),fwidth(w),fFixedWidth(false),fpos(p)
+    FITSform::FITSform(const size_t& p,const std::string& name, const dtype& t, const int64_t& r, const int64_t& w, const std::string unit):fname(name),ftype(t),fFixedWidth(false),funit(unit),fscale(1),fzero(0),frepeat(r),fwidth(w),fpos(p)
     {initWithType();}
 
     /**
@@ -80,11 +80,11 @@ namespace DSL
      * @param z Zero point.
      * @param unit Optional unit.
      */
-    FITSform::FITSform(const size_t& p, const std::string& name, const dtype& t, const int64_t& r, const int64_t& w, const double& s, const double& z, const std::string unit):fname(name),ftype(t),funit(unit),fscale(s),fzero(z),frepeat(r),fwidth(w),fFixedWidth(false),fpos(p)
+    FITSform::FITSform(const size_t& p, const std::string& name, const dtype& t, const int64_t& r, const int64_t& w, const double& s, const double& z, const std::string unit):fname(name),ftype(t),fFixedWidth(false),funit(unit),fscale(s),fzero(z),frepeat(r),fwidth(w),fpos(p)
     {initWithType();}
 
 
-    FITSform::FITSform(const FITSform& col):fname(col.fname),ftype(col.ftype),funit(col.funit),fscale(col.fscale),fzero(col.fzero),frepeat(col.frepeat),fwidth(col.fwidth),fFixedWidth(col.fFixedWidth),fpos(col.fpos)
+    FITSform::FITSform(const FITSform& col):fname(col.fname),ftype(col.ftype),fFixedWidth(col.fFixedWidth),funit(col.funit),fscale(col.fscale),fzero(col.fzero),frepeat(col.frepeat),fwidth(col.fwidth),fpos(col.fpos)
     {};
     
 #pragma endregion

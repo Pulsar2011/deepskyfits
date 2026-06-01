@@ -908,12 +908,8 @@ namespace DSL
     
     void FITSmanager::AppendKeyToHeader(int HDU, const std::string& key, const FITSkeyword &val)
     {
-        char *comment = NULL;
         fits_status = 0;
 
-        if(val.comment().size() > 0 )
-            comment = const_cast<char*>(val.comment().c_str());
-        
         try
         {
             switch (val.type()) {
