@@ -9,7 +9,7 @@
 
 using namespace DSL;
 
-#if defined(__APPLE__)
+#ifndef CI_CIWORKER
 std::string testvurl = "./build/testdata/test_vstringtable.fits";
 std::string testurl = "./build/testdata/test_stringtable.fits";
 #else

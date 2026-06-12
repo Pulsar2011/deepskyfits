@@ -7,7 +7,7 @@
 
 using namespace DSL;
 
-#if defined(__APPLE__)
+#ifndef CI_CIWORKER
 std::string testurl = "./build/testdata/test_fitstable.fits";
 #else
 std::string testurl = "./testdata/test_fitstable.fits";

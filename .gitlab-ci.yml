@@ -39,7 +39,7 @@ build:
   script:
     - mkdir -p build
     - cd build
-    - cmake -Wno-dev -DCMAKE_CXX_STANDARD=23 -DCMAKE_CXX_STANDARD_REQUIRED=ON -DCMAKE_CXX_EXTENSIONS=OFF ..
+    - cmake -Wno-dev -DCMAKE_CXX_STANDARD=23 -DCMAKE_CXX_STANDARD_REQUIRED=ON -DCMAKE_CXX_EXTENSIONS=OFF -DCI_CIWORKER=ON ..
     - make -j 2
   artifacts:
     expire_in: 2 hrs
