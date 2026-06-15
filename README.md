@@ -269,5 +269,4 @@ Notes
 --------------------------------------------------------------------------------
 
 # License
-CC BY-NC 4.0 (non-commercial, attribution)
-https://creativecommons.org/licenses/by-nc/4.0/
+Licensed under [Non-Commercial Polyform](https://polyformproject.org/licenses/noncommercial/1.0.0/).
