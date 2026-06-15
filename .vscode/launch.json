@@ -7,6 +7,18 @@
     {
         "type": "lldb-dap",
         "request": "launch",
+        "name": "gTest_version (LLDB)",
+        "program": "${workspaceRoot}/build/exe/gTest_version",
+        "args": [],
+        "env": [],
+        "cwd": "${workspaceRoot}",
+        "MIMode": "lldb",
+        "sourceLanguages":["C++"],
+        "preLaunchTask": "make gtest"
+    },
+    {
+        "type": "lldb-dap",
+        "request": "launch",
         "name": "gTest_manager (LLDB)",
         "program": "${workspaceRoot}/build/exe/gTest_manager",
         "args": [],
@@ -29,7 +41,7 @@
         "preLaunchTask": "make gtest"
     },
     {
-        "type": "cppdbg",
+        "type": "lldb-dap",
         "request": "launch",
         "name": "gTest_hdu (LLDB)",
         "program": "${workspaceRoot}/build/exe/gTest_hdu",
@@ -40,7 +52,7 @@
         "preLaunchTask": "make gtest"
     },
     {
-        "type": "cppdbg",
+        "type": "lldb-dap",
         "request": "launch",
         "name": "gTest_statistic (LLDB)",
         "program": "${workspaceRoot}/build/exe/gTest_statistic",
@@ -51,7 +63,7 @@
         "preLaunchTask": "make gtest"
     },
     {
-        "type": "cppdbg",
+        "type": "lldb-dap",
         "request": "launch",
         "name": "gTest_FitsImage (LLDB)",
         "program": "${workspaceRoot}/build/exe/gTest_FitsImage",
@@ -62,7 +74,7 @@
         "preLaunchTask": "make gtest"
     },
     {
-        "type": "cppdbg",
+        "type": "lldb-dap",
         "request": "launch",
         "name": "gTest_wcs (LLDB)",
         "program": "${workspaceRoot}/build/exe/gTest_wcs",
@@ -73,7 +85,7 @@
         "preLaunchTask": "make gtest"
     },
     {
-        "type": "cppdbg",
+        "type": "lldb-dap",
         "request": "launch",
         "name": "gTest_form (LLDB)",
         "program": "${workspaceRoot}/build/exe/gTest_form",
