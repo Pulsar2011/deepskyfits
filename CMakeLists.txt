@@ -38,6 +38,10 @@ endif(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 set(EXECUTABLE_OUTPUT_PATH ./build/exe/)
 set(LIBRARY_OUTPUT_PATH ./build/lib/)
 
+if(CI_CIWORKER)
+    add_compile_definitions(CI_CIWORKER)
+endif()
+
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/modules")
 
 message("${BoldYellow}-- CMAKE INSTALL PREFIX : ${ColourReset}" ${CMAKE_INSTALL_PREFIX})
