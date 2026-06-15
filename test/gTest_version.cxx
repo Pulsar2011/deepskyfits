@@ -1,4 +1,4 @@
-#include "gTest_version.h"
+#include <gTest_version.h>
 #include <gtest/gtest.h>
 #include <DSF_version.h>
 
@@ -102,9 +102,19 @@ namespace DSF
                 to_test[to_test.size()-k] -= ((to_test[to_test.size()-k]>0)?1:0);
             else if (k > to_test.size())
             {
-                to_test[0] -= ((to_test[0]>0)?1:0);
-                to_test[1] -= ((to_test[1]>0)?1:0); if(to_test[0] < 1) to_test[1] ++;
-                to_test[2] -= ((to_test[2]>0)?1:0); if(to_test[0] < 1) to_test[2] ++;
+                if(to_test[2]>0)
+                    to_test[2] -=1;
+                else if(to_test[1]>0)
+                {
+                    to_test[1] -=1;
+                    to_test[2] +=9;
+                }
+                else if(to_test[0]>0)
+                {
+                    to_test[0] -=1;
+                    to_test[1] +=5;
+                    to_test[2] +=9;
+                }
             }
 
             std::string older = std::string("v")+std::to_string(to_test[0])
@@ -123,27 +133,11 @@ namespace DSF
             }
             else
             {
-                int32_t lver = static_cast<int32_t>(std::stoi(std::string(std::to_string(ver[0])+std::to_string(ver[1])+std::to_string(ver[2]))));
-                int32_t lto_test = static_cast<int32_t>(std::stoi(std::string(std::to_string(to_test[0])+std::to_string(to_test[1])+std::to_string(to_test[2]))));
-                
-                if(lto_test<lver)
-                {
-                    ASSERT_EQ((*gGIT::this_ver)<older, false)<<gGIT::version_short()<<" < "<<older<<" ?!" <<(ver[0]<to_test[0] )<<"||"<<(ver[1]<to_test[1] )<<"||"<<(ver[2]<to_test[2])<<" -> "<<((*gGIT::this_ver)<older);
+                ASSERT_EQ((*gGIT::this_ver)<older, false)<<gGIT::version_short()<<" < "<<older<<" ?!" <<(ver[0]<to_test[0] )<<"||"<<(ver[1]<to_test[1] )<<"||"<<(ver[2]<to_test[2])<<" -> "<<((*gGIT::this_ver)<older);
+                ASSERT_EQ((*gGIT::this_ver)<=older,false)<<gGIT::version_short()<<" <= "<<older<<" ?!"<<(ver[0]<=to_test[0])<<"||"<<(ver[1]<=to_test[1])<<"||"<<(ver[2]<=to_test[2])<<" -> "<<((*gGIT::this_ver)<=older);
 
-                    ASSERT_EQ((*gGIT::this_ver)<=older,false)<<gGIT::version_short()<<" <= "<<older<<" ?!"<<(ver[0]<=to_test[0])<<"||"<<(ver[1]<=to_test[1])<<"||"<<(ver[2]<=to_test[2])<<" -> "<<((*gGIT::this_ver)<=older);
-
-                    ASSERT_EQ((*gGIT::this_ver)>older, true)<<gGIT::version_short()<<" > "<<older<<" ?!" <<(ver[0]>to_test[0] )<<"||"<<(ver[1]>to_test[1] )<<"||"<<(ver[2]>to_test[2])<<" -> "<<((*gGIT::this_ver)>older);
-                    ASSERT_EQ((*gGIT::this_ver)>=older,true)<<gGIT::version_short()<<" >= "<<older<<" ?!"<<(ver[0]>=to_test[0])<<"||"<<(ver[1]>=to_test[1])<<"||"<<(ver[2]>=to_test[2])<<" -> "<<((*gGIT::this_ver)>=older);
-                }
-                else
-                {
-                    ASSERT_EQ((*gGIT::this_ver)<older, true)<<gGIT::version_short()<<" < "<<older<<" ?!" <<(ver[0]<to_test[0] )<<"||"<<(ver[1]<to_test[1] )<<"||"<<(ver[2]<to_test[2])<<" -> "<<((*gGIT::this_ver)<older);
-
-                    ASSERT_EQ((*gGIT::this_ver)<=older,true)<<gGIT::version_short()<<" <= "<<older<<" ?!"<<(ver[0]<=to_test[0])<<"||"<<(ver[1]<=to_test[1])<<"||"<<(ver[2]<=to_test[2])<<" -> "<<((*gGIT::this_ver)<=older);
-
-                    ASSERT_EQ((*gGIT::this_ver)>older, false)<<gGIT::version_short()<<" > "<<older<<" ?!" <<(ver[0]>to_test[0] )<<"||"<<(ver[1]>to_test[1] )<<"||"<<(ver[2]>to_test[2])<<" -> "<<((*gGIT::this_ver)>older);
-                    ASSERT_EQ((*gGIT::this_ver)>=older,false)<<gGIT::version_short()<<" >= "<<older<<" ?!"<<(ver[0]>=to_test[0])<<"||"<<(ver[1]>=to_test[1])<<"||"<<(ver[2]>=to_test[2])<<" -> "<<((*gGIT::this_ver)>=older);
-                }
+                ASSERT_EQ((*gGIT::this_ver)>older, true)<<gGIT::version_short()<<" > "<<older<<" ?!" <<(ver[0]>to_test[0] )<<"||"<<(ver[1]>to_test[1] )<<"||"<<(ver[2]>to_test[2])<<" -> "<<((*gGIT::this_ver)>older);
+                ASSERT_EQ((*gGIT::this_ver)>=older,true)<<gGIT::version_short()<<" >= "<<older<<" ?!"<<(ver[0]>=to_test[0])<<"||"<<(ver[1]>=to_test[1])<<"||"<<(ver[2]>=to_test[2])<<" -> "<<((*gGIT::this_ver)>=older);
             }
         }
     }

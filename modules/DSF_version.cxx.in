@@ -1,6 +1,8 @@
 #include <DSTfits/DSF_version.h> //update as appropriate
 #include <stdexcept>
-using namespace DSF;
+
+namespace DSF
+{
 
 // Namespace DSF stand For DeepSkyMath.
   gGIT *gGIT::this_ver = NULL;
@@ -256,3 +258,4 @@ using namespace DSF;
       
     return !((*this_ver) == ver);
   }
+}
