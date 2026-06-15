@@ -106,3 +106,4 @@ doc/html
 test/gTest_version.h
 
 googletest/generated
+cmake_*
