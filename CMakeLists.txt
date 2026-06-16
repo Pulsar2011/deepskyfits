@@ -133,6 +133,12 @@ if(WITH_DEBUG)
 	message("${Blue}-- DEBUG MODE ACTIVATED${ColourReset}")
 	add_definitions(-D__DEBUG__)
 	set(CMAKE_BUILD_TYPE DEBUG)
+	# LTO (flto/flto=thin) prevents LLDB from resolving debug info on macOS:
+	# it replaces .o files with LLVM bitcode, leaving the debug map with empty
+	# OSO entries that LLDB cannot follow. Strip it for debug builds.
+	string(REPLACE "-flto=thin" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+	string(REPLACE "-flto" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+	set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0 -fsanitize=address -fno-omit-frame-pointer")
 else(WITH_DEBUG)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
@@ -226,18 +232,22 @@ include(ExternalProject)
 
 set(CFITSIO_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include/cfitsio)
 
-ExternalProject_Add(
-    cfitsio_external
-    SOURCE_DIR ${CMAKE_SOURCE_DIR}/cfitsio
-    BINARY_DIR ${CMAKE_SOURCE_DIR}/build/cfitsio 
-    CONFIGURE_COMMAND CC=${CMAKE_C_COMPILER} CFLAGS=-fPIC ${CMAKE_SOURCE_DIR}/cfitsio/configure --enable-static --disable-shared --prefix=${CMAKE_SOURCE_DIR}/build --with-gnu-ld --with-bzip2
-    BUILD_COMMAND make -j 4 libcfitsio.la
-    INSTALL_COMMAND ${CMAKE_COMMAND} -E make_directory ${CFITSIO_INCLUDE_DIR}
-        && ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/build/cfitsio/.libs/libcfitsio.a ${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a
-        # Copy each header file individually
-        && cmake -P ${CMAKE_SOURCE_DIR}/cmake/copy_cfitsio_headers.cmake
-    BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a
-)
+if(WITH_DEBUG AND EXISTS "${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a")
+    message("${Blue}-- DEBUG: Skipping cfitsio rebuild, using existing library${ColourReset}")
+    add_custom_target(cfitsio_external)
+else()
+    ExternalProject_Add(
+        cfitsio_external
+        SOURCE_DIR ${CMAKE_SOURCE_DIR}/cfitsio
+        BINARY_DIR ${CMAKE_SOURCE_DIR}/build/cfitsio
+        CONFIGURE_COMMAND CC=${CMAKE_C_COMPILER} CFLAGS=-fPIC ${CMAKE_SOURCE_DIR}/cfitsio/configure --enable-static --disable-shared --prefix=${CMAKE_SOURCE_DIR}/build --with-gnu-ld --with-bzip2
+        BUILD_COMMAND make -j 4 libcfitsio.la
+        INSTALL_COMMAND ${CMAKE_COMMAND} -E make_directory ${CFITSIO_INCLUDE_DIR}
+            && ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/build/cfitsio/.libs/libcfitsio.a ${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a
+            && cmake -P ${CMAKE_SOURCE_DIR}/cmake/copy_cfitsio_headers.cmake
+        BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a
+    )
+endif()
 
 #-------------------- Configuration de la bibliothèque WCSFIT
 
@@ -256,35 +266,47 @@ file(MAKE_DIRECTORY "${CMAKE_SOURCE_DIR}/wcslib")
 file(MAKE_DIRECTORY "${WCSLIB_INSTALL_DIR}")
 set(WCSLIB_TARBALL "${CMAKE_SOURCE_DIR}/wcslib-${WCSLIB_VERSION}.tar.bz2")
 
-# Custom target to download wcslib tarball (only download if missing)
-add_custom_target(download_wcslib
-    COMMAND /usr/bin/env bash -c "set -e; if [ ! -f \"${WCSLIB_TARBALL}\" ]; then echo 'Downloading wcslib to ${WCSLIB_TARBALL}...'; for u in ${WCSLIB_URLS_SP}; do echo \"Trying: $u\"; if command -v wget >/dev/null 2>&1; then wget -t 3 --retry-connrefused -O \"${WCSLIB_TARBALL}\" \"$u\" && exit 0 || true; elif command -v curl >/dev/null 2>&1; then curl -fsSL --retry 3 \"$u\" -o \"${WCSLIB_TARBALL}\" && exit 0 || true; fi; done; echo 'All wcslib download URLs failed' >&2; exit 1; else echo 'wcslib tarball already exists: ${WCSLIB_TARBALL}'; fi"
-    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/wcslib"
-    COMMENT "Download wcslib tarball if missing"
-    VERBATIM
-)
+# expose include/lib paths for targets
+set(WCSLIB_INCLUDE_DIR "${WCSLIB_INSTALL_DIR}/include" CACHE PATH "wcslib include dir")
+set(WCSLIB_LIBRARY     "${WCSLIB_INSTALL_DIR}/lib/libwcs-${WCSLIB_VERSION}.a" CACHE FILEPATH "wcslib static library")
 
-add_custom_target(extract_wcslib
-  COMMAND ${CMAKE_COMMAND} -E echo "Extracting ${WCSLIB_TARBALL} to ${CMAKE_SOURCE_DIR}/wcslib"
-  COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/wcslib"
-  COMMAND /usr/bin/env tar -xjf "${WCSLIB_TARBALL}" -C "${CMAKE_SOURCE_DIR}/wcslib"
-  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/wcslib"
-  VERBATIM
-)
+if(WITH_DEBUG AND EXISTS "${WCSLIB_LIBRARY}")
+    message("${Blue}-- DEBUG: Skipping wcslib rebuild, using existing library${ColourReset}")
+    add_custom_target(download_wcslib)
+    add_custom_target(extract_wcslib)
+    add_custom_target(wcslib_external)
+else()
+    add_custom_target(download_wcslib
+        COMMAND /usr/bin/env bash -c "set -e; if [ ! -f \"${WCSLIB_TARBALL}\" ]; then echo 'Downloading wcslib to ${WCSLIB_TARBALL}...'; for u in ${WCSLIB_URLS_SP}; do echo \"Trying: $u\"; if command -v wget >/dev/null 2>&1; then wget -t 3 --retry-connrefused -O \"${WCSLIB_TARBALL}\" \"$u\" && exit 0 || true; elif command -v curl >/dev/null 2>&1; then curl -fsSL --retry 3 \"$u\" -o \"${WCSLIB_TARBALL}\" && exit 0 || true; fi; done; echo 'All wcslib download URLs failed' >&2; exit 1; else echo 'wcslib tarball already exists: ${WCSLIB_TARBALL}'; fi"
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/wcslib"
+        COMMENT "Download wcslib tarball if missing"
+        VERBATIM
+    )
 
-# ExternalProject to configure/build/install wcslib from the extracted source
-ExternalProject_Add(
-  wcslib_external
-  SOURCE_DIR      ${WCSLIB_SRC_DIR}
-  PREFIX          ${CMAKE_SOURCE_DIR}/build/wcslib
-  DOWNLOAD_COMMAND ""                         # download handled by download_wcslib
-  UPDATE_COMMAND   ""                         # no update step
-  CONFIGURE_COMMAND CC=${CMAKE_C_COMPILER} CFLAGS=-fPIC ${WCSLIB_SRC_DIR}/configure --prefix=${WCSLIB_INSTALL_DIR} --with-cfitsioinc=${CFITSIO_INCLUDE_DIR} --with-cfitsiolib=${CMAKE_SOURCE_DIR}/build/lib --disable-shared
-  BUILD_COMMAND     ${CMAKE_MAKE_PROGRAM} -j ${CMAKE_BUILD_PARALLEL_LEVEL}
-  INSTALL_COMMAND   ${CMAKE_MAKE_PROGRAM} install
-  BUILD_IN_SOURCE   1
-  BUILD_BYPRODUCTS  ${WCSLIB_INSTALL_DIR}/lib/libwcs.a ${WCSLIB_INSTALL_DIR}/bin/tofits
-)
+    add_custom_target(extract_wcslib
+        COMMAND ${CMAKE_COMMAND} -E echo "Extracting ${WCSLIB_TARBALL} to ${CMAKE_SOURCE_DIR}/wcslib"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/wcslib"
+        COMMAND /usr/bin/env tar -xjf "${WCSLIB_TARBALL}" -C "${CMAKE_SOURCE_DIR}/wcslib"
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/wcslib"
+        VERBATIM
+    )
+
+    ExternalProject_Add(
+        wcslib_external
+        SOURCE_DIR      ${WCSLIB_SRC_DIR}
+        PREFIX          ${CMAKE_SOURCE_DIR}/build/wcslib
+        DOWNLOAD_COMMAND ""
+        UPDATE_COMMAND   ""
+        CONFIGURE_COMMAND CC=${CMAKE_C_COMPILER} CFLAGS=-fPIC ${WCSLIB_SRC_DIR}/configure --prefix=${WCSLIB_INSTALL_DIR} --with-cfitsioinc=${CFITSIO_INCLUDE_DIR} --with-cfitsiolib=${CMAKE_SOURCE_DIR}/build/lib --disable-shared
+        BUILD_COMMAND     ${CMAKE_MAKE_PROGRAM} -j ${CMAKE_BUILD_PARALLEL_LEVEL}
+        INSTALL_COMMAND   ${CMAKE_MAKE_PROGRAM} install
+        BUILD_IN_SOURCE   1
+        BUILD_BYPRODUCTS  ${WCSLIB_INSTALL_DIR}/lib/libwcs.a ${WCSLIB_INSTALL_DIR}/bin/tofits
+    )
+
+    add_dependencies(wcslib_external cfitsio_external extract_wcslib)
+    add_dependencies(extract_wcslib download_wcslib)
+endif()
 
 add_custom_target(tofits
     COMMAND /usr/bin/env bash -c "${CMAKE_SOURCE_DIR}/build/wcslib/bin/tofits <${CMAKE_SOURCE_DIR}/wcslib/wcslib-${WCSLIB_VERSION}/C/test/DSS.keyrec> ${CMAKE_SOURCE_DIR}/build/testdata/DSS.fits"
@@ -294,17 +316,6 @@ add_custom_target(tofits
 )
 
 add_dependencies(tofits wcslib_external)
-
-# extraction must run before building wcslib
-
-# expose include/lib paths for targets
-set(WCSLIB_INCLUDE_DIR "${WCSLIB_INSTALL_DIR}/include" CACHE PATH "wcslib include dir")
-set(WCSLIB_LIBRARY     "${WCSLIB_INSTALL_DIR}/lib/libwcs-${WCSLIB_VERSION}.a" CACHE FILEPATH "wcslib static library")
-
-# ensure DSTfits waits for wcslib to be built and links to it
-
-add_dependencies(wcslib_external cfitsio_external extract_wcslib)
-add_dependencies(extract_wcslib download_wcslib)
 
 
 # Provide explicit cfitsio static library path variable for later linking
@@ -332,10 +343,25 @@ include_directories(build/wcslib/include)
 #-------------------- Configuration des test
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build/lib)
 
-add_subdirectory(Minuit2   EXCLUDE_FROM_ALL)
 include_directories(Minuit2/inc)
 
-add_dependencies(DSTfits Minuit2)
+if(WITH_DEBUG)
+    file(GLOB EXISTING_MINUIT2_LIBS
+        "${CMAKE_SOURCE_DIR}/build/lib/libMinuit2.dylib"
+        "${CMAKE_SOURCE_DIR}/build/lib/libMinuit2.so"
+        "${CMAKE_SOURCE_DIR}/build/lib/libMinuit2.a"
+    )
+endif()
+
+if(WITH_DEBUG AND EXISTING_MINUIT2_LIBS)
+    message("${Blue}-- DEBUG: Skipping Minuit2 rebuild, using existing library${ColourReset}")
+    list(GET EXISTING_MINUIT2_LIBS 0 MINUIT2_LIB_FILE)
+    add_library(Minuit2 SHARED IMPORTED GLOBAL)
+    set_target_properties(Minuit2 PROPERTIES IMPORTED_LOCATION "${MINUIT2_LIB_FILE}")
+else()
+    add_subdirectory(Minuit2 EXCLUDE_FROM_ALL)
+    add_dependencies(DSTfits Minuit2)
+endif()
 
 
 #-------------------- Configuration des test
@@ -485,8 +511,8 @@ if(CMAKE_INSTALL_PREFIX)
     set(WCSLIB_OUTPUT_LIB ${CMAKE_SOURCE_DIR}/build/wcslib/lib/libwcs-${WCSLIB_VERSION}.a)
     INSTALL(FILES ${WCSLIB_OUTPUT_LIB} DESTINATION lib)
 
-    # Minuit2 libraries: install if targets exist, otherwise fallback to copying built files
-    if(TARGET Minuit2)
+    # Minuit2 libraries: install if targets exist and are not imported
+    if(TARGET Minuit2 AND NOT MINUIT2_LIB_FILE)
         INSTALL(TARGETS Minuit2
             RUNTIME DESTINATION exe
             LIBRARY DESTINATION lib
@@ -502,7 +528,7 @@ if(CMAKE_INSTALL_PREFIX)
         )
     endif()
 
-    if(NOT (TARGET Minuit2 OR TARGET Minuit2Math))
+    if(MINUIT2_LIB_FILE OR NOT (TARGET Minuit2 OR TARGET Minuit2Math))
         # Fallback: copy any libMinuit2* libraries found in the build lib dir
         install(DIRECTORY ${CMAKE_SOURCE_DIR}/build/lib/ DESTINATION lib
             FILES_MATCHING
