@@ -113,6 +113,7 @@ namespace DSL
 #pragma endregion
 #pragma region * Accessing file block
         inline const std::shared_ptr<fitsfile>& CurrentHDU() const {return fptr;}
+        const size_t CurrentHDUindex();
         
         int MoveToHDU(const int&);
         int MoveToPrimary();

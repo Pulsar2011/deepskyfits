@@ -1072,6 +1072,20 @@ namespace DSL
         }
     }
 
+    const size_t FITSmanager::CurrentHDUindex()
+    {
+        std::shared_lock<std::shared_mutex> lk(fptr_mtx);
+        if(!fptr)
+        {
+            fits_status = SHARED_NULPTR;
+            throw FITSexception(fits_status,"FITSmanager","CurrentHDUindex","CAN'T GET HEADER FROM NULL POINTER");
+        }
+
+        int hdu_index = 0;
+        fits_get_hdu_num(fptr.get(), &hdu_index);
+        return static_cast<size_t>(hdu_index);
+    }
+
 #pragma endregion
 #pragma endregion
     
