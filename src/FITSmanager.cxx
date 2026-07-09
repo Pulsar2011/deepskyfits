@@ -502,6 +502,44 @@ namespace DSL
         }
         return std::make_shared<FITShdu>(local);
     }
+
+    /**
+     *  @details Retrive specific header from the fits file
+     *  @param hdu_name HDU name.
+     *  @return Pointer to the requested header
+     *  @note It will return a NULL pointer if the header haven't been found or in case of errors while reading the FITS data
+     */
+    const std::shared_ptr<FITShdu> FITSmanager::GetHeader(const std::string& hdu_name)
+    {
+        int hdublck = 0;
+        {
+            std::unique_lock<std::shared_mutex> lk(fptr_mtx);
+
+            // Move to HDU by name
+            int status = BAD_HDU_NUM;
+            size_t maxTrial = 3;
+            size_t trial = 0;
+            std::vector<int> hdu_type = {IMAGE_HDU, BINARY_TBL, ASCII_TBL};
+
+            while(status == BAD_HDU_NUM && trial < maxTrial)
+            {
+                status = 0;
+                fits_movnam_hdu(fptr.get(), hdu_type[trial], (char*) hdu_name.c_str(), 0, &status);
+                trial++;
+            }
+
+            fits_status = status;
+
+            if(fits_status)
+                throw FITSexception(fits_status,"FITSmanager","GetHeader","HEADER "+hdu_name+" NOT FOUND BY NAME");
+
+            // get current HDU index
+            fits_get_hdu_num(fptr.get(), &hdublck);
+        }
+
+        // now call GetImageAtIndex to do the rest
+        return GetHeaderAtIndex(hdublck);
+    }
     
 #pragma endregion
 #pragma region * Accessing FITS image

@@ -95,6 +95,7 @@ namespace DSL
         inline const int NumberOfHeader(){return num_hdu;}              //!< Get the total number of HDU
         const std::shared_ptr<FITShdu> GetPrimaryHeader();              //!< Retrieve primary header
         const std::shared_ptr<FITShdu> GetHeaderAtIndex(const int&);    //!< Retrive specific HDU
+        const std::shared_ptr<FITShdu> GetHeader(const std::string&);   //!< Retrive specific HDU
         
 #pragma endregion
 #pragma region * Accessing FITS image

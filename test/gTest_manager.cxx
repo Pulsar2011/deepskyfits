@@ -601,6 +601,35 @@ TEST(FITStable, NavigateHDU)
     fm.Close();
 }
 
+TEST(FITStable, NavigateHDUbyName)
+{
+#ifndef CI_CIWORKER
+    FITSmanager fm("build/testdata/rosat_pspc_rdf2_3_im2.fits");
+#else
+    FITSmanager fm("testdata/rosat_pspc_rdf2_3_im2.fits");
+#endif
+
+    ASSERT_TRUE(fm.isOpen());
+    ASSERT_EQ(fm.NumberOfHeader(), 3);
+
+    std::shared_ptr <FITShdu> hdu1;
+    std::shared_ptr <FITShdu> hdu2;
+
+    EXPECT_NO_THROW(fm.GetTable("LS2"));
+    EXPECT_NO_THROW(fm.GetPrimaryHeader());
+    EXPECT_EQ(fm.CurrentHDUindex(), 1);
+
+    EXPECT_NO_THROW(hdu1 = fm.GetHeader("LS2"));
+    EXPECT_EQ(fm.CurrentHDUindex(), 2);
+    EXPECT_EQ(hdu1->GetValueForKey("EXTNAME"),"LS2");
+
+    EXPECT_NO_THROW(hdu2 = fm.GetHeader("MS2"));
+    EXPECT_EQ(fm.CurrentHDUindex(), 3);
+    EXPECT_EQ(hdu2->GetValueForKey("EXTNAME"),"MS2");
+
+    fm.Close();
+}
+
 TEST(FITStable, openTableFromFile)
 {
 #ifndef CI_CIWORKER
