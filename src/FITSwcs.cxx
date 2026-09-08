@@ -12,6 +12,9 @@
 #include <thread>
 #include <iostream>
 #include <sstream>
+#include <cmath>
+#include <ctime>
+#include <algorithm>
 
 #include <fitsio.h>
 
@@ -23,6 +26,11 @@
 #include <wcslib/wcsfix.h>
 #include <wcslib/wcsprintf.h>
 #include <wcslib/wcsutil.h>
+
+// novas.h has no extern "C" guard of its own; wrap it so the linker resolves libsupernovas's C symbols.
+extern "C" {
+#include <novas.h>
+}
 
 namespace DSL
 {
@@ -1058,5 +1066,651 @@ namespace DSL
             }
 #pragma endregion
 
+#pragma region SkyCoordinates calss implementation
+        SkyCoordinates::SkyCoordinates():fphi(0.0),ftheta(0.0),fpmPhi(0.0),fpmTheta(0.0),fparallax(0.0),fradialVelocity(0.0),fepoch(NOVAS_JD_J2000),fcoordSys(CoordSystem::UNDEFINED),fcoordFrame(CoordFrame::UNDEFINED)
+        { }
+
+        SkyCoordinates::SkyCoordinates(const double& phi, const double& theta):fphi(phi),ftheta(theta),fpmPhi(0.0),fpmTheta(0.0),fparallax(0.0),fradialVelocity(0.0),fepoch(NOVAS_JD_J2000),fcoordSys(CoordSystem::UNDEFINED),fcoordFrame(CoordFrame::UNDEFINED)
+        { }
+
+        SkyCoordinates::SkyCoordinates(const double& phi, const double& theta, CoordSystem sys, CoordFrame frame):fphi(phi),ftheta(theta),fpmPhi(0.0),fpmTheta(0.0),fparallax(0.0),fradialVelocity(0.0),fepoch(epochOf(frame)),fcoordSys(sys),fcoordFrame(frame)
+        { }
+
+        SkyCoordinates::SkyCoordinates(const double& phi, const double& theta, const double& pmPhi, const double& pmTheta):fphi(phi),ftheta(theta),fpmPhi(pmPhi),fpmTheta(pmTheta),fparallax(0.0),fradialVelocity(0.0),fepoch(NOVAS_JD_J2000),fcoordSys(CoordSystem::UNDEFINED),fcoordFrame(CoordFrame::UNDEFINED)
+        { }
+
+        SkyCoordinates::SkyCoordinates(const double& phi, const double& theta, const double& pmPhi, const double& pmTheta, CoordSystem sys, CoordFrame frame):fphi(phi),ftheta(theta),fpmPhi(pmPhi),fpmTheta(pmTheta),fparallax(0.0),fradialVelocity(0.0),fepoch(epochOf(frame)),fcoordSys(sys),fcoordFrame(frame)
+        { }
+
+        SkyCoordinates::SkyCoordinates(const double& phi, const double& theta, const double& pmPhi, const double& pmTheta,
+                                       const double& parallax, const double& radialVelocity, const double& epoch,
+                                       CoordSystem sys, CoordFrame frame):fphi(phi),ftheta(theta),fpmPhi(pmPhi),fpmTheta(pmTheta),fparallax(parallax),fradialVelocity(radialVelocity),fepoch(std::isnan(epoch) ? epochOf(frame) : epoch),fcoordSys(sys),fcoordFrame(frame)
+        { }
+
+        void SkyCoordinates::setPhi(const double& phi) { fphi = phi; }
+        void SkyCoordinates::setTheta(const double& theta) { ftheta = theta; }
+        void SkyCoordinates::setProperMotion(const double& pmPhi, const double& pmTheta) { fpmPhi = pmPhi; fpmTheta = pmTheta; }
+        void SkyCoordinates::setParallax(const double& parallax) { fparallax = parallax; }
+        void SkyCoordinates::setRadialVelocity(const double& radialVelocity) { fradialVelocity = radialVelocity; }
+        void SkyCoordinates::setEpoch(const double& epoch) { fepoch = epoch; }
+        double SkyCoordinates::getPhi() const { return fphi; }
+        double SkyCoordinates::getTheta() const { return ftheta; }
+        SkyCoordinates::CoordFrame SkyCoordinates::getFrame() const { return fcoordFrame; }
+        SkyCoordinates::CoordSystem SkyCoordinates::getSystem() const { return fcoordSys; }
+        double SkyCoordinates::getProperMotionPhi() const { return fpmPhi; }
+        double SkyCoordinates::getProperMotionTheta() const { return fpmTheta; }
+        double SkyCoordinates::getParallax() const { return fparallax; }
+        double SkyCoordinates::getRadialVelocity() const { return fradialVelocity; }
+        double SkyCoordinates::getEpoch() const { return fepoch; }
+
+#pragma region * Epochs
+        // Every one of these forwards to SuperNOVAS: the library owns the definition of
+        // what "B1950.0" or "J1991.25" means, and of how the system clock maps onto TT.
+
+        //! ICRS and HIPPARCOS name the same set of axes; they differ only in their standard epoch.
+        static bool isICRSOriented(const CoordFrame& frame)
+        {
+            return frame == CoordFrame::ICRS || frame == CoordFrame::HIPPARCOS;
+        }
+
+        //! The date a position carries after a frame conversion.
+        //! An FK4 leg goes through transform_cat(CHANGE_EPOCH, ...), which advances the star
+        //! along its proper motion as well as rotating it; every other leg is a pure rotation
+        //! and leaves the date alone.
+        static double frameConversionEpoch(const CoordFrame& from, const CoordFrame& to, const double& currentEpoch)
+        {
+            if(to == CoordFrame::FK4)
+                return NOVAS_JD_B1950;  // carried back to B1950.0 on the way into FK4
+
+            if(from == CoordFrame::FK4)
+                return NOVAS_JD_J2000;  // ... and forward to J2000.0 on the way out of it
+
+            return currentEpoch;
+        }
+
+        //! The NOVAS system name a frame is known by, and therefore the epoch it resolves to.
+        static const char* novasSystemOf(const CoordFrame& frame)
+        {
+            switch(frame)
+            {
+                case CoordFrame::FK4:       return NOVAS_SYSTEM_FK4;
+                case CoordFrame::FK5:       return NOVAS_SYSTEM_FK5;
+                case CoordFrame::ICRS:      return NOVAS_SYSTEM_ICRS;
+                case CoordFrame::HIPPARCOS: return NOVAS_SYSTEM_HIP;
+                default:                    return NOVAS_SYSTEM_J2000;  // undefined frame: assume J2000.0
+            }
+        }
+
+        double SkyCoordinates::epochOf(CoordFrame frame)
+        {
+            const double jd = novas_epoch(novasSystemOf(frame));
+            if(std::isnan(jd))
+                throw std::runtime_error("[ERROR] SkyCoordinates::epochOf: novas_epoch() rejected the system name");
+
+            return jd;
+        }
+
+        double SkyCoordinates::epochOf(const std::string& spec)
+        {
+            const double jd = novas_epoch(spec.c_str());
+            if(std::isnan(jd))
+                throw std::invalid_argument("[ERROR] SkyCoordinates::epochOf: unrecognised epoch specification '" + spec + "'");
+
+            return jd;
+        }
+
+        double SkyCoordinates::currentEpoch()
+        {
+            const std::time_t unixTime = std::time(nullptr);
+            novas_timespec now = NOVAS_TIMESPEC_INIT;
+
+            // UT1-UTC is left at zero: it never exceeds 0.9 s, which is far below the
+            // resolution of any proper motion this epoch is going to be used with.
+            if(novas_set_current_time(novas_lookup_leap(unixTime), 0.0, &now) != 0)
+                throw std::runtime_error("[ERROR] SkyCoordinates::currentEpoch: novas_set_current_time() failed");
+
+            return novas_get_time(&now, NOVAS_TT);
+        }
+#pragma endregion
+
+        void SkyCoordinates::assign(const double& phi, const double& theta, CoordSystem sys, CoordFrame frame)
+        {
+            assign(phi, theta, 0.0, 0.0, sys, frame);
+        }
+
+        void SkyCoordinates::assign(const double& phi, const double& theta, const double& pmPhi, const double& pmTheta,
+                                     CoordSystem sys, CoordFrame frame)
+        {
+            // Preserve the distance and the date: neither is changed by a plain re-assignment
+            // of the angular coordinates.
+            assign(phi, theta, pmPhi, pmTheta, fparallax, fradialVelocity, fepoch, sys, frame);
+        }
+
+        void SkyCoordinates::assign(const double& phi, const double& theta, const double& pmPhi, const double& pmTheta,
+                                     const double& parallax, const double& radialVelocity, const double& epoch,
+                                     CoordSystem sys, CoordFrame frame)
+        {
+            fphi            = phi;
+            ftheta          = theta;
+            fpmPhi          = pmPhi;
+            fpmTheta        = pmTheta;
+            fparallax       = parallax;
+            fradialVelocity = radialVelocity;
+            fepoch          = std::isnan(epoch) ? epochOf(frame) : epoch;
+            fcoordSys       = sys;
+            fcoordFrame     = frame;
+        }
+
+        double SkyCoordinates::angularSeparation(const SkyCoordinates& other) const
+        {
+            const double lon1 = fphi         * NOVAS_DEGREE;
+            const double lat1 = ftheta       * NOVAS_DEGREE;
+            const double lon2 = other.fphi   * NOVAS_DEGREE;
+            const double lat2 = other.ftheta * NOVAS_DEGREE;
+
+            const double dlon = lon2 - lon1;
+            const double dlat = lat2 - lat1;
+
+            // Haversine formula: stable for small separations
+            const double sinDLatHalf = std::sin(dlat / 2.0);
+            const double sinDLonHalf = std::sin(dlon / 2.0);
+
+            double hav = sinDLatHalf * sinDLatHalf +
+                         std::cos(lat1) * std::cos(lat2) * sinDLonHalf * sinDLonHalf;
+
+            // Clamp to handle numerical rounding
+            hav = std::max(0.0, std::min(1.0, hav));
+
+            double sep = 2.0 * std::asin(std::sqrt(hav));
+
+            // For very large angles (>~90°), law of cosines is more accurate
+            // Use it as a fallback if haversine gives suspiciously large values
+            if (sep > M_PI / 2.0) {
+                double cosSep = std::sin(lat1)*std::sin(lat2) + 
+                               std::cos(lat1)*std::cos(lat2)*std::cos(dlon);
+                cosSep = std::max(-1.0, std::min(1.0, cosSep));
+                sep = std::acos(cosSep);
+            }
+
+            return sep / NOVAS_DEGREE;
+        }
+
+#pragma endregion
+
+#pragma region EquatorialCoordinates implementation
+
+        EquatorialCoordinates::EquatorialCoordinates():SkyCoordinates(0.0, 0.0, CoordSystem::EQUATORIAL, CoordFrame::ICRS)
+        {
+        }
+
+        EquatorialCoordinates::EquatorialCoordinates(const double& ra, const double& dec):SkyCoordinates(ra,dec, CoordSystem::EQUATORIAL, CoordFrame::ICRS)
+        {
+        }
+
+        EquatorialCoordinates::EquatorialCoordinates(const double& ra, const double& dec, CoordFrame frame):SkyCoordinates(ra,dec, CoordSystem::EQUATORIAL, frame)
+        {
+        }
+
+        EquatorialCoordinates::EquatorialCoordinates(const double& ra, const double& dec, const double& pmRA, const double& pmDEC):SkyCoordinates(ra, dec, pmRA, pmDEC, CoordSystem::EQUATORIAL, CoordFrame::ICRS)
+        {
+        }
+
+        EquatorialCoordinates::EquatorialCoordinates(const double& ra, const double& dec, const double& pmRA, const double& pmDEC, CoordFrame frame):SkyCoordinates(ra, dec, pmRA, pmDEC, CoordSystem::EQUATORIAL, frame)
+        {
+        }
+
+        EquatorialCoordinates::EquatorialCoordinates(const double& ra, const double& dec, const double& pmRA, const double& pmDEC,
+                                                     const double& parallax, const double& radialVelocity,
+                                                     CoordFrame frame, const double& epoch):SkyCoordinates(ra, dec, pmRA, pmDEC, parallax, radialVelocity, epoch, CoordSystem::EQUATORIAL, frame)
+        {
+        }
+
+        EquatorialCoordinates::~EquatorialCoordinates()
+        { }
+
+        double EquatorialCoordinates::getRA()  const { return getPhi();   }
+        double EquatorialCoordinates::getDEC() const { return getTheta(); }
+        double EquatorialCoordinates::getPMRA()  const { return getProperMotionPhi();   }
+        double EquatorialCoordinates::getPMDEC() const { return getProperMotionTheta(); }
+
+        void EquatorialCoordinates::toEquatorial(SkyCoordinates* output, CoordFrame frame) const
+        {
+           if(!output)
+               throw std::invalid_argument("[ERROR] EquatorialCoordinates::toEquatorial: output pointer is null");
+        
+           if (getFrame() == frame) {
+               // No conversion needed, just copy
+               output->assign(getRA(), getDEC(), getPMRA(), getPMDEC(),
+                             getParallax(), getRadialVelocity(), getEpoch(),
+                             CoordSystem::EQUATORIAL, frame);
+               return;
+           }
+
+           // Convert frame: convertFrame wants RA in hours
+           double ra = 0.0, dec = 0.0, pmRA = 0.0, pmDEC = 0.0, parallax = 0.0, rv = 0.0;
+           EquatorialCoordinates::convertFrame(getRA() / 15.0, getDEC(),
+                                              getPMRA(), getPMDEC(),
+                                              getParallax(), getRadialVelocity(),
+                                              getFrame(), frame,
+                                              ra, dec, pmRA, pmDEC, parallax, rv);
+
+           // Output in degrees
+           output->assign(ra * 15.0, dec, pmRA, pmDEC, parallax, rv,
+                          frameConversionEpoch(getFrame(), frame, getEpoch()),
+                          CoordSystem::EQUATORIAL, frame);
+        }
+
+        void EquatorialCoordinates::toEcliptic(SkyCoordinates* output, CoordFrame frame) const
+        {
+            if(!output)
+                throw std::invalid_argument("[ERROR] EquatorialCoordinates::toEcliptic: output pointer is null");
+        
+            // Get coordinates in requested frame
+            double ra = getRA() / 15.0, dec = getDEC();
+            double parallax = getParallax(), rv = getRadialVelocity();
+
+            if (getFrame() != frame) {
+                double pmRA = 0.0, pmDEC = 0.0;
+                EquatorialCoordinates::convertFrame(ra, dec, getPMRA(), getPMDEC(),
+                                                   parallax, rv,
+                                                   getFrame(), frame,
+                                                   ra, dec, pmRA, pmDEC, parallax, rv);
+            }
+
+            // Convert equatorial (in requested frame) to ecliptic
+            double elon = 0.0, elat = 0.0;
+            equ2ecl(NOVAS_JD_J2000, NOVAS_GCRS_EQUATOR, NOVAS_FULL_ACCURACY, ra, dec, &elon, &elat);
+
+            output->assign(elon, elat, 0.0, 0.0, parallax, rv,
+                           frameConversionEpoch(getFrame(), frame, getEpoch()),
+                           CoordSystem::ECLIPTIC, frame);
+        }
+
+        void EquatorialCoordinates::toGalactic(SkyCoordinates* output, CoordFrame frame) const
+        {
+            if(!output)
+                throw std::invalid_argument("[ERROR] EquatorialCoordinates::toGalactic: output pointer is null");
+        
+            // Get coordinates in requested frame
+            double ra = getRA() / 15.0, dec = getDEC();
+            double parallax = getParallax(), rv = getRadialVelocity();
+
+            if (getFrame() != frame) {
+                double pmRA = 0.0, pmDEC = 0.0;
+                EquatorialCoordinates::convertFrame(ra, dec, getPMRA(), getPMDEC(),
+                                                   parallax, rv,
+                                                   getFrame(), frame,
+                                                   ra, dec, pmRA, pmDEC, parallax, rv);
+            }
+
+            // Convert equatorial (in requested frame) to galactic
+            double glon = 0.0, glat = 0.0;
+            equ2gal(ra, dec, &glon, &glat);  // ← Use frame-converted coords
+
+            output->assign(glon, glat, 0.0, 0.0, parallax, rv,
+                           frameConversionEpoch(getFrame(), frame, getEpoch()),
+                           CoordSystem::GALACTIC, frame);
+        }
+
+        void EquatorialCoordinates::convertFrame(double raHours, double decDeg, double pmRaMasPerYr, double pmDecMasPerYr,
+                                                  CoordFrame from, CoordFrame to,
+                                                  double& raHoursOut, double& decDegOut,
+                                                  double& pmRaMasPerYrOut, double& pmDecMasPerYrOut)
+        {
+            double parallaxOut = 0.0, rvOut = 0.0;
+            convertFrame(raHours, decDeg, pmRaMasPerYr, pmDecMasPerYr, 0.0, 0.0, from, to,
+                         raHoursOut, decDegOut, pmRaMasPerYrOut, pmDecMasPerYrOut, parallaxOut, rvOut);
+        }
+
+        // Converts an RA/Dec (+ space motion) entry between FK4 (B1950 dynamical mean equator/equinox),
+        // FK5 (J2000 dynamical mean equator/equinox), ICRS and HIPPARCOS, via transform_cat() which
+        // propagates the position and the proper motion together (CHANGE_EPOCH for FK4<->FK5,
+        // CHANGE_*_TO_* for the FK5/J2000<->ICRS frame tie). The frame tie legs are time-independent
+        // (see novas transform_cat()).
+        //
+        // HIPPARCOS shares the ICRS orientation, so it takes the same rotation path; what separates the
+        // two is the epoch (J1991.25 vs J2000.0), which is the business of atEpoch(), not of a rotation.
+        void EquatorialCoordinates::convertFrame(double raHours, double decDeg, double pmRaMasPerYr, double pmDecMasPerYr,
+                                                  double parallaxMas, double rvKmPerSec,
+                                                  CoordFrame from, CoordFrame to,
+                                                  double& raHoursOut, double& decDegOut,
+                                                  double& pmRaMasPerYrOut, double& pmDecMasPerYrOut,
+                                                  double& parallaxMasOut, double& rvKmPerSecOut)
+        {
+            if(from == CoordFrame::UNDEFINED || to == CoordFrame::UNDEFINED)
+                throw std::invalid_argument("[ERROR] EquatorialCoordinates::convertFrame: source/target frame is undefined");
+
+            // HIPPARCOS and ICRS are the same set of axes, so a conversion between them is a no-op.
+            const bool sameOrientation = (from == to)
+                || (isICRSOriented(from) && isICRSOriented(to));
+
+            if(sameOrientation)
+            {
+                raHoursOut       = raHours;
+                decDegOut        = decDeg;
+                pmRaMasPerYrOut  = pmRaMasPerYr;
+                pmDecMasPerYrOut = pmDecMasPerYr;
+                parallaxMasOut   = parallaxMas;
+                rvKmPerSecOut    = rvKmPerSec;
+                return;
+            }
+
+            cat_entry in, pivot, result;
+            make_cat_entry("SRC", "USER", 0, raHours, decDeg, pmRaMasPerYr, pmDecMasPerYr, parallaxMas, rvKmPerSec, &in);
+
+            // Step 1: bring the star to the J2000-dynamical frame pivot
+            switch(from)
+            {
+                case CoordFrame::FK4:
+                    transform_cat(CHANGE_EPOCH, NOVAS_JD_B1950, &in, NOVAS_JD_J2000, NOVAS_SYSTEM_FK5, &pivot);
+                    break;
+                case CoordFrame::FK5:
+                    pivot = in;
+                    break;
+                case CoordFrame::ICRS:
+                case CoordFrame::HIPPARCOS:
+                    transform_cat(CHANGE_ICRS_TO_J2000, NOVAS_JD_J2000, &in, NOVAS_JD_J2000, NOVAS_SYSTEM_J2000, &pivot);
+                    break;
+                default:
+                    throw std::invalid_argument("[ERROR] EquatorialCoordinates::convertFrame: unsupported source frame");
+            }
+
+            // Step 2: from the J2000-dynamical pivot to the requested target frame
+            switch(to)
+            {
+                case CoordFrame::FK4:
+                    transform_cat(CHANGE_EPOCH, NOVAS_JD_J2000, &pivot, NOVAS_JD_B1950, NOVAS_SYSTEM_FK4, &result);
+                    break;
+                case CoordFrame::FK5:
+                    result = pivot;
+                    break;
+                case CoordFrame::ICRS:
+                case CoordFrame::HIPPARCOS:
+                    transform_cat(CHANGE_J2000_TO_ICRS, NOVAS_JD_J2000, &pivot, NOVAS_JD_J2000, NOVAS_SYSTEM_ICRS, &result);
+                    break;
+                default:
+                    throw std::invalid_argument("[ERROR] EquatorialCoordinates::convertFrame: unsupported target frame");
+            }
+
+            raHoursOut       = result.ra;
+            decDegOut        = result.dec;
+            pmRaMasPerYrOut  = result.promora;
+            pmDecMasPerYrOut = result.promodec;
+            parallaxMasOut   = result.parallax;
+            rvKmPerSecOut    = result.radialvelocity;
+        }
+
+#pragma region * Epoch propagation
+
+        void EquatorialCoordinates::atEpoch(const double& targetEpoch, EquatorialCoordinates* output) const
+        {
+            if(!output)
+                throw std::invalid_argument("[ERROR] EquatorialCoordinates::atEpoch: output pointer is null");
+
+            cat_entry in, moved;
+            make_cat_entry("SRC", "USER", 0, getRA() / 15.0, getDEC(), getPMRA(), getPMDEC(),
+                           getParallax(), getRadialVelocity(), &in);
+
+            // PROPER_MOTION carries the star along its own space-motion vector between the two
+            // dates and leaves the reference frame untouched, which is exactly the split this
+            // class draws between "frame" (orientation) and "epoch" (date).
+            if(transform_cat(PROPER_MOTION, getEpoch(), &in, targetEpoch, "USER", &moved) != 0)
+                throw std::runtime_error("[ERROR] EquatorialCoordinates::atEpoch: transform_cat() failed");
+
+            output->assign(moved.ra * 15.0, moved.dec, moved.promora, moved.promodec,
+                           moved.parallax, moved.radialvelocity, targetEpoch,
+                           CoordSystem::EQUATORIAL, getFrame());
+        }
+
+        void EquatorialCoordinates::atEpoch(const std::string& epochSpec, EquatorialCoordinates* output) const
+        {
+            atEpoch(SkyCoordinates::epochOf(epochSpec), output);
+        }
+
+        void EquatorialCoordinates::atEpoch(CoordFrame frame, EquatorialCoordinates* output) const
+        {
+            atEpoch(SkyCoordinates::epochOf(frame), output);
+        }
+
+        void EquatorialCoordinates::atCurrentEpoch(EquatorialCoordinates* output) const
+        {
+            atEpoch(SkyCoordinates::currentEpoch(), output);
+        }
+#pragma endregion
+
+        // The three named helpers are toEquatorial() with the target frame fixed; keeping them as
+        // one-line forwards means the distance, velocity and epoch bookkeeping lives in one place.
+        void EquatorialCoordinates::toICRS(EquatorialCoordinates* output) const
+        {
+            if(!output)
+                throw std::invalid_argument("[ERROR] EquatorialCoordinates::toICRS: output pointer is null");
+
+            toEquatorial(output, CoordFrame::ICRS);
+        }
+
+        void EquatorialCoordinates::toFK5(EquatorialCoordinates* output) const
+        {
+            if(!output)
+                throw std::invalid_argument("[ERROR] EquatorialCoordinates::toFK5: output pointer is null");
+
+            toEquatorial(output, CoordFrame::FK5);
+        }
+
+        void EquatorialCoordinates::toFK4(EquatorialCoordinates* output) const
+        {
+            if(!output)
+                throw std::invalid_argument("[ERROR] EquatorialCoordinates::toFK4: output pointer is null");
+
+            toEquatorial(output, CoordFrame::FK4);
+        }
+
+#pragma endregion
+
+#pragma region GalacticCoordinates implementation
+
+        GalacticCoordinates::GalacticCoordinates():SkyCoordinates()
+        {
+            assign(0.0, 0.0, CoordSystem::GALACTIC, CoordFrame::ICRS);
+        }
+
+        GalacticCoordinates::GalacticCoordinates(const double& glon, const double& glat):SkyCoordinates()
+        {
+            assign(glon, glat, CoordSystem::GALACTIC, CoordFrame::ICRS);
+        }
+
+        GalacticCoordinates::~GalacticCoordinates()
+        { }
+
+        double GalacticCoordinates::getGLON() const { return getPhi();   }
+        double GalacticCoordinates::getGLAT() const { return getTheta(); }
+
+        void GalacticCoordinates::toGalactic(SkyCoordinates* output, CoordFrame frame) const
+        {
+            if(!output)
+                throw std::invalid_argument("[ERROR] GalacticCoordinates::toGalactic: output pointer is null");
+        
+            if (frame == getFrame()) {
+                // No conversion needed
+                output->assign(getGLON(), getGLAT(), 0.0, 0.0,
+                               getParallax(), getRadialVelocity(), getEpoch(),
+                               CoordSystem::GALACTIC, frame);
+                return;
+            }
+
+            // Step 1: Convert galactic → equatorial (stays in current frame)
+            double ra = 0.0, dec = 0.0;
+            gal2equ(getGLON(), getGLAT(), &ra, &dec);  // ra in hours
+
+            // Step 2: Convert frame
+            double raOut = ra, decOut = dec, pmRA = 0.0, pmDEC = 0.0;
+            double parallax = getParallax(), rv = getRadialVelocity();
+            EquatorialCoordinates::convertFrame(ra, dec, 0.0, 0.0, parallax, rv,
+                                               getFrame(), frame,
+                                               raOut, decOut, pmRA, pmDEC, parallax, rv);
+
+            // Step 3: Convert back to galactic in new frame
+            double glon = 0.0, glat = 0.0;
+            equ2gal(raOut, decOut, &glon, &glat);
+
+            output->assign(glon, glat, 0.0, 0.0, parallax, rv,
+                           frameConversionEpoch(getFrame(), frame, getEpoch()),
+                           CoordSystem::GALACTIC, frame);
+        }
+
+        void GalacticCoordinates::toEquatorial(SkyCoordinates* output, CoordFrame frame) const
+        {
+            if(!output)
+                throw std::invalid_argument("[ERROR] GalacticCoordinates::toEquatorial: output pointer is null");
+        
+            // Step 1: Convert galactic → equatorial (stays in our current frame)
+            double ra = 0.0, dec = 0.0;
+            gal2equ(getGLON(), getGLAT(), &ra, &dec);  // ra in hours, dec in degrees
+            
+            // Step 2: Apply frame conversion if needed
+            double raOut = ra, decOut = dec, pmRA = 0.0, pmDEC = 0.0;
+            double parallax = getParallax(), rv = getRadialVelocity();
+            if (frame != getFrame()) {
+                EquatorialCoordinates::convertFrame(ra, dec, 0.0, 0.0, parallax, rv,
+                                                   getFrame(), frame,
+                                                   raOut, decOut, pmRA, pmDEC, parallax, rv);
+            }
+
+            // Step 3: Output in degrees (ra*15 converts hours→degrees)
+            output->assign(raOut * 15.0, decOut, pmRA, pmDEC, parallax, rv,
+                           frameConversionEpoch(getFrame(), frame, getEpoch()),
+                           CoordSystem::EQUATORIAL, frame);
+        }
+
+        void GalacticCoordinates::toEcliptic(SkyCoordinates* output, CoordFrame frame) const
+        {
+            if(!output)
+                throw std::invalid_argument("[ERROR] GalacticCoordinates::toEcliptic: output pointer is null");
+
+            // Step 1: Convert galactic → equatorial (stays in current frame)
+            double ra = 0.0, dec = 0.0;
+            gal2equ(getGLON(), getGLAT(), &ra, &dec);  // ra in hours, dec in degrees
+
+            // Step 2: Convert frame if needed
+            double parallax = getParallax(), rv = getRadialVelocity();
+            if(getFrame() != frame)
+            {
+                double pmRA = 0.0, pmDEC = 0.0;
+                EquatorialCoordinates::convertFrame(ra, dec, 0.0, 0.0, parallax, rv,
+                                                   getFrame(), frame,
+                                                   ra, dec, pmRA, pmDEC, parallax, rv);
+            }
+
+            // Step 3: Convert equatorial (in requested frame) to ecliptic
+            double elon = 0.0, elat = 0.0;
+            equ2ecl(NOVAS_JD_J2000, NOVAS_GCRS_EQUATOR, NOVAS_FULL_ACCURACY, ra, dec, &elon, &elat);
+
+            output->assign(elon, elat, 0.0, 0.0, parallax, rv,
+                           frameConversionEpoch(getFrame(), frame, getEpoch()),
+                           CoordSystem::ECLIPTIC, frame);
+        }
+
+#pragma endregion
+
+#pragma region EclipticCoordinates implementation
+
+        EclipticCoordinates::EclipticCoordinates():SkyCoordinates()
+        {
+            assign(0.0, 0.0, CoordSystem::ECLIPTIC, CoordFrame::ICRS);
+        }
+
+        EclipticCoordinates::EclipticCoordinates(const double& elon, const double& elat):SkyCoordinates()
+        {
+            assign(elon, elat, CoordSystem::ECLIPTIC, CoordFrame::ICRS);
+        }
+
+        EclipticCoordinates::~EclipticCoordinates()
+        { }
+
+        double EclipticCoordinates::getELON() const { return getPhi();   }
+        double EclipticCoordinates::getELAT() const { return getTheta(); }
+
+        void EclipticCoordinates::toEcliptic(SkyCoordinates* output, CoordFrame frame) const
+        {
+            if(!output)
+                throw std::invalid_argument("[ERROR] EclipticCoordinates::toEcliptic: output pointer is null");
+
+            double elon = getELON(), elat = getELAT();
+            double parallax = getParallax(), rv = getRadialVelocity();
+
+            if(frame != getFrame())
+            {
+                // The frame change is defined on equatorial coordinates, so round-trip
+                // through them: ecliptic → equatorial, change frame, equatorial → ecliptic.
+                double ra = 0.0, dec = 0.0, pmRA = 0.0, pmDEC = 0.0;
+                ecl2equ(NOVAS_JD_J2000, NOVAS_GCRS_EQUATOR, NOVAS_FULL_ACCURACY,
+                        elon, elat, &ra, &dec);  // ra in hours, dec in degrees
+
+                EquatorialCoordinates::convertFrame(ra, dec, 0.0, 0.0, parallax, rv,
+                                                   getFrame(), frame,
+                                                   ra, dec, pmRA, pmDEC, parallax, rv);
+
+                equ2ecl(NOVAS_JD_J2000, NOVAS_GCRS_EQUATOR, NOVAS_FULL_ACCURACY, ra, dec, &elon, &elat);
+            }
+
+            output->assign(elon, elat, 0.0, 0.0, parallax, rv,
+                           frameConversionEpoch(getFrame(), frame, getEpoch()),
+                           CoordSystem::ECLIPTIC, frame);
+        }
+
+        void EclipticCoordinates::toEquatorial(SkyCoordinates* output, CoordFrame frame) const
+        {
+            if(!output)
+                throw std::invalid_argument("[ERROR] EclipticCoordinates::toEquatorial: output pointer is null");
+
+            // Step 1: Convert ecliptic → equatorial (stays in current frame)
+            double ra = 0.0, dec = 0.0, pmRA = 0.0, pmDEC = 0.0;
+            ecl2equ(NOVAS_JD_J2000, NOVAS_GCRS_EQUATOR, NOVAS_FULL_ACCURACY,
+                    getELON(), getELAT(), &ra, &dec);  // ra in hours, dec in degrees
+
+            // Step 2: Convert frame if needed
+            double parallax = getParallax(), rv = getRadialVelocity();
+            if(frame != getFrame())
+            {
+                EquatorialCoordinates::convertFrame(ra, dec, 0.0, 0.0, parallax, rv,
+                                                   getFrame(), frame,
+                                                   ra, dec, pmRA, pmDEC, parallax, rv);
+            }
+
+            // Step 3: Output in degrees (ra*15 converts hours→degrees)
+            output->assign(ra * 15.0, dec, pmRA, pmDEC, parallax, rv,
+                           frameConversionEpoch(getFrame(), frame, getEpoch()),
+                           CoordSystem::EQUATORIAL, frame);
+        }
+
+        void EclipticCoordinates::toGalactic(SkyCoordinates* output, CoordFrame frame) const
+        {
+            if(!output)
+                throw std::invalid_argument("[ERROR] EclipticCoordinates::toGalactic: output pointer is null");
+        
+            // Step 1: Convert ecliptic → equatorial (stays in current frame)
+            double ra = 0.0, dec = 0.0;
+            ecl2equ(NOVAS_JD_J2000, NOVAS_GCRS_EQUATOR, NOVAS_FULL_ACCURACY, 
+                    getELON(), getELAT(), &ra, &dec);
+            
+            // Step 2: Convert frame if needed
+            double raOut = ra, decOut = dec, pmRA = 0.0, pmDEC = 0.0;
+            double parallax = getParallax(), rv = getRadialVelocity();
+            if (frame != getFrame())
+            {
+                EquatorialCoordinates::convertFrame(ra, dec, 0.0, 0.0, parallax, rv,
+                                                   getFrame(), frame,
+                                                   raOut, decOut, pmRA, pmDEC, parallax, rv);
+            }
+
+            // Step 3: Convert to galactic
+            double glon = 0.0, glat = 0.0;
+            equ2gal(raOut, decOut, &glon, &glat);
+
+            output->assign(glon, glat, 0.0, 0.0, parallax, rv,
+                           frameConversionEpoch(getFrame(), frame, getEpoch()),
+                           CoordSystem::GALACTIC, frame);
+        }
+
+#pragma endregion
 }
 #pragma endregion
