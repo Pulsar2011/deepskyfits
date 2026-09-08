@@ -10,3 +10,6 @@
 [submodule "doxygen-awesome-css"]
 	path = doxygen-awesome-css
 	url = https://github.com/jothepro/doxygen-awesome-css.git
+[submodule "SuperNOVAS"]
+	path = SuperNOVAS
+	url = https://github.com/Sigmyne/SuperNOVAS.git

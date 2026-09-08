@@ -34,6 +34,7 @@ Clone with submodules (required: googletest, cfitsio, Minuit2, doxygen-awesome-c
 - *WCSLIB* is downloaded and built via ExternalProject_Add (static)
 - *Minuit2* and *googletest* come from submodules
 - *Doxygen* is optional (target: doc)
+- *superNOVAS* is downloaded and built via ExternalProject_Add  (static)
 
 ### Basic build:
 ```
@@ -259,6 +260,113 @@ Logic behind selection/filtering
 Notes
 - Pseudo-unsigned types (tsbyte, tushort, tuint, tulong, tulonglong) are stored with signed CFITSIO codes and use BSCALE/BZERO for exact value preservation. Typed access remains in the target unsigned type.
 - For bit-packed flags, use toBoolVector/fromBoolVector helpers to decode/encode scalar masks..
+
+### SkyCoordinates (celestial coordinates)
+Alongside the WCS wrapper, DeepSkyFits ships a small hierarchy for the positions themselves: where an object is on the sky, how fast it is moving, and when it was measured. `SkyCoordinates` is the abstract base; `EquatorialCoordinates`, `GalacticCoordinates` and `EclipticCoordinates` each fix one spherical system and name the angles the way astronomers do. Everything underneath is SuperNOVAS — the library owns every constant and every rotation matrix, and nothing is reimplemented here. The design goal is that you should never have to remember whether a given routine wants hours or degrees, or which of precession and proper motion a "convert to B1950" actually applied.
+
+- `SkyCoordinates` (abstract): the two angles, proper motion, parallax, radial velocity, epoch, system and frame
+  - `angularSeparation()` — great-circle angle, haversine below 90°, law of cosines above
+  - `assign()` — populates any concrete subclass, which is how a conversion fills a sibling type
+  - `toEquatorial()` / `toGalactic()` / `toEcliptic()` — one-argument (keep the frame) and two-argument (rotate into one) forms
+  - `epochOf()`, `currentEpoch()` — epoch lookups, forwarded to SuperNOVAS
+- `EquatorialCoordinates`: right ascension and declination; the pivot every other system routes through
+  - `getRA()`, `getDEC()`, `getPMRA()`, `getPMDEC()`
+  - `toICRS()`, `toFK5()`, `toFK4()` — named shorthands for the frame rotations
+  - `atEpoch()`, `atCurrentEpoch()` — transport the star along its own space motion
+  - `convertFrame()` — static, for callers holding loose numbers rather than objects
+- `GalacticCoordinates`: galactic longitude and latitude, on the IAU/Hipparcos definition
+- `EclipticCoordinates`: ecliptic longitude and latitude, tilted from the equator by the obliquity
+
+#### System, frame, and epoch
+Three independent things describe a position, and keeping them apart is what the hierarchy is organised around. Mixing them up is the usual source of arcsecond-scale confusion, so the API makes each one a separate operation.
+
+| | What it fixes | How you change it | What moves |
+|---|---|---|---|
+| **System** (`CoordSystem`) | Which pole and origin the angles are measured from | `toEquatorial()`, `toGalactic()`, `toEcliptic()` | Nothing physical — the same direction, different numbers |
+| **Frame** (`CoordFrame`) | The orientation of the axes: FK4, FK5, ICRS, HIPPARCOS | the two-argument conversions, or `toFK4()` / `toFK5()` / `toICRS()` | The axes rotate under the star |
+| **Epoch** (`getEpoch()`) | The date the position is valid at | `atEpoch()`, `atCurrentEpoch()` | The star moves along its proper motion |
+
+Angles are in degrees everywhere in the public interface, proper motions in mas/yr, parallax in mas, radial velocity in km/s, and epochs are Julian dates on the TT scale.
+
+#### Examples: converting between systems and frames
+- Convert between systems (the destination is an output parameter, not a return value):
+```c++
+   using namespace DSL;
+
+   EquatorialCoordinates m31(10.68470, 41.26875);   // ICRS by default
+   GalacticCoordinates   gal;
+   EclipticCoordinates   ecl;
+
+   m31.toGalactic(&gal);    // gal.getGLON() == 121.174..., gal.getGLAT() == -21.573...
+   m31.toEcliptic(&ecl);
+```
+
+- Rotate into another reference frame:
+```c++
+   EquatorialCoordinates b1950;
+   m31.toFK4(&b1950);                              // named shorthand
+   m31.toEquatorial(&b1950, CoordFrame::FK4);      // identical, generic form
+
+   // Or ask for a system and a frame in one step:
+   m31.toEcliptic(&ecl, CoordFrame::FK4);
+```
+
+- Measure an angle on the sky:
+```c++
+   EquatorialCoordinates m42(83.82208, -5.39111);
+   double sep = m31.angularSeparation(m42);        // [deg]
+```
+
+#### Examples: proper motion and epochs
+- A full catalogue entry, moved to tonight:
+```c++
+   // Barnard's Star, as published by Hipparcos at epoch J1991.25
+   EquatorialCoordinates barnard(269.45207, 4.66829,   // [deg]    RA, Dec
+                                 -798.58, 10328.12,    // [mas/yr] pmRA*, pmDec
+                                 547.45, -110.51,      // [mas] parallax, [km/s] v_rad
+                                 CoordFrame::HIPPARCOS);
+
+   EquatorialCoordinates today;
+   barnard.atCurrentEpoch(&today);
+
+   std::cout << barnard.angularSeparation(today) << " deg since J1991.25\n";
+```
+
+- Name a date however is convenient:
+```c++
+   EquatorialCoordinates at2000, at2030, atHip;
+
+   barnard.atEpoch("J2000.0", &at2000);                  // epoch string
+   barnard.atEpoch(SkyCoord::epochOf("J2030.5"), &at2030); // explicit Julian date
+   barnard.atEpoch(CoordFrame::HIPPARCOS, &atHip);       // a frame's standard epoch
+```
+
+- Frame and epoch compose in either order, and are genuinely independent:
+```c++
+   EquatorialCoordinates rotated, moved;
+   barnard.toFK5(&rotated);              // axes rotate, date untouched
+   barnard.atEpoch("J2000.0", &moved);   // star moves, axes untouched
+```
+
+- Static form, when you have loose numbers rather than objects:
+```c++
+   double ra = 0.0, dec = 0.0, pmRA = 0.0, pmDEC = 0.0;
+   // NOTE: this is the one place right ascension is in HOURS, not degrees.
+   EquatorialCoordinates::convertFrame(4.0, 20.0, 30.0, -10.0,
+                                       CoordFrame::FK4, CoordFrame::FK5,
+                                       ra, dec, pmRA, pmDEC);
+```
+
+#### Notes
+- Conversions fill a destination you supply rather than returning a new object, so one call site can target any concrete subclass. Every conversion throws `std::invalid_argument` on a null destination, and `convertFrame` throws if either frame is `UNDEFINED`.
+- Right ascension is in degrees everywhere except the static `convertFrame()`, which takes hours to match the SuperNOVAS catalogue convention. The doc comment says so at each overload.
+- Proper motion is not carried into or out of the galactic and ecliptic systems — the rate would have to be re-projected onto different axes, which the classes do not do, so those results come back with zero proper motion. Parallax, radial velocity and epoch do travel through: they are properties of the star, not of the axes used to point at it.
+- HIPPARCOS and ICRS name the same axes. Converting between them is a no-op; what separates them is the J1991.25 epoch, which is `atEpoch()`'s business. Rotating a Hipparcos entry to ICRS therefore leaves it at J1991.25 rather than silently relabelling it J2000.
+- FK4 is the exception to "a frame change is only a rotation". Converting into or out of it goes through a NOVAS `CHANGE_EPOCH` transformation, which transports the star over the 50 years between B1950.0 and J2000.0 as well as rotating it, so the epoch follows the frame there. `getEpoch()` reports where you actually ended up.
+- `CoordSystem::UNDEFINED` and `CoordSystem::EQUATORIAL` are both `0`, so an unset system reads as equatorial. Treat `UNDEFINED` as a default, not as a detectable error.
+- Ecliptic conversions use the J2000.0 obliquity on both ends of a frame change. That makes the change a clean rotation about the ecliptic pole — longitude precesses, latitude does not — and makes it exactly invertible. It is not the mean obliquity of the target epoch.
+- Propagating a star to another epoch and back does not close exactly when the radial velocity is non-zero. The residual is of order `μ · Δt · (v_r · Δt / d)` — about 0.4 mas for a 50 pc star at 30 km/s over 50 years — and comes from SuperNOVAS `transform_cat()` scaling the returned proper motion by the input distance while reporting the updated parallax. It vanishes for zero radial velocity.
+
 --------------------------------------------------------------------------------
 
 # C++ API reference

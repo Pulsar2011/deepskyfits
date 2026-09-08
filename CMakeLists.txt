@@ -224,6 +224,7 @@ file(GLOB MINUIT_HEADER "include/Minuit2/*.h")
 file(GLOB MINUIT2_HEADER "include/Minuit2/Minuit2/*.h")
 file(GLOB MINUITF_HEADER "include/Minuit2/Fit/*.h")
 file(GLOB MINUITM_HEADER "include/Minuit2/Math/*.h")
+file(GLOB SUPERNOVAS_HEADER "include/supernovas/*.h")
 
 
 #-------------------- Configuration de la bibliothèque
@@ -364,6 +365,74 @@ else()
 endif()
 
 
+#-------------------- Configuration de la bibliothèque SuperNOVAS
+# Built static so it is absorbed into libDSTfits.so (no separate runtime lib to ship).
+
+# SuperNOVAS ships a C++ API (namespace `supernovas`, include <supernovas.h>) in a library of
+# its own, libsupernovas++, gated behind ENABLE_CPP. DSTfits still calls the C99 API: the C++ one
+# has no catalog-epoch propagation (no transform_cat(PROPER_MOTION, ...) equivalent) and its
+# Equatorial::to_system() carries only a direction vector, so it would drop proper motion,
+# parallax and radial velocity. Building it here keeps it available for when that gap closes.
+set(ENABLE_CPP ON CACHE BOOL "Build the SuperNOVAS C++ API (libsupernovas++)" FORCE)
+
+if(WITH_DEBUG)
+    file(GLOB EXISTING_SUPERNOVAS_LIBS
+        "${CMAKE_SOURCE_DIR}/build/lib/libsupernovas.a"
+        "${CMAKE_SOURCE_DIR}/build/lib/libsupernovas.dylib"
+        "${CMAKE_SOURCE_DIR}/build/lib/libsupernovas.so"
+    )
+    # The C++ half is a separate artefact: without it the fast path below would hand back a
+    # supernovas::cpp that does not exist, so treat a missing libsupernovas++ as "not prebuilt".
+    file(GLOB EXISTING_SUPERNOVAS_CPP_LIBS
+        "${CMAKE_SOURCE_DIR}/build/lib/libsupernovas++.a"
+        "${CMAKE_SOURCE_DIR}/build/lib/libsupernovas++.dylib"
+        "${CMAKE_SOURCE_DIR}/build/lib/libsupernovas++.so"
+    )
+endif()
+
+if(WITH_DEBUG AND EXISTING_SUPERNOVAS_LIBS AND EXISTING_SUPERNOVAS_CPP_LIBS)
+    message("${Blue}-- DEBUG: Skipping SuperNOVAS rebuild, using existing library${ColourReset}")
+    list(GET EXISTING_SUPERNOVAS_LIBS 0 SUPERNOVAS_LIB_FILE)
+    add_library(supernovas STATIC IMPORTED GLOBAL)
+    set_target_properties(supernovas PROPERTIES
+        IMPORTED_LOCATION "${SUPERNOVAS_LIB_FILE}"
+        INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/include/supernovas"
+    )
+    add_library(supernovas::core ALIAS supernovas)
+
+    list(GET EXISTING_SUPERNOVAS_CPP_LIBS 0 SUPERNOVAS_CPP_LIB_FILE)
+    add_library(supernovas_cpp STATIC IMPORTED GLOBAL)
+    set_target_properties(supernovas_cpp PROPERTIES
+        IMPORTED_LOCATION "${SUPERNOVAS_CPP_LIB_FILE}"
+        INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/include/supernovas"
+        INTERFACE_LINK_LIBRARIES supernovas::core
+    )
+    add_library(supernovas::cpp ALIAS supernovas_cpp)
+else()
+    # Static build + PIC so its object code is embedded directly into the DSTfits shared library
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    set(BUILD_TESTING     OFF CACHE BOOL "" FORCE)
+    set(BUILD_EXAMPLES    OFF CACHE BOOL "" FORCE)
+    set(BUILD_BENCHMARK   OFF CACHE BOOL "" FORCE)
+    set(BUILD_DOC         OFF CACHE BOOL "" FORCE)
+    add_subdirectory(SuperNOVAS EXCLUDE_FROM_ALL)
+    add_dependencies(DSTfits core)
+
+    # SuperNOVAS/src/cpp/CMakeLists.txt pins its target to C++11, but supernovas.h includes
+    # <optional>, which is C++17. Override it here rather than patching the vendored tree, so
+    # the fix survives re-vendoring the dependency.
+    if(TARGET cpp)
+        set_property(TARGET cpp PROPERTY CXX_STANDARD 17)
+        set_property(TARGET cpp PROPERTY CXX_STANDARD_REQUIRED ON)
+        add_dependencies(DSTfits cpp)
+    endif()
+endif()
+
+target_include_directories(DSTfits PRIVATE ${CMAKE_SOURCE_DIR}/SuperNOVAS/include)
+include_directories(include/supernovas)
+
+
 #-------------------- Configuration des test
 add_subdirectory(googletest   EXCLUDE_FROM_ALL)
 include_directories(${PARENT_PATH_OF_GTEST}/googltest/googltest/include)
@@ -372,6 +441,7 @@ enable_testing()
 target_link_libraries(DSTfits
     PRIVATE ${CFITSIO_OUTPUT_LIB}
     PRIVATE Minuit2
+    PRIVATE supernovas::core
     PRIVATE bz2
     PRIVATE curl
     PRIVATE z
@@ -473,6 +543,7 @@ CMakeFiles
 ./cfitsio_external-prefix
 ./include/cfitsio
 ./include/Minuit2
+./include/supernovas
 )
 
 add_custom_target(
@@ -495,6 +566,7 @@ if(CMAKE_INSTALL_PREFIX)
     INSTALL(FILES ${MINUIT2_HEADER} DESTINATION include/Minuit2/Minuit2)
     INSTALL(FILES ${MINUITF_HEADER} DESTINATION include/Minuit2/Fit)
     INSTALL(FILES ${MINUITM_HEADER} DESTINATION include/Minuit2/Math)
+    INSTALL(FILES ${SUPERNOVAS_HEADER} DESTINATION include/supernovas)
     INSTALL(FILES ${WCSLIB_HEADER} DESTINATION include/wcslib)
 
     # Core library built by this project
@@ -537,6 +609,22 @@ if(CMAKE_INSTALL_PREFIX)
             PATTERN "libMinuit2*.dylib"
         )
     endif()
+
+    # SuperNOVAS: install if built as a real target, otherwise copy the imported/prebuilt library
+    if(TARGET core)
+        INSTALL(TARGETS core
+            RUNTIME DESTINATION exe
+            LIBRARY DESTINATION lib
+            ARCHIVE DESTINATION lib
+        )
+    else()
+        install(DIRECTORY ${CMAKE_SOURCE_DIR}/build/lib/ DESTINATION lib
+            FILES_MATCHING
+            PATTERN "libsupernovas*.a"
+            PATTERN "libsupernovas*.so"
+            PATTERN "libsupernovas*.dylib"
+        )
+    endif()
 endif(CMAKE_INSTALL_PREFIX)
 
 # At the end of your CMakeLists.txt, generate a helper script for cfitsio headers:
@@ -562,4 +650,20 @@ add_custom_command(
     TARGET DSTfits POST_BUILD
     COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/cmake/copy_minuit2_headers.cmake
     COMMENT "Copying Minuit2 headers to include/Minuit2"
+)
+
+# Generate a helper script for SuperNOVAS headers:
+file(WRITE ${CMAKE_SOURCE_DIR}/cmake/copy_supernovas_headers.cmake
+"file(GLOB SUPERNOVAS_HEADER \"${CMAKE_SOURCE_DIR}/SuperNOVAS/include/*.h\")\n"
+"file(MAKE_DIRECTORY \"${CMAKE_SOURCE_DIR}/include/supernovas\")\n"
+"foreach(header \${SUPERNOVAS_HEADER})\n"
+"  file(COPY \${header} DESTINATION \"${CMAKE_SOURCE_DIR}/include/supernovas\")\n"
+"endforeach()\n"
+)
+
+# Add a post-build custom command to copy SuperNOVAS headers
+add_custom_command(
+    TARGET DSTfits POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/cmake/copy_supernovas_headers.cmake
+    COMMENT "Copying SuperNOVAS headers to include/supernovas"
 )
