@@ -1235,6 +1235,89 @@ namespace DSL
             return sep / NOVAS_DEGREE;
         }
 
+#pragma region * Dumping
+            void SkyCoordinates::dump(std::ostream& os, bool singleline) const
+            {
+                if(singleline)
+                {
+                    os << "," << fphi
+                       << "," << ftheta
+                       << "," << (std::abs(fpmPhi) > std::numeric_limits<double>::epsilon() ? std::to_string(fpmPhi) : "           ")
+                       << "," << (std::abs(fpmTheta) > std::numeric_limits<double>::epsilon() ? std::to_string(fpmTheta) : "           ")
+                       << "," << (std::abs(fparallax) > std::numeric_limits<double>::epsilon() ? std::to_string(fparallax) : "           ")
+                       << "," << (std::abs(fradialVelocity) > std::numeric_limits<double>::epsilon() ? std::to_string(fradialVelocity) : "           ")
+                       << "," << fepoch;
+                       switch(fcoordSys)
+                       {
+                           case CoordSystem::EQUATORIAL: os << ", EQUATORIAL"; break;
+                           case CoordSystem::ECLIPTIC:   os << ", ECLIPTIC"; break;
+                           case CoordSystem::GALACTIC:   os << ", GALACTIC"; break;
+                           default:                      os << ", UNDEFINED"; break;
+                       }
+                       switch(fcoordFrame)
+                       {
+                           case CoordFrame::ICRS: os << ", ICRS"; break;
+                           case CoordFrame::FK4: os << ", FK4"; break;
+                           case CoordFrame::FK5: os << ", FK5"; break;
+                           default:              os << ", UNDEFINED"; break;
+                       }
+                } 
+                else
+                {
+                    os << "SkyCoordinates:\n";
+
+                    switch(fcoordSys)
+                       {
+                           case CoordSystem::EQUATORIAL: os << "\033[34m|-\033[0m  system=EQUATORIAL"<<std::endl; break;
+                           case CoordSystem::ECLIPTIC:   os << "\033[34m|-\033[0m  system=ECLIPTIC"<<std::endl; break;
+                           case CoordSystem::GALACTIC:   os << "\033[34m|-\033[0m  system=GALACTIC"<<std::endl; break;
+                           default:                      os << "\033[34m|-\033[0m  system=UNDEFINED"<<std::endl; break;
+                       }
+                       
+                    switch (fcoordSys)
+                    {
+                        case CoordSystem::EQUATORIAL:
+                            os << "\033[34m|  |-\033[0m  RA: " << fphi << "º"<<std::endl
+                               << "\033[34m|  `-\033[0m  DEC: " << ftheta << "º"<<std::endl;
+                            break;
+                        case CoordSystem::ECLIPTIC:
+                            os << "\033[34m|  |-\033[0m  eLon: " << fphi << "º"<<std::endl
+                               << "\033[34m|  `-\033[0m  eLat: " << ftheta << "º"<<std::endl;
+                            break;
+                        case CoordSystem::GALACTIC:
+                            os << "\033[34m|  |-\033[0m  l: " << fphi << "º"<<std::endl
+                               << "\033[34m|  `-\033[0m  b: " << ftheta << "º"<<std::endl;
+                            break;
+                        default:
+                            os << "\033[34m|  |-\033[0m  phi: " << fphi << "º"<<std::endl
+                               << "\033[34m|  `-\033[0m  theta: " << ftheta << "º"<<std::endl;
+                            break;
+                    }
+                    if( std::abs(fpmPhi) > std::numeric_limits<double>::epsilon() ||
+                        std::abs(fpmTheta) > std::numeric_limits<double>::epsilon() ||
+                        std::abs(fparallax) > std::numeric_limits<double>::epsilon() ||
+                        std::abs(fradialVelocity) > std::numeric_limits<double>::epsilon() )
+                    {
+                        os << "\033[34m|-\033[0m  Target proper motion and distance:"<<std::endl;
+                    
+                        if( std::abs(fpmPhi) > std::numeric_limits<double>::epsilon() ) os << "\033[34m|  |-\033[0m  pmPhi: " << fpmPhi << "mas/yr"<<std::endl;
+                        if( std::abs(fpmTheta) > std::numeric_limits<double>::epsilon() ) os << "\033[34m|  |-\033[0m  pmTheta: " << fpmTheta << "mas/yr"<<std::endl;
+                        if( std::abs(fparallax) > std::numeric_limits<double>::epsilon() ) os << "\033[34m|  |-\033[0m  parallax: " << fparallax << "mas"<<std::endl;
+                        if( std::abs(fradialVelocity) > std::numeric_limits<double>::epsilon() ) os << "\033[34m|  `-\033[0m  radialVelocity: " << fradialVelocity << "km/s"<<std::endl;
+                    }
+                    
+                    os << "\033[34m|-\033[0m    epoch: " << fepoch << ""<<std::endl;
+                    switch(fcoordFrame)
+                    {
+                        case CoordFrame::ICRS: os << "\033[34m|  `-\033[0m  frame=ICRS"<<std::endl; break;
+                        case CoordFrame::FK4: os << "\033[34m|  `-\033[0m  frame=FK4"<<std::endl; break;
+                        case CoordFrame::FK5: os << "\033[34m|  `-\033[0m  frame=FK5"<<std::endl; break;
+                        default:              os << "\033[34m|  `-\033[0m  frame=UNDEFINED"<<std::endl; break;
+                    }
+                }
+            }
+#pragma endregion
+
 #pragma endregion
 
 #pragma region EquatorialCoordinates implementation

@@ -553,7 +553,12 @@ namespace DSL
     FITShdu::FITShdu(const FITShdu& in_hdu)
     {
         for(FITSDictionary::const_iterator it = in_hdu.hdu.begin(); it != in_hdu.hdu.end(); it++)
-            hdu.insert(std::pair<key_code,FITSkeyword>(it->first,FITSkeyword(it->second)));
+        {
+            if(it->first == "PCOUNT" || it->first == "GCOUNT")
+                hdu.insert(std::pair<key_code,FITSkeyword>(it->first,FITSkeyword(it->second.value(), it->second.comment(), DSL::key_type::fInt)));
+            else
+                hdu.insert(std::pair<key_code,FITSkeyword>(it->first,FITSkeyword(it->second)));
+        }
     }
     
     /**
@@ -650,6 +655,10 @@ namespace DSL
                     hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fDouble)));
                 else if(key == "BLANK")
                     hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fUInt)));
+                else if(key == "PCOUNT")
+                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fInt)));
+                else if(key == "GCOUNT")
+                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fInt)));
                 else
                     hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment)));
             }
@@ -1648,8 +1657,20 @@ namespace DSL
      *  @param cmt commentair describing the keyword.
      *  @note the total number of char of the Keyword value + commentair string shall not exceed 80 character
      */
-    void FITShdu::ValueForKey(const key_code& keyword, const std::string& value, const key_type& kt, const std::string& cmt)
+    void FITShdu::ValueForKey(const key_code& keyword, const std::string& value, const key_type& requested, const std::string& cmt)
     {
+        // Structural keywords are integers whatever the caller says: the string
+        // overloads default to fChar, and a quoted PCOUNT/GCOUNT/BITPIX/NAXISn makes
+        // the extension unreadable for CFITSIO. Same types as Process() assigns.
+        key_type kt = requested;
+        if(kt == fChar)
+        {
+            if(keyword == "PCOUNT" || keyword == "GCOUNT" || keyword == "BITPIX")
+                kt = fInt;
+            else if(keyword.rfind("NAXIS", 0) == 0)
+                kt = fULongLong;
+        }
+
         FITSDictionary::iterator it = hdu.find(keyword);
         if(it != hdu.end())
         {
@@ -1677,8 +1698,10 @@ namespace DSL
             it->second.setValue(value);
             return;
         }
-        
-        hdu.insert(std::pair<key_code,FITSkeyword>(keyword, FITSkeyword(value,cmt)));
+
+        // New keyword: created with the requested type, not the FITSkeyword default —
+        // otherwise a numeric keyword added this way is written as a quoted string.
+        hdu.insert(std::pair<key_code,FITSkeyword>(keyword, FITSkeyword(value,cmt,kt)));
     }
 
     /**

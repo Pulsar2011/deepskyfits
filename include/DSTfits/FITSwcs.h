@@ -575,6 +575,16 @@ namespace DSL
              */
             virtual void toEcliptic  (SkyCoordinates* output, CoordFrame frame) const = 0;
 #pragma endregion
+#pragma region * Dumping
+            /**
+             * @brief Dump the contents of this object to an output stream.
+             * @details The output is human-readable, but not machine-parseable. It is intended
+             *          for debugging and logging, not for saving a catalogue.
+             * @param os Output stream to write to
+             * @param inline If true, the output is formatted as a single line; if false, it's formatted as multiple lines
+             */
+            virtual void dump(std::ostream& os, bool singleline=true) const;
+#pragma endregion
 
         private:
             double fphi;   //!< [deg] longitude-like angle (RA, galactic or ecliptic longitude)
