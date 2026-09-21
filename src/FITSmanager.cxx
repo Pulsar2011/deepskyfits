@@ -729,81 +729,91 @@ namespace DSL
             throw FITSexception(fits_status,"FITSmanager","InsertTable","TABLE "+table->GetName()+" ALREADY EXISTS");
         }
 
-        // Move to the end of the file to append the new table
-        MoveToHDU(num_hdu);
+        // Move to the end of the file and append the new table under a single write
+        // lock: MoveToHDU_unlocked() instead of MoveToHDU(), since the latter would
+        // release fptr_mtx before returning and reopen the race between the move
+        // and the write.
+        std::unique_lock<std::shared_mutex> lk(fptr_mtx);
+        MoveToHDU_unlocked(num_hdu);
         table->write(fptr,0);
+
+        // write() above appended one HDU: refresh num_hdu so MoveToHDU()'s bound
+        // check and the next InsertTable()/UpdateTable() append at the right spot.
+        fits_get_num_hdus(fptr.get(), &num_hdu, &fits_status);
     }
 
     void FITSmanager::UpdateTable(const std::shared_ptr<FITStable>& table)
     {
-        // Safely read fptr under shared lock
+        // fits_delete_hdu() and the append below mutate fptr: take the write
+        // (unique) lock for the whole operation, not a shared one, and hold it
+        // through the final write so nothing else can interleave with the
+        // delete-then-append sequence.
+        std::unique_lock<std::shared_mutex> lk(fptr_mtx);
+        if(!fptr)
         {
-            std::shared_lock<std::shared_mutex> rlk(fptr_mtx);
-            if(!fptr)
-            {
-                fits_status = SHARED_NULPTR;
-                throw FITSexception(fits_status,"FITSmanager","UpdateTable","CAN'T CREATE TABLE : NULL FILEPTR");
-            }
+            fits_status = SHARED_NULPTR;
+            throw FITSexception(fits_status,"FITSmanager","UpdateTable","CAN'T CREATE TABLE : NULL FILEPTR");
         }
 
+        std::string tname = table->GetName();
+        int hdublck = 0;
+        ttype hdutype = table->getTableType();
+
+        int hdutype_int = 0;
+
+        if(hdutype == BINARY_TBL)
+            hdutype_int = BINARY_TBL;
+        else if(hdutype == ASCII_TBL)
+            hdutype_int = ASCII_TBL;
+
+        if(hdutype != BINARY_TBL && hdutype != ASCII_TBL)
         {
-            std::shared_lock<std::shared_mutex> lk(fptr_mtx);
-            std::string tname = table->GetName();
-            int hdublck = 0;
-            ttype hdutype = table->getTableType();
+            fits_status = NOT_ATABLE;
+            throw FITSexception(fits_status,"FITSmanager","UpdateTable","TABLE "+tname+" TYPE IS INVALID");
+        }
 
-            int hdutype_int = 0;
-            
-            if(hdutype == BINARY_TBL)
-                hdutype_int = BINARY_TBL;
-            else if(hdutype == ASCII_TBL)
-                hdutype_int = ASCII_TBL;
-
-            if(hdutype != BINARY_TBL && hdutype != ASCII_TBL)
-            {
-                fits_status = NOT_ATABLE;
-                throw FITSexception(fits_status,"FITSmanager","UpdateTable","TABLE "+tname+" TYPE IS INVALID");
-            }
-
-            if(tname != "" && tname != "NO NAME")
-            {
-                fits_movnam_hdu(fptr.get(), hdutype_int, (char*) tname.c_str(), 0, &fits_status);
-                if(fits_status)
-                    throw FITSexception(fits_status,"FITSmanager","UpdateTable","TABLE "+tname+" NOT FOUND BY NAME");
-
-                fits_get_hdu_num(fptr.get(), &hdublck);
-            
-            }
-            else if(table->HDU().Exists("HDUBLKNO"))
-            {
-                hdublck = static_cast<int>(table->HDU().GetUInt16ValueForKey("HDUBLKNO"));
-                fits_movabs_hdu(fptr.get(), hdublck, &hdutype_int, &fits_status);
-            }
-            else
-            {
-                throw std::invalid_argument("\033[31m[FITSmanager::UpdateTable]\033[0m table "+tname+" unidentified.");
-            }
-
-            if(fits_status || (hdutype != BINARY_TBL && hdutype != ASCII_TBL))
-            {
-                std::stringstream ss;
-                ss<<"TABLE "+tname+" HDU BLOCK #"+std::to_string(hdublck)+" NOT FOUND";
-                throw FITSexception(fits_status,"FITSmanager","UpdateTable",ss.str());
-            }
-
-            std::cerr<<"\033[31m[FITSmanager::UpdateTable]\033[0m table "<<tname<<"[\033[31m"<<hdublck<<"\033[0m] will be deleted and replaced with new table."<<std::endl;
-            fits_delete_hdu(fptr.get(), &hdutype_int, &fits_status);
-
+        if(tname != "" && tname != "NO NAME")
+        {
+            fits_movnam_hdu(fptr.get(), hdutype_int, (char*) tname.c_str(), 0, &fits_status);
             if(fits_status)
-            {
-                std::stringstream ss;
-                ss<<"TABLE "+tname+" HDU BLOCK #"+std::to_string(hdublck)+" CANNOT BE DELETED";
-                throw FITSexception(fits_status,"FITSmanager","UpdateTable",ss.str());
-            }
+                throw FITSexception(fits_status,"FITSmanager","UpdateTable","TABLE "+tname+" NOT FOUND BY NAME");
+
+            fits_get_hdu_num(fptr.get(), &hdublck);
+
+        }
+        else if(table->HDU().Exists("HDUBLKNO"))
+        {
+            hdublck = static_cast<int>(table->HDU().GetUInt16ValueForKey("HDUBLKNO"));
+            fits_movabs_hdu(fptr.get(), hdublck, &hdutype_int, &fits_status);
+        }
+        else
+        {
+            throw std::invalid_argument("\033[31m[FITSmanager::UpdateTable]\033[0m table "+tname+" unidentified.");
+        }
+
+        if(fits_status || (hdutype != BINARY_TBL && hdutype != ASCII_TBL))
+        {
+            std::stringstream ss;
+            ss<<"TABLE "+tname+" HDU BLOCK #"+std::to_string(hdublck)+" NOT FOUND";
+            throw FITSexception(fits_status,"FITSmanager","UpdateTable",ss.str());
+        }
+
+        std::cerr<<"\033[31m[FITSmanager::UpdateTable]\033[0m table "<<tname<<"[\033[31m"<<hdublck<<"\033[0m] will be deleted and replaced with new table."<<std::endl;
+        fits_delete_hdu(fptr.get(), &hdutype_int, &fits_status);
+
+        if(fits_status)
+        {
+            std::stringstream ss;
+            ss<<"TABLE "+tname+" HDU BLOCK #"+std::to_string(hdublck)+" CANNOT BE DELETED";
+            throw FITSexception(fits_status,"FITSmanager","UpdateTable",ss.str());
         }
 
         // Move to the end of the file to append the new table
         table->write(fptr,0);
+
+        // fits_delete_hdu()/write() just changed the HDU count: refresh num_hdu so
+        // MoveToHDU()'s bound check and InsertTable()'s append-at-end stay correct.
+        fits_get_num_hdus(fptr.get(), &num_hdu, &fits_status);
     }
     
 #pragma endregion
@@ -813,10 +823,8 @@ namespace DSL
         return MoveToHDU(1);
     }
 
-    int FITSmanager::MoveToHDU(const int& hdu_index)
+    int FITSmanager::MoveToHDU_unlocked(const int& hdu_index)
     {
-        std::unique_lock<std::shared_mutex> lk(fptr_mtx);
-
         if(!fptr)
         {
             fits_status = SHARED_NULPTR;
@@ -826,30 +834,36 @@ namespace DSL
         if(hdu_index< 1 || hdu_index > num_hdu)
         {
             std::stringstream ss;
-            
+
             // Avoid calling GetFileName() (would deadlock); use raw pointer overload
             ss<<"FILE "<<GetFileName(fptr.get())
               <<std::endl
               <<"HEADER #"<<hdu_index<<" doesn't exist"<<"\033[0m"<<std::endl;
-            
+
             fits_status = NOT_ATABLE;
-            
+
             throw FITSexception(fits_status,"FITSmanager","MoveToHDU",ss.str());
         }
 
         fits_status = 0;
         int hdu_type = 0;
-        
+
         // Use fits_movabs_hdu and check fits_status (CFITSIO returns status via fits_status param)
         if(fits_movabs_hdu( fptr.get(), hdu_index, &hdu_type, &fits_status ) != 0)
         {
             std::stringstream ss;
             ss<<"HEADER #"<<hdu_index<<" @ FILE "<<GetFileName(fptr.get())<<std::endl;
-            
+
             throw FITSexception(fits_status,"FITSmanager","MoveToHDU",ss.str());
         }
-        
+
         return hdu_type;
+    }
+
+    int FITSmanager::MoveToHDU(const int& hdu_index)
+    {
+        std::unique_lock<std::shared_mutex> lk(fptr_mtx);
+        return MoveToHDU_unlocked(hdu_index);
     }
     
 #pragma endregion

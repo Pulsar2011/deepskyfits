@@ -46,7 +46,13 @@ namespace DSL
 
 #pragma region * Initialization
         void explore();                                     //<! Explore fits pointer and retrive basic information on its content
-        
+
+        // Core of MoveToHDU(), without locking fptr_mtx: callers that already hold
+        // the lock (InsertTable, UpdateTable, ...) call this directly instead of
+        // going through MoveToHDU(), which would release the lock before returning
+        // and reopen a race between the move and whatever the caller does next.
+        int MoveToHDU_unlocked(const int&);
+
     public:
         FITSmanager();                                                  //!< Default constructor
         FITSmanager(const std::string&);                                //!< Construct with FITS file name
