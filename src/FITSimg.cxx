@@ -390,7 +390,16 @@ class FITSmanager;
     }
     
 #pragma endregion
-#pragma region * accessor        
+#pragma region * accessor   
+
+    unit FITScube::GetUnit() const
+    {
+        if(hdu.Exists("BUNIT"))
+            return unit(hdu.GetValueForKey("BUNIT"));
+        else
+            return unit();
+    }
+
     /**
      *  Obtain the number of pixel along one of the dimension of the FITS datacube
      *  @param i: the dimension one are interested in, starting from 1 for the NAXIS1 of the FITS datacube

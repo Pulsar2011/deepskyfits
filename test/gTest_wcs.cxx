@@ -574,7 +574,7 @@ TEST(FITS_wcs, SUBFRAMECOPY_CONSTRUCTOR_INT)
     
         if(k==0)
         {
-            EXPECT_ANY_THROW( FITSwcs wcs2(wcs1,k,std::vector<size_t>({10,50})); ); // Copy constructor with invalid offset size
+            EXPECT_ANY_THROW( FITSwcs wcs2(wcs1,k,std::vector<size_t>({10,50,5})); ); // Copy constructor with invalid offset size
             continue;
         }
 
@@ -632,7 +632,7 @@ TEST(FITS_wcs, SUBFRAMECOPY_CONSTRUCTOR_DBL)
     
         if(k==0)
         {
-            EXPECT_ANY_THROW( FITSwcs wcs2(wcs1,k,{10.,50.}); ); // Copy constructor with invalid offset size
+            EXPECT_ANY_THROW( FITSwcs wcs2(wcs1,k,{10.,50.,8.}); ); // Copy constructor with invalid offset size
             continue;
         }
 

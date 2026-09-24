@@ -555,7 +555,7 @@ namespace DSL
         for(FITSDictionary::const_iterator it = in_hdu.hdu.begin(); it != in_hdu.hdu.end(); it++)
         {
             if(it->first == "PCOUNT" || it->first == "GCOUNT")
-                hdu.insert(std::pair<key_code,FITSkeyword>(it->first,FITSkeyword(it->second.value(), it->second.comment(), DSL::key_type::fInt)));
+                hdu.insert(std::pair<key_code,FITSkeyword>(it->first,FITSkeyword(it->second.value(), it->second.comment(), DSL::key_type::fULongLong)));
             else
                 hdu.insert(std::pair<key_code,FITSkeyword>(it->first,FITSkeyword(it->second)));
         }
@@ -599,46 +599,95 @@ namespace DSL
                 continue;
             }
             
-            size_t cmt_start = hdu_entry.find("\'/");
-            size_t cmt_stop  = hdu_entry.rfind("/\'");
-            size_t end_str   = hdu_entry.rfind("\'");
-            
-            if(cmt_start == std::string::npos )
-                cmt_start = 0;
-            
-            if(cmt_stop == std::string::npos )
-                cmt_stop = 0;
-            
-            if(end_str == std::string::npos )
-                end_str = 0;
-            
-            cmt_start=(cmt_stop > cmt_start)?cmt_stop:cmt_start;
-            
-            cmt_start=(end_str > cmt_start)?end_str:cmt_start;
-            
-            size_t cmt_pos = hdu_entry.find_first_of("/",cmt_start+2);
-            
             size_t step = 10;
-            
+
+            // Locate the comment separator. The value field starts at column 11
+            // and, for a character keyword, is a single quoted string in which a
+            // doubled '' stands for an embedded apostrophe. Only a '/' *outside*
+            // that string opens the comment, so the closing quote has to be
+            // found by scanning the value instead of searching the card backwards:
+            // an apostrophe in the comment text, or a '/' written right after the
+            // closing quote, would otherwise anchor the search past the separator
+            // and merge the comment into the value.
+            size_t cmt_start = step;
+
+            bool   is_string = false;          // value field is a properly closed quoted string
+            size_t str_start = std::string::npos;
+            size_t str_stop  = std::string::npos;
+
+            if(step < hdu_entry.size())
+            {
+                size_t val_start = hdu_entry.find_first_not_of(" ", step);
+
+                if(val_start != std::string::npos && hdu_entry[val_start] == '\'')
+                {
+                    size_t iChar = val_start + 1;
+
+                    while(iChar < hdu_entry.size())
+                    {
+                        if(hdu_entry[iChar] != '\'')
+                        {
+                            iChar++;
+                        }
+                        else if(iChar + 1 < hdu_entry.size() && hdu_entry[iChar + 1] == '\'')
+                        {
+                            iChar += 2;               // escaped apostrophe: still part of the value
+                        }
+                        else
+                        {
+                            is_string = true;         // iChar is the closing quote
+                            break;
+                        }
+                    }
+
+                    if(is_string)
+                    {
+                        str_start = val_start + 1;
+                        str_stop  = iChar;
+                        cmt_start = iChar + 1;        // just past the closing quote
+                    }
+                    else
+                        cmt_start = hdu_entry.size(); // unterminated string: no comment field
+                }
+            }
+
+            size_t cmt_pos = (cmt_start < hdu_entry.size())? hdu_entry.find_first_of("/",cmt_start)
+                                                           : std::string::npos;
+
             if(cmt_pos == std::string::npos)
-            {
-                value = hdu_entry.substr(step,hdu_entry.size() - step);
                 comment = std::string();
-            }
             else
-            {
-                value   = hdu_entry.substr(step,cmt_pos - step);
                 comment = hdu_entry.substr(cmt_pos + 1, hdu_entry.size() - cmt_pos - 1 );
-            }
-            
+
+            if(is_string)
+                value = hdu_entry.substr(str_start, str_stop - str_start);
+            else if(cmt_pos == std::string::npos)
+                value = hdu_entry.substr(step, hdu_entry.size() - step);
+            else
+                value = hdu_entry.substr(step, cmt_pos - step);
+
             if(   key != "COMMENT"
                && key != "HISTORY" )
             {
-                value.erase(std::remove_if(value.begin(), value.end(), [](unsigned char c){ return std::isspace(c); }), value.end());
-                while(value.find_first_of("'") != std::string::npos)
-                    value.erase(value.find_first_of("'"), 1);
+                if(is_string)
+                {
+                    // Inside a character value only trailing blanks are insignificant,
+                    // leading ones belong to the value, and a doubled '' encodes a
+                    // single apostrophe.
+                    size_t last = value.find_last_not_of(" ");
+                    value.erase((last == std::string::npos)? 0 : last + 1);
+
+                    for(size_t iChar = value.find("''"); iChar != std::string::npos; iChar = value.find("''", iChar + 1))
+                        value.erase(iChar, 1);
+                }
+                else
+                {
+                    value.erase(std::remove_if(value.begin(), value.end(), [](unsigned char c){ return std::isspace(c); }), value.end());
+                    while(value.find_first_of("'") != std::string::npos)
+                        value.erase(value.find_first_of("'"), 1);
+                }
             }
-            
+
             FITSDictionary::iterator iKey = hdu.end();
             if(hdu.size() > 1)
                 iKey = hdu.find(key);
@@ -650,15 +699,15 @@ namespace DSL
                 else if(key == "BITPIX")
                     hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fInt)));
                 else if(key == "BZERO")
-                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fDouble)));
+                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fULongLong)));
                 else if(key == "BSCALE")
                     hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fDouble)));
                 else if(key == "BLANK")
                     hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fUInt)));
                 else if(key == "PCOUNT")
-                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fInt)));
+                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fULongLong)));
                 else if(key == "GCOUNT")
-                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fInt)));
+                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fULongLong)));
                 else
                     hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment)));
             }
@@ -1635,6 +1684,36 @@ namespace DSL
     
 #pragma mark * Modifier
 
+    void FITShdu::Import(const FITShdu& other, const std::set<std::string>& key_codes_to_skip)
+    {
+        for(FITSDictionary::const_iterator it = other.hdu.cbegin(); it != other.hdu.cend(); it++)
+        {
+            if(
+                it->first == "SIMPLE"   ||
+                it->first == "XTENSION" ||
+                it->first == "EXTEND"   ||
+                it->first == "EXTNAME"  ||
+                it->first == "COMMENT"  ||
+                it->first == "HISTORY"  ||
+                it->first == "BSCALE"   ||
+                it->first == "BZERO"    ||
+                it->first == "PCOUNT"   ||
+                it->first == "GCOUNT"   ||
+                it->first == "BITPIX"   ||
+                it->first == "DATASUM"  ||
+                it->first == "CHECKSUM" ||
+                it->first == "HISTORY"  ||
+                it->first.rfind("NAXIS", 0) == 0
+                )
+                continue;
+
+            if(key_codes_to_skip.find(it->first) != key_codes_to_skip.end())
+                continue;
+
+            hdu.insert(std::pair<key_code,FITSkeyword>(it->first, it->second));
+        }
+    }
+
     /**
      *  Modify the value associated to a FITS keyword. If the keyword doesn't exists, a new filed is added to the disctionary with the given KEYWORD and its associated value.
      *
@@ -1666,7 +1745,7 @@ namespace DSL
         if(kt == fChar)
         {
             if(keyword == "PCOUNT" || keyword == "GCOUNT" || keyword == "BITPIX")
-                kt = fInt;
+                kt = fULongLong;
             else if(keyword.rfind("NAXIS", 0) == 0)
                 kt = fULongLong;
         }
@@ -1813,7 +1892,9 @@ namespace DSL
      */
     void FITShdu::ValueForKey(const key_code& keyword, const size_t& value, const std::string& cmt)
     {
-        ValueForKey(keyword, std::to_string(value), fLongLong,cmt);
+        // size_t is unsigned: fLongLong would reject anything above INT64_MAX,
+        // e.g. the BZERO = 2^63 of an unsigned 64 bit image.
+        ValueForKey(keyword, std::to_string(value), fULongLong,cmt);
     }
     
     void FITShdu::ValueForKey(const key_code& keyword, const size_t& value)

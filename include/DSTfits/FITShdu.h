@@ -17,6 +17,8 @@
 #include <cstdio>
 #include <cstring>
 #include <map>
+#include <set>
+#include <string>
 #include <vector>
 #include <limits>
 #include <fitsio.h>
@@ -173,6 +175,15 @@ namespace DSL
 
 #pragma endregion
 #pragma region  * Modifier
+
+        /*  
+         *  @details Import all the key-value pairs from another FITShdu object into this one. If a key already exists, it is overwritten.
+         *  @note the FITS keyword SIMPLE XTENSION EXTEND EXTNAME COMMENT HISTORY BSCALE BZERO"  PCOUNT GCOUNT BITPIX DATASUM CHECKSU HISTORY are always ignored during the imprort. 
+         * 
+         *  @param other The FITShdu object to import from.
+         *  @param key_codes_to_skip A set of key codes to skip during the import. If a key code is in this set, it will not be imported.
+         */
+        void Import(const FITShdu&, const std::set<std::string>& key_codes_to_skip={});
 
         void ValueForKey(const key_code&, const std::string&, const key_type& tk);                      //!< Set value for key
         void ValueForKey(const key_code&, const std::string&, const key_type& tk, const std::string&);  //!< Set value for key
