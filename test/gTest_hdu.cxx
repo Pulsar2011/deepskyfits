@@ -407,7 +407,7 @@ TEST(FITShdu_Constructor, FromFitsFile)
     EXPECT_EQ(hdu.GetEntry("NAXIS2")->second.type(), key_type::fULongLong);
     EXPECT_EQ(hdu.GetEntry("BITPIX")->second.type(), key_type::fInt);
     EXPECT_EQ(hdu.GetEntry("BSCALE")->second.type(), key_type::fDouble);
-    EXPECT_EQ(hdu.GetEntry("BZERO")->second.type(), key_type::fDouble);
+    EXPECT_EQ(hdu.GetEntry("BZERO")->second.type(), key_type::fULongLong);
 
     ff.Close();
 
@@ -626,6 +626,9 @@ TEST(FITShdu_out, asString)
     hdu.ValueForKey("AKEY1", (int8_t) 1, "first key");
     hdu.ValueForKey("AKEY2", (float) 2.0, "second key");
     hdu.ValueForKey("AKEY3", std::string("this is my value3"), "third key");
+    hdu.ValueForKey("BUNIT", std::string("ADU.s/px"), fChar, "Unit sytem in 'ADU.s/px' unit");
+    hdu.ValueForKey("TEST",  std::string("M31 O''Neil"), fChar, "'Object name'");
+    hdu.ValueForKey("SCS_ID",  std::string("11"), fChar, "Detector ID, e.g. '13'");
     hdu.ValueForKey("COMMENT", std::string("this is now a very very long comment string to test how does the parser format the string when the commant string is longer than the 80 char allowed for standard FITS keys cards"));
     hdu.ValueForKey("HISTORY", std::string("this is now a very very long comment string to test how does the parser format the string when the commant string is longer than the 80 char allowed for standard FITS keys cards"));
 
@@ -634,33 +637,124 @@ TEST(FITShdu_out, asString)
     std::string endStr = out.substr(out.size()-8,3);
     EXPECT_EQ(endStr.compare("END"),0)<< endStr;
 
-    for (size_t k = 0; k < 5; k++)
+    // Keys are held in a std::map, so the cards come out in alphabetical order. Look
+    // them up by keyword rather than by card index: adding a key must not shift what
+    // the assertions below are pointing at.
+    auto cardOf = [](const std::string& block, const std::string& keyword) -> std::string
     {
-        if(k < 3)
+        for(size_t pos = 0; pos + 80 <= block.size(); pos += 80)
         {
-            std::string thisStr = out.substr(k*80, 80);
-            EXPECT_EQ(thisStr.find("AKEY"+std::to_string(k+1)), 0);
-            EXPECT_EQ(thisStr.find("="), 9-1);
-            EXPECT_EQ(thisStr.find("/"), 32-1);
+            if(block.compare(pos, keyword.size(), keyword) == 0)
+                return block.substr(pos, 80);
         }
-        else if(k==3)
-        {
+        return std::string();
+    };
 
-            out.erase(0, (k) * 80);
-            std::string thisStr = out.substr(0, out.find("HISTORY")-1);
-            EXPECT_EQ(thisStr.find("COMMENT"), 0);
-            thisStr.erase(0,80);
-            EXPECT_EQ(thisStr.find("COMMENT "), 0);
-        }
-        else if(k==4)
+    auto cardCount = [](const std::string& block, const std::string& keyword) -> size_t
+    {
+        size_t nCard = 0;
+        for(size_t pos = 0; pos + 80 <= block.size(); pos += 80)
         {
-            out.erase(0, out.find("HISTORY"));
-            EXPECT_EQ(out.find("HISTORY "), 0);
-            out.erase(0,80);
-            EXPECT_EQ(out.find("HISTORY "), 0);
+            if(block.compare(pos, keyword.size(), keyword) == 0)
+                nCard++;
         }
+        return nCard;
+    };
+
+    // Process() keeps the blank that follows the '/' separator as well as the blanks
+    // padding the card to 80 columns, so comments are compared trailing-trimmed.
+    auto rtrim = [](std::string str) -> std::string
+    {
+        size_t last = str.find_last_not_of(" ");
+        str.erase((last == std::string::npos)? 0 : last + 1);
+        return str;
+    };
+
+    for (size_t k = 1; k <= 3; k++)
+    {
+        std::string thisStr = cardOf(out, "AKEY"+std::to_string(k));
+        ASSERT_EQ(thisStr.size(), 80)<< "no card for AKEY" << k << std::endl << out;
+        EXPECT_EQ(thisStr.find("AKEY"+std::to_string(k)), 0);
+        EXPECT_EQ(thisStr.find("="), 9-1);
+        EXPECT_EQ(thisStr.find("/"), 32-1);
     }
 
+    // BUNIT: both the value and the comment hold a '/', so neither the first '/' of the
+    // card nor the last quote of the card locates the comment separator.
+    std::string bunitStr = cardOf(out, "BUNIT");
+    ASSERT_EQ(bunitStr.size(), 80)<< "no card for BUNIT" << std::endl << out;
+    EXPECT_EQ(bunitStr.find("="), 9-1);
+    EXPECT_EQ(bunitStr.substr(10,10), std::string("'ADU.s/px'"))<< bunitStr;
+    EXPECT_EQ(bunitStr.find("/"), 17-1)<< bunitStr;                   // the one inside the value
+    EXPECT_EQ(bunitStr.substr(30,3), std::string(" / "))<< bunitStr;  // the real separator
+    EXPECT_EQ(bunitStr.find("Unit sytem in 'ADU.s/px' unit"), 34-1)<< bunitStr;
+
+    // TEST: '' is the FITS escape for an apostrophe, so the value field closes on the
+    // last quote of the value, not on the first one met.
+    std::string testStr = cardOf(out, "TEST");
+    ASSERT_EQ(testStr.size(), 80)<< "no card for TEST" << std::endl << out;
+    EXPECT_EQ(testStr.find("="), 9-1);
+    EXPECT_EQ(testStr.substr(10,13), std::string("'M31 O''Neil'"))<< testStr;
+    EXPECT_EQ(testStr.substr(30,3), std::string(" / "))<< testStr;
+    EXPECT_EQ(testStr.find("'Object name'"), 34-1)<< testStr;
+
+    // SCS_ID: short quoted value followed by a comment that ends on a quoted number,
+    // the card that used to come back as a single mangled value.
+    std::string scsStr = cardOf(out, "SCS_ID");
+    ASSERT_EQ(scsStr.size(), 80)<< "no card for SCS_ID" << std::endl << out;
+    EXPECT_EQ(scsStr.find("="), 9-1);
+    EXPECT_EQ(scsStr.substr(10,4), std::string("'11'"))<< scsStr;
+    EXPECT_EQ(scsStr.substr(30,3), std::string(" / "))<< scsStr;
+    EXPECT_EQ(scsStr.find("Detector ID, e.g. '13'"), 34-1)<< scsStr;
+
+    // Long COMMENT/HISTORY values are continued over several cards, each one carrying
+    // the keyword again.
+    ASSERT_GE(cardCount(out, "COMMENT"), 2)<< out;
+    ASSERT_GE(cardCount(out, "HISTORY"), 2)<< out;
+    EXPECT_EQ(cardOf(out, "COMMENT").find("COMMENT "), 0);
+    EXPECT_EQ(cardOf(out, "HISTORY").find("HISTORY "), 0);
+
+    // Read the block back: value and comment must not bleed into each other.
+    FITShdu testHdu = FITShdu(out);
+
+    ASSERT_TRUE(testHdu.Exists("BUNIT"));
+    EXPECT_EQ(testHdu.GetValueForKey("BUNIT"), std::string("ADU.s/px"));
+    EXPECT_EQ(testHdu.GetEntry("BUNIT")->second.type(), key_type::fChar);
+    EXPECT_EQ(rtrim(testHdu.GetEntry("BUNIT")->second.comment()), std::string(" Unit sytem in 'ADU.s/px' unit"));
+
+    ASSERT_TRUE(testHdu.Exists("TEST"));
+    EXPECT_EQ(testHdu.GetValueForKey("TEST"), std::string("M31 O'Neil"));   // '' decoded
+    EXPECT_EQ(testHdu.GetEntry("TEST")->second.type(), key_type::fChar);
+    EXPECT_EQ(rtrim(testHdu.GetEntry("TEST")->second.comment()), std::string(" 'Object name'"));
+
+    ASSERT_TRUE(testHdu.Exists("SCS_ID"));
+    EXPECT_EQ(testHdu.GetValueForKey("SCS_ID"), std::string("11"));
+    EXPECT_EQ(rtrim(testHdu.GetEntry("SCS_ID")->second.comment()), std::string(" Detector ID, e.g. '13'"));
+    // Process() types a keyword from the text of its value alone, so a quoted number
+    // comes back numeric and asString() would write it back unquoted. Update this
+    // expectation to fChar once the quoted form is carried through.
+    EXPECT_EQ(testHdu.GetEntry("SCS_ID")->second.type(), key_type::fUShort);
+
+    // Blanks inside a character value belong to the value, only trailing ones don't.
+    ASSERT_TRUE(testHdu.Exists("AKEY3"));
+    EXPECT_EQ(testHdu.GetValueForKey("AKEY3"), std::string("this is my value3"));
+    EXPECT_EQ(testHdu.GetEntry("AKEY3")->second.type(), key_type::fChar);
+    EXPECT_EQ(rtrim(testHdu.GetEntry("AKEY3")->second.comment()), std::string(" third key"));
+
+    ASSERT_TRUE(testHdu.Exists("AKEY1"));
+    ASSERT_TRUE(testHdu.Exists("AKEY2"));
+    EXPECT_EQ  (testHdu.GetInt8ValueForKey("AKEY1"), 1);
+    EXPECT_NEAR(testHdu.GetFloatValueForKey("AKEY2"), 2.0f, 1e-6f);
+
+    // The continuation cards of COMMENT/HISTORY are re-joined under their keyword. The
+    // text isn't compared character for character: asString() prefixes a continued card
+    // with 9 columns while Process() reads the value from column 11.
+    ASSERT_TRUE(testHdu.Exists("COMMENT"));
+    ASSERT_TRUE(testHdu.Exists("HISTORY"));
+    EXPECT_NE(testHdu.GetValueForKey("COMMENT").find("this is now a very very long comment string"), std::string::npos)
+        << testHdu.GetValueForKey("COMMENT");
+    EXPECT_NE(testHdu.GetValueForKey("HISTORY").find("this is now a very very long comment string"), std::string::npos)
+        << testHdu.GetValueForKey("HISTORY");
 }
 
 #pragma endregion

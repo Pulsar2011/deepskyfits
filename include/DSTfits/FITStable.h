@@ -39,12 +39,13 @@
 #include "FITShdu.h"
 #include "FITSdata.h"
 #include "FITSexception.h"
+#include "FITSunit.h"
 
 #include <fitsio.h>
 
 namespace DSL
 {
-#if __cplusplus < 201703L
+#if __cplusplus < 201703
     /**
      * @brief Fallback replacement for std::bad_any_cast on pre-C++17 compilers.
      */
@@ -458,6 +459,7 @@ namespace DSL
         inline const std::string& getName() const {return fname;}
         inline const dtype&       getType() const {return ftype;}
         inline const std::string& getUnit() const {return funit;}
+        inline       DSL::unit    asUnit() const  {return DSL::unit(funit);}
         inline const double&      getScale()const {return fscale;}
         inline const double&      getZero() const {return fzero;}
         inline const size_t&      getPosition() const {return fpos;}

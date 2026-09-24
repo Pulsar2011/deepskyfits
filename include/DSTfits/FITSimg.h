@@ -33,6 +33,7 @@
 #include "FITSstatistic.h"
 #include "FITSdata.h" // <- add include for FitsArrayBase / FitsArray
 #include "FITSwcs.h"
+#include "FITSunit.h"
 #include "DSF_version.h"
 #if __cplusplus >= 201703L && defined(__cpp_lib_execution) && !defined(_LIBCPP_VERSION)
 #include <execution>
@@ -160,6 +161,8 @@ namespace DSL
         inline const int GetEqBitPerPixel()  const {return eqBITPIX;}  //!< Get the number of equivalent Bit per image pixel
         inline const size_t GetDimension() const {return Naxis.size();}
         inline const std::string GetName() const {if(hdu.Exists("EXTNAME")) return hdu.GetValueForKey("EXTNAME"); else return std::string("NO NAME");}       //!< Get the name of the image
+
+        unit GetUnit() const;  //!< Get the unit of the image
 
 #pragma endregion
 #pragma region * WCS
