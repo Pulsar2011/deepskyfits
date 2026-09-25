@@ -77,6 +77,10 @@ namespace DSL
             void prune();
 
         public:
+
+            typedef std::pair<std::string,int16_t> unitTerm;  //!< symbol and exponent of one term
+            typedef std::map<std::string,int16_t>::const_iterator const_iterator;  //!< iterator over the map of terms
+
             unit();  //!< Default constructor, dimensionless
             explicit unit(const std::string&);  //!< Constructor from unit string
 
@@ -89,6 +93,10 @@ namespace DSL
             bool dimensionless() const;  //!< Check if the unit is dimensionless
 
             std::string asString() const;  //!< Return unit as a string
+
+            inline unit::const_iterator find(const std::string& u) const {return unitMap.find(u);}  //!< Return iterator to the first term
+            inline unit::const_iterator cbegin() const {return unitMap.cbegin();}  //!< Return const iterator to the first term
+            inline unit::const_iterator cend() const {return unitMap.cend();}  //!< Return const iterator to the end of the map
     };
 
     unit operator*(unit, const unit&);  //!< Product of two units

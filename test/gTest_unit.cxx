@@ -249,5 +249,36 @@ namespace DSL
         ASSERT_EQ(s.asString(), "s**-1");
         ASSERT_EQ(unit(s.asString()), s);
     }
+
+    TEST(unit_Tester, iteratorCollection)
+    {
+        // Nothing in the numerator: written with signed exponents rather than as
+        // "1/s", so that the string still starts on a symbol and parses back.
+        const unit s = unit("10**16.erg/s/cm**2");
+
+        unit::const_iterator it = s.find("10");
+        ASSERT_NE(it, s.cend());
+        ASSERT_EQ(it->first, "10");
+        ASSERT_EQ(it->second, 16);
+
+        it = s.find("erg");
+        ASSERT_NE(it, s.cend());
+        ASSERT_EQ(it->first, "erg");
+        ASSERT_EQ(it->second, 1);
+
+        it = s.find("s");
+        ASSERT_NE(it, s.cend());
+        ASSERT_EQ(it->first, "s");
+        ASSERT_EQ(it->second, -1);
+
+        it = s.find("cm");
+        ASSERT_NE(it, s.cend());
+        ASSERT_EQ(it->first, "cm");
+        ASSERT_EQ(it->second, -2);
+
+        const unit p = unit("10**0");
+        ASSERT_TRUE(p.dimensionless());
+        ASSERT_EQ(p.asString(), "");
+    }
 #pragma endregion
 }
