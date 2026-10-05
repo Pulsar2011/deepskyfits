@@ -14,6 +14,7 @@
 
 #include <cstdarg>
 #include <cstdio>
+#include <cmath>
 #include <sstream>
 #include <map>
 #include <vector>
@@ -169,7 +170,14 @@ namespace DSL
         inline double at(const size_t& i) const { if(data == nullptr) throw FITSexception(SHARED_NOMEM,"FITScube","at","No data in memory"); return data->get(i); }
         inline const FITSwcs& getWCS() const { return fwcs; }
         inline size_t getNumberOfWCS() const {return (fwcs.getNumberOfWCS() >=0)? static_cast<size_t>(fwcs.getNumberOfWCS()) : 0; }
-        
+
+        /*
+         * Pixel convention: every pixel coordinate the functions below take or return is
+         * 0-based (array convention, centre of the first pixel at 0.0 on every axis), whether
+         * given as a linear index, as integer indices or as floating-point coordinates. The
+         * conversion to and from the FITS (1-based) convention of wcslib is done inside.
+         * getWCS() exposes the underlying FITSwcs, which stays in the FITS convention.
+         */
         virtual worldCoords             WorldCoordinates(const size_t&, const int& wcsIndex=0) const; //!< Get world coordinates
         virtual worldCoords             WorldCoordinates(const std::vector<size_t>&, const int& wcsIndex=0) const; //!< Get world coordinates
         virtual worldCoords             WorldCoordinates(const pixelCoords&, const int& wcsIndex=0) const; //!< Get world coordinates
@@ -2117,7 +2125,8 @@ namespace DSL
                 //UPDATE THE WCSAXES KEYWORD
                 if(!hdu.Exists("CRPIX3"+suff))
                 {
-                    hdu.ValueForKey("CRPIX3"+suff,"0.0",fFloat,"Reference pixel for axis 3");
+                    // FITS convention: layer 0 (array) is FITS pixel 1, so CRVAL3 is the value of the first layer.
+                    hdu.ValueForKey("CRPIX3"+suff,"1.0",fFloat,"Reference pixel for axis 3");
                     wcs_needs_update |= true;
                 }
                 
@@ -3835,9 +3844,25 @@ namespace DSL
         if(!handle)
             throw FITSexception(SHARED_NULPTR,"FITSimg<T>::Rebin","missing data");
 
-        // Attempt to propagate rebinning to WCS
-        size_t nWCS = getNumberOfWCS();
-        std::vector<std::string> wcsType;
+        // Propagate the rebinning to the WCS.
+        //
+        // The copy starts from the COMPLETE WCS of this image, as wcslib writes it back
+        // (projection, units, frame, poles, PV/SIP terms, alternate suffix included), and
+        // only what binning changes is then rescaled. Copying CRPIX/CRVAL/CDELT alone, as
+        // was done before, lost CTYPE: the binned image fell back to a linear WCS, wrong
+        // by 1/cos(dec) in right ascension.
+        //
+        // Binning pixel axis j by b_j (pixel coordinates, FITS convention, first pixel edge
+        // at 0.5 in both grids): p_old - 0.5 = b_j (p_new - 0.5). Hence
+        //  - CRPIXj  -> (CRPIXj - 0.5)/b_j + 0.5;
+        //  - column j of the linear matrix (PCi_j or CDi_j) -> times b_j. CDELTi scales the
+        //    WORLD axis i and is left alone, otherwise the scale would be applied twice;
+        //  - SIP, polynomials in pixel offsets: A_p_q  -> A_p_q  b1^p b2^q / b1,
+        //                                       B_p_q  -> B_p_q  b1^p b2^q / b2, idem AP/BP,
+        //                                       A_DMAX -> A_DMAX/b1, B_DMAX -> B_DMAX/b2.
+        // TPV/PV terms act on intermediate world coordinates and need no change.
+        const size_t nWCS = getNumberOfWCS();
+        std::vector<std::string> wcsType;          // suffixes, used by the fallback below
         if(nWCS > 1)
         {
             wcsType = makeAlphaSequence(nWCS);
@@ -3846,45 +3871,106 @@ namespace DSL
         else
             wcsType.push_back("");
 
-        for(size_t k = 1; k <= this->GetDimension(); k++)
         {
+            // ValueForKey(double) writes the shortest exact text.
+            auto setDouble = [](FITShdu& h, const std::string& key, double v, const std::string& cmt)
+            {
+                h.ValueForKey(key, v, cmt);
+            };
+
+            // Binning factor of each pixel axis, 1 on the axes left unbinned.
+            std::vector<double> b(this->GetDimension()+1, 1.);
+            for(size_t j = 1; j <= this->GetDimension(); j++)
+                b[j] = static_cast<double>(Size(j))/static_cast<double>(copy->Size(j));
+            auto bAxis = [&b](size_t j)->double { return (j < b.size()) ? b[j] : 1.; };
 
             for(size_t wcsIdx = 0; wcsIdx < nWCS; wcsIdx++)
+            try
             {
-                if(hdu.Exists("CDELT"+std::to_string(k)+wcsType[wcsIdx]))
-                    copy->HDU().ValueForKey("CDELT"+std::to_string(k)+wcsType[wcsIdx],
-                                             this->HDU().GetDoubleValueForKey("CDELT"+std::to_string(k)+wcsType[wcsIdx])
-                                             * static_cast<double>(Size(k))/static_cast<double>(copy->Size(k)));
-                else
-                    copy->HDU().ValueForKey("CDELT"+std::to_string(k)+wcsType[wcsIdx],
-                                             static_cast<double>(Size(k))/static_cast<double>(copy->Size(k)),"");
+                FITShdu w = fwcs.asFITShdu(static_cast<int>(wcsIdx));
 
-                if(hdu.Exists("CRPIX"+std::to_string(k)+wcsType[wcsIdx]))
-                    copy->HDU().ValueForKey("CRPIX"+std::to_string(k)+wcsType[wcsIdx],
-                                            (this->HDU().GetDoubleValueForKey("CRPIX"+std::to_string(k)+wcsType[wcsIdx])
-                                                + ((std::abs(this->HDU().GetDoubleValueForKey("CRPIX"+std::to_string(k)+wcsType[wcsIdx]))<std::numeric_limits<double>::min())?-0.5:0))
-                                            * (static_cast<double>(copy->Size(k))/static_cast<double>(Size(k))));
-                else
-                    copy->HDU().ValueForKey("CRPIX"+std::to_string(k)+wcsType[wcsIdx],
-                                            static_cast<double>(copy->Size(k))/static_cast<double>(Size(k)),"");
+                const std::string suff  = fwcs.getSuffix(wcsIdx);
+                const size_t      naxis = fwcs.getNumberOfAxis(wcsIdx);
 
-                if(hdu.Exists("CRVAL"+std::to_string(k)+wcsType[wcsIdx]))
-                    copy->HDU().ValueForKey("CRVAL"+std::to_string(k)+wcsType[wcsIdx],
-                                            this->HDU().GetDoubleValueForKey("CRVAL"+std::to_string(k)+wcsType[wcsIdx]));
-                else
-                    copy->HDU().ValueForKey("CRVAL"+std::to_string(k)+wcsType[wcsIdx],0.0,"");
-
-                for (size_t iL = 1; iL <= this->GetDimension(); iL++)
+                // Reference pixel.
+                for(size_t j = 1; j <= naxis; j++)
                 {
-                    std::string pcKey = "PC"+std::to_string(k)+"_"+std::to_string(iL)+wcsType[wcsIdx];
-                    std::string cdKey = "CD"+std::to_string(k)+"_"+std::to_string(iL)+wcsType[wcsIdx];
+                    const std::string key = "CRPIX"+std::to_string(j)+suff;
+                    const double crpix = w.Exists(key) ? w.GetDoubleValueForKey(key) : 0.;
+                    setDouble(w, key, (crpix - 0.5)/bAxis(j) + 0.5, "Pixel coordinate of reference point");
+                }
 
-                    if(hdu.Exists(pcKey))
-                        copy->HDU().ValueForKey(pcKey,
-                                                this->HDU().GetDoubleValueForKey(pcKey)*static_cast<double>(Size(k))/static_cast<double>(copy->Size(k)));
-                    else if(hdu.Exists(cdKey))
-                        copy->HDU().ValueForKey(cdKey,
-                                                this->HDU().GetDoubleValueForKey(cdKey)*static_cast<double>(Size(k))/static_cast<double>(copy->Size(k)));}
+                // Linear matrix, column j times b_j. CD if the WCS carries one, PC otherwise
+                // (an absent PCi_j is the identity's element, which binning may make non-trivial).
+                bool hasCD = false;
+                for(size_t i = 1; i <= naxis && !hasCD; i++)
+                    for(size_t j = 1; j <= naxis && !hasCD; j++)
+                        hasCD = w.Exists("CD"+std::to_string(i)+"_"+std::to_string(j)+suff);
+
+                for(size_t i = 1; i <= naxis; i++)
+                    for(size_t j = 1; j <= naxis; j++)
+                    {
+                        const std::string key = (hasCD ? "CD" : "PC")+std::to_string(i)+"_"+std::to_string(j)+suff;
+                        const double m = w.Exists(key) ? w.GetDoubleValueForKey(key)
+                                                       : ((!hasCD && i == j) ? 1. : 0.);
+                        if(m != 0. || w.Exists(key))
+                            setDouble(w, key, m*bAxis(j), hasCD ? "Coordinate transformation matrix" : "Linear transformation matrix");
+                    }
+
+                // SIP distortion (primary WCS only: SIP has no alternate form).
+                if(suff.empty())
+                {
+                    std::vector<std::pair<std::string,double>> sip;
+                    for(FITSDictionary::const_iterator it = w.begin(); it != w.end(); ++it)
+                    {
+                        const std::string& key = it->first;
+
+                        std::string prefix;
+                        if     (key.compare(0, 3, "AP_") == 0) prefix = "AP_";
+                        else if(key.compare(0, 3, "BP_") == 0) prefix = "BP_";
+                        else if(key.compare(0, 2, "A_")  == 0) prefix = "A_";
+                        else if(key.compare(0, 2, "B_")  == 0) prefix = "B_";
+                        else continue;
+
+                        const bool   onX  = (prefix[0] == 'A');
+                        const double bOwn = onX ? bAxis(1) : bAxis(2);
+
+                        if(key == prefix+"DMAX")
+                        {
+                            sip.push_back({key, w.GetDoubleValueForKey(key)/bOwn});
+                            continue;
+                        }
+
+                        unsigned p = 0, q = 0;
+                        int consumed = 0;
+                        if(std::sscanf(key.c_str()+prefix.size(), "%u_%u%n", &p, &q, &consumed) != 2 ||
+                           static_cast<size_t>(consumed) != key.size()-prefix.size())
+                            continue;   // A_ORDER, B_ORDER, ...: not a coefficient
+
+                        const double scale = std::pow(bAxis(1), static_cast<double>(p))
+                                           * std::pow(bAxis(2), static_cast<double>(q)) / bOwn;
+                        sip.push_back({key, w.GetDoubleValueForKey(key)*scale});
+                    }
+
+                    for(const auto& kv : sip)
+                        setDouble(w, kv.first, kv.second, "SIP distortion coefficient");
+                }
+
+                // Paper IV / lookup-table distortions are expressed in pixel units too and are
+                // not rescaled here.
+                for(FITSDictionary::const_iterator it = w.begin(); it != w.end(); ++it)
+                    if(it->first.compare(0, 5, "CPDIS") == 0 || it->first.compare(0, 5, "CQDIS") == 0)
+                    {
+                        std::cerr<<FITSwarning("FITScube","Rebin","WCS "+std::to_string(wcsIdx)+" carries a "+it->first+" distortion, which is not rescaled by the binning.").what()<<std::endl;
+                        break;
+                    }
+
+                for(FITSDictionary::const_iterator it = w.begin(); it != w.end(); ++it)
+                    copy->HDU().ValueForKey(it->first, it->second.value(), it->second.type(), it->second.comment());
+            }
+            catch(std::exception& e)
+            {
+                std::cerr<<FITSwarning("FITScube","Rebin","WCS "+std::to_string(wcsIdx)+" could not be propagated to the rebinned image: "+e.what()).what()<<std::endl;
             }
         }
 

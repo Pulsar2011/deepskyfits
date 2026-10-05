@@ -1034,10 +1034,12 @@ TEST(FITSimg, Test_RebinningWCS)
     for(size_t j=0; j<cimg->Size(2); j++)
         for(size_t i=0; i<cimg->Size(1); i++)
         {
-            worldCoords wcsrc =  img->WorldCoordinates( img->PixelIndex({i*4+2,j*4+2}), 0);
+            // Binned pixel i (0-based) is the average of source pixels 4i..4i+3: its centre
+            // is source coordinate 4i+1.5, exactly.
+            worldCoords wcsrc =  img->WorldCoordinates(pixelCoords({4.*static_cast<double>(i)+1.5, 4.*static_cast<double>(j)+1.5}), 0);
             worldCoords wcscr = cimg->WorldCoordinates(cimg->PixelIndex({i    ,    j}), 0);
-            EXPECT_NEAR(wcsrc[0], wcscr[0], 1e-1);
-            EXPECT_NEAR(wcsrc[1], wcscr[1], 1e-1);
+            EXPECT_NEAR(wcsrc[0], wcscr[0], 1e-9);
+            EXPECT_NEAR(wcsrc[1], wcscr[1], 1e-9);
         }
 
     
@@ -1172,7 +1174,7 @@ TYPED_TEST(FITSimgStatsTest, LayerParent)
         EXPECT_EQ(img.getNumberOfWCS(), 2);
         EXPECT_EQ(img.getWCS().getNumberOfAxis(0), 3);
         EXPECT_EQ(img.getWCS().getNumberOfAxis(1), 3);
-        EXPECT_NEAR(img.getWCS().CRPIX(0,3),0,1e-7);
+        EXPECT_NEAR(img.getWCS().CRPIX(0,3),1,1e-7);   // FITS: layer 0 is pixel 1
         EXPECT_NEAR(img.getWCS().CRVAL(0,3),1,1e-7);
         EXPECT_NEAR(img.getWCS().CDELT(0,3),1,1e-7);
         
@@ -1194,7 +1196,7 @@ TYPED_TEST(FITSimgStatsTest, LayerParent)
         EXPECT_EQ(img.getWCS().getNumberOfAxis(1), 3);
 
         auto ldata = layer->GetData<T>();
-        EXPECT_NEAR(layer->getWCS().CRPIX(0,3),-1*static_cast<double>(k),1e-7);
+        EXPECT_NEAR(layer->getWCS().CRPIX(0,3),1.-static_cast<double>(k),1e-7);
         EXPECT_NEAR(layer->getWCS().CRVAL(0,3),1,1e-7);
         EXPECT_NEAR(layer->getWCS().CDELT(0,3),1,1e-7);
 
@@ -1313,7 +1315,7 @@ TYPED_TEST(FITSimgStatsTest, LayerChild)
         EXPECT_EQ(img.getNumberOfWCS(), 2);
         EXPECT_EQ(img.getWCS().getNumberOfAxis(0), 3);
         EXPECT_EQ(img.getWCS().getNumberOfAxis(1), 3);
-        EXPECT_NEAR(img.getWCS().CRPIX(0,3),0,1e-7);
+        EXPECT_NEAR(img.getWCS().CRPIX(0,3),1,1e-7);   // FITS: layer 0 is pixel 1
         EXPECT_NEAR(img.getWCS().CRVAL(0,3),1,1e-7);
         EXPECT_NEAR(img.getWCS().CDELT(0,3),1,1e-7);
         
@@ -1335,7 +1337,7 @@ TYPED_TEST(FITSimgStatsTest, LayerChild)
         EXPECT_EQ(img.getWCS().getNumberOfAxis(1), 3);
 
         auto ldata = layer->GetData<T>();
-        EXPECT_NEAR(layer->getWCS().CRPIX(0,3),-1*static_cast<double>(k),1e-7);
+        EXPECT_NEAR(layer->getWCS().CRPIX(0,3),1.-static_cast<double>(k),1e-7);
         EXPECT_NEAR(layer->getWCS().CRVAL(0,3),1,1e-7);
         EXPECT_NEAR(layer->getWCS().CDELT(0,3),1,1e-7);
 
@@ -2138,8 +2140,51 @@ TEST(FITSimg, WorldCoordinatesMatrix)
 
     for(size_t k=0; k< img->Nelements(); k++)
         EXPECT_EQ(piX[k], piY[k]);
-    
-    
+
+
+    EXPECT_NO_THROW(ff.Close());
+    EXPECT_FALSE(ff.isOpen());
+}
+
+// Pins the pixel convention. The round trips above hold whatever the convention, which is
+// how a one pixel offset between FITScube and wcslib went unnoticed: here FITScube (0-based,
+// array) is compared with FITSwcs (1-based, FITS) directly.
+TEST(FITSimg, WorldCoordinatesConvention)
+{
+    verbose = verboseLevel::VERBOSE_NONE;
+
+#ifndef CI_CIWORKER
+    std::string src = "build/testdata/testkeys.fits";
+#else
+    std::string src = "testdata/testkeys.fits";
+#endif
+
+    FITSmanager ff(src);
+    EXPECT_TRUE(ff.isOpen());
+
+    std::shared_ptr<FITScube> img = ff.GetPrimary();
+    ASSERT_NE(img, nullptr);
+    ASSERT_GT(img->getNumberOfWCS(), 0u);
+
+    for(size_t j : {size_t(0), size_t(17), img->Size(2)-1})
+        for(size_t i : {size_t(0), size_t(42), img->Size(1)-1})
+        {
+            // Array pixel (i,j) is FITS pixel (i+1,j+1).
+            const worldCoords viaCube = img->WorldCoordinates(img->PixelIndex({i,j}));
+            const worldCoords viaWcs  = img->getWCS().pixel2world(0, {pixelCoords({static_cast<double>(i)+1., static_cast<double>(j)+1.})})[0];
+            EXPECT_NEAR(viaCube[0], viaWcs[0], 1e-10);
+            EXPECT_NEAR(viaCube[1], viaWcs[1], 1e-10);
+
+            // World2Pixel is the inverse, in array coordinates.
+            const pixelCoords px = img->World2Pixel(viaWcs);
+            EXPECT_NEAR(px[0], static_cast<double>(i), 1e-6);
+            EXPECT_NEAR(px[1], static_cast<double>(j), 1e-6);
+        }
+
+    // Left of the first pixel's edge is outside the array, not a wrapped-around index.
+    EXPECT_EQ(img->PixelIndex(pixelCoords({-0.6, 0.})), img->Nelements());
+    EXPECT_EQ(img->PixelIndex(pixelCoords({-0.4, 0.})), size_t(0));
+
     EXPECT_NO_THROW(ff.Close());
     EXPECT_FALSE(ff.isOpen());
 }

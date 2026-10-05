@@ -24,6 +24,8 @@
 #include <cstdint>
 #include <climits>
 #include <iomanip>
+#include <cstdio>
+#include <cstdlib>
 
 // Ensure basic integer sizes for narrowing casts / CFITSIO interoperability
 static_assert(CHAR_BIT == 8, "This code assumes 8-bit chars");
@@ -33,6 +35,40 @@ static_assert(sizeof(long long) >= 8, "Expected long long >= 64 bits");
 
 namespace DSL
 {
+    namespace
+    {
+        /**
+         * @brief Shortest text that reads back as exactly @p v, for a FITS real keyword.
+         *
+         * @details Tries @p minDigits .. @p maxDigits significant digits and keeps the first
+         * that round-trips through @p parse; @p maxDigits (max_digits10 of the type) always
+         * does. Exact without padding: 0.0018888888 stays 0.0018888888, 150.5 stays 150.5.
+         *
+         * A decimal point is added to an integral result ("4" -> "4.0") so the value still
+         * reads as a real, not an integer. Non-finite values keep their plain text, FITS
+         * having no representation for them anyway.
+         */
+        template<typename T>
+        std::string exactRealString(T v, int minDigits, int maxDigits, T (*parse)(const char*, char**))
+        {
+            if(!std::isfinite(v))
+                return std::to_string(v);
+
+            char buf[40];
+            for(int p = minDigits; p <= maxDigits; p++)
+            {
+                std::snprintf(buf, sizeof(buf), "%.*G", p, static_cast<double>(v));
+                if(parse(buf, nullptr) == v)
+                    break;
+            }
+
+            std::string s(buf);
+            if(s.find_first_of(".E") == std::string::npos)
+                s += ".0";
+
+            return s;
+        }
+    }
 
 #pragma mark - FITSkeyword class implementation
     
@@ -1931,14 +1967,12 @@ namespace DSL
      */
     void FITShdu::ValueForKey(const key_code& keyword, const float& value, const std::string& cmt)
     {
-        if(std::fabs(value) > 1e-4 && std::fabs(value) < 1e4)
-            ValueForKey(keyword, std::to_string(value), fFloat, cmt);
-        else
-        {
-            std::ostringstream oss;
-            oss << std::setprecision(std::numeric_limits<float>::max_digits10) << std::scientific << value;
-            ValueForKey(keyword, oss.str(), fFloat, cmt);
-        }
+        // Shortest exact text. std::to_string kept only 6 decimals between 1e-4 and 1e4,
+        // which truncated any value carrying more (WCS terms first among them).
+        ValueForKey(keyword,
+                    exactRealString<float>(value, std::numeric_limits<float>::digits10, std::numeric_limits<float>::max_digits10,
+                                           [](const char* s, char** e)->float { return std::strtof(s, e); }),
+                    fFloat, cmt);
     }
     
     void FITShdu::ValueForKey(const key_code& keyword, const float& value)
@@ -1956,14 +1990,12 @@ namespace DSL
      */
     void FITShdu::ValueForKey(const key_code& keyword, const double& value, const std::string& cmt)
     {
-        if(std::fabs(value) > 1e-4 && std::fabs(value) < 1e4)
-            ValueForKey(keyword, std::to_string(value), fDouble, cmt);
-        else
-        {
-            std::ostringstream oss;
-            oss << std::setprecision(std::numeric_limits<double>::max_digits10) << std::scientific << value;
-            ValueForKey(keyword, oss.str(), fDouble, cmt);
-        }
+        // Shortest exact text. std::to_string kept only 6 decimals between 1e-4 and 1e4,
+        // which truncated CDi_j, PVi_m, CRVAL, ... written through this overload.
+        ValueForKey(keyword,
+                    exactRealString<double>(value, std::numeric_limits<double>::digits10, std::numeric_limits<double>::max_digits10,
+                                            [](const char* s, char** e)->double { return std::strtod(s, e); }),
+                    fDouble, cmt);
     }
 
     void FITShdu::ValueForKey(const key_code& keyword, const double& value)

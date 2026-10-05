@@ -434,6 +434,36 @@ class FITSmanager;
         return nElements;
     }
     
+    /*
+     * Pixel convention of FITScube
+     * ----------------------------
+     * Every pixel coordinate FITScube takes or returns is 0-based, the convention of the data
+     * array: the centre of the first pixel is 0.0 on every axis. wcslib, and the FITS WCS
+     * standard behind it, number pixels from 1. The conversion is done here, at the two
+     * functions that call FITSwcs (fitsToArray / arrayToFits below), and nowhere else: callers
+     * never add or subtract 1. FITSwcs itself stays in the FITS convention.
+     */
+    namespace
+    {
+        //! 0-based array coordinates -> FITS (1-based) pixel coordinates, every pixel axis.
+        pixelVectors arrayToFits(pixelVectors px)
+        {
+            for(pixelCoords& p : px)
+                for(double& v : p)
+                    v += 1.;
+            return px;
+        }
+
+        //! FITS (1-based) pixel coordinates -> 0-based array coordinates. Unconvertible points stay empty.
+        pixelVectors fitsToArray(pixelVectors px)
+        {
+            for(pixelCoords& p : px)
+                for(double& v : p)
+                    v -= 1.;
+            return px;
+        }
+    }
+
     /**
      * @details Obtain the physical coordinate of a pixel in a specified coordinate system
      * @param k pixel index position in the pixel array
@@ -483,7 +513,7 @@ class FITSmanager;
 
         pixelVectors pxVec;
         pxVec.push_back(pixel);
-        worldCoords wcs = fwcs.pixel2world(wcsIndex,pxVec)[0];
+        worldCoords wcs = fwcs.pixel2world(wcsIndex,arrayToFits(pxVec))[0];   // 0-based -> FITS
 
         return wcs;
     }
@@ -563,7 +593,7 @@ class FITSmanager;
             throw WCSexception(WCSERR_NULL_POINTER,"FITScube","WorldCoordinatesMatrix","No WCS at index "+std::to_string(wcsIndex)+" defined in this FITS image");
         }
 
-        return fwcs.pixel2world(wcsIndex, pixels);
+        return fwcs.pixel2world(wcsIndex, arrayToFits(pixels));   // 0-based -> FITS
     }
     
     /**
@@ -610,7 +640,7 @@ class FITSmanager;
         
         worldVectors VWCoo;
         VWCoo.push_back(coo);
-        return fwcs.world2pixel(wcsIndex, VWCoo)[0];
+        return fitsToArray(fwcs.world2pixel(wcsIndex, VWCoo))[0];   // FITS -> 0-based
     }
 
     /**
@@ -632,7 +662,7 @@ class FITSmanager;
             throw  WCSexception(WCSERR_NULL_POINTER,"FITScube","World2PixelMatrix","No WCS at index "+std::to_string(wcsIndex)+" defined in this FITS image");
         }
         
-        return fwcs.world2pixel(wcsIndex, coo);
+        return fitsToArray(fwcs.world2pixel(wcsIndex, coo));   // FITS -> 0-based
     }
 
     /**
@@ -693,7 +723,12 @@ class FITSmanager;
     {
         std::vector<size_t> pix_index;
         for(size_t k = 0; k < Px.size(); k++ )
-        {            
+        {
+            // 0-based coordinates: anything left of the first pixel's edge (-0.5), or not a
+            // number, is out of the array. Casting it to size_t would wrap around.
+            if(!(Px[k] >= -0.5))
+                return Nelements();
+
             pix_index.push_back(static_cast<size_t>( Px[k]+0.5 ));
         }
 
