@@ -30,6 +30,10 @@ namespace DSL
 
         // A division must not read as a multiplication.
         ASSERT_NE(unit("erg/s"), unit("erg.s"));
+
+        ASSERT_EQ(unit("ergs"), unit("ergs"));
+        ASSERT_EQ(unit("10**-16erg/s/cm**2/Angstrom").asString(), "10**-16.erg/Angstrom/cm**2/s");
+        ASSERT_EQ(unit("10**-16ergs/s/cm**2/Angstrom").asString(), "10**-16.ergs/Angstrom/cm**2/s");
     }
 
     TEST(unit_Tester, parse_electron_symbol)

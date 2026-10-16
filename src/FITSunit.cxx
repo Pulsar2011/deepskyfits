@@ -58,6 +58,7 @@ namespace DSL
      travels with the rest: squaring that unit gives `10**-32`, and multiplying it by
      `10**16 erg**-1` leaves `10**-16.s**-1.cm**-2` — bookkeeping the caller would
      otherwise have to do by hand, and the reason the factor is not simply dropped.
+     The factor may run straight into the symbol it scales (`10**-16erg/s/cm**2`).
      No other number is a unit, and `10**0` is the dimensionless 1 that the algebra
      says it is: prune() drops it like any other term that reached zero.
      @param u Unit string in the FITS syntax. Empty, or all whitespace, is
@@ -171,6 +172,15 @@ namespace DSL
             else if(i > beforeGap)
             {
                 sign = 1;   // whitespace alone separates two terms: a multiplication
+            }
+            else if(sym == kScaleSymbol && isAlphaChar(u[i]))
+            {
+                // '10**-16erg/s': the scale factor runs straight into the symbol it
+                // scales. A figure cannot continue into letters, so the boundary is
+                // unambiguous and reads as a multiplication. Nothing is consumed here:
+                // the next pass starts on the symbol.
+                sign = 1;
+                continue;
             }
             else
                 throw FITSexception(BAD_KEYCHAR, kUnitClass, "unit",
