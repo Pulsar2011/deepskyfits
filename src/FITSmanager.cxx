@@ -11,6 +11,7 @@
 
 
 #include <DSTfits/FITSexception.h>
+#include <DSTfits/FITSnumeric.h>
 #include <DSTfits/FITSmanager.h>
 #include <DSTfits/FITSimg.h>
 #include <DSTfits/FITSdata.h>
@@ -963,6 +964,10 @@ namespace DSL
     {
         fits_status = 0;
 
+        // Outside the try below, which reports and carries on: a value
+        // that doesn't match its type has to reach the caller.
+        val.validate();
+
         try
         {
             switch (val.type()) {
@@ -990,8 +995,22 @@ namespace DSL
                     AppendKeyToHeader(HDU, key, TLONGLONG, val.value(), val.comment());
                     break;
 
+                case fByte :
                 case fBool :
                     AppendKeyToHeader(HDU, key, TBYTE, val.value(), val.comment());
+                    break;
+
+                case fUShort :
+                    AppendKeyToHeader(HDU, key, TUSHORT, val.value(), val.comment());
+                    break;
+
+                case fUInt :
+                case fULong :
+                    AppendKeyToHeader(HDU, key, TUINT, val.value(), val.comment());
+                    break;
+
+                case fULongLong :
+                    AppendKeyToHeader(HDU, key, TULONGLONG, val.value(), val.comment());
                     break;
 
                 case fFloat :
@@ -1071,7 +1090,7 @@ namespace DSL
         {
             if(TYPE == TFLOAT)
             {
-                float dval = std::stof(val);
+                float dval = parseWholeReal<float>(val);
                 
                 if(fits_update_key_fixflt(fptr.get(), const_cast<char*>( key.c_str() ),  dval, 8, comment, &fits_status ))
                 {
@@ -1080,34 +1099,70 @@ namespace DSL
             }
             else if(TYPE == TDOUBLE)
             {
-                double dval = std::stod(val);
+                double dval = parseWholeReal<double>(val);
                 
                 if(fits_update_key_fixdbl(fptr.get(), const_cast<char*>( key.c_str() ),  dval, 14, comment, &fits_status ))
                 {
                     throw FITSexception(fits_status,"FITSmanager","AppendKey");
                 }
             }
-            else if(TYPE == TSHORT  ||
-                    TYPE == TINT    ||
-                    TYPE == TUINT     )
+            else if(TYPE == TSBYTE    ||
+                    TYPE == TSHORT    ||
+                    TYPE == TINT      ||
+                    TYPE == TLONG     ||
+                    TYPE == TLONGLONG )
             {
-                long dval = std::stol(val);
+                LONGLONG dval = 0;
+
+                switch(TYPE)
+                {
+                    case TSBYTE: dval = parseInteger<int8_t>(val);    break;
+                    case TSHORT: dval = parseInteger<short>(val);     break;
+                    case TINT:   dval = parseInteger<int>(val);       break;
+                    case TLONG:  dval = parseInteger<long>(val);      break;
+                    default:     dval = parseInteger<long long>(val); break;
+                }
 
                 if(fits_update_key_lng(fptr.get(), const_cast<char*>( key.c_str() ), dval, comment, &fits_status ))
                 {
                     throw FITSexception(fits_status,"FITSmanager","AppendKey");
                 }
             }
-            else if(TYPE == TLONG   ||
-                    TYPE == TULONG  ||
-                    TYPE == TLONGLONG )
+            else if(TYPE == TBYTE      ||
+                    TYPE == TUSHORT    ||
+                    TYPE == TUINT      ||
+                    TYPE == TULONG     ||
+                    TYPE == TULONGLONG )
             {
-                LONGLONG dval = std::stoll(val);
-                
-                if(fits_update_key_lng(fptr.get(), const_cast<char*>( key.c_str() ),  dval, comment, &fits_status ))
+                ULONGLONG dval = 0;
+
+                switch(TYPE)
+                {
+                    case TBYTE:   dval = parseInteger<uint8_t>(val);            break;
+                    case TUSHORT: dval = parseInteger<unsigned short>(val);     break;
+                    case TUINT:   dval = parseInteger<unsigned int>(val);       break;
+                    case TULONG:  dval = parseInteger<unsigned long>(val);      break;
+                    default:      dval = parseInteger<unsigned long long>(val); break;
+                }
+
+                if(fits_update_key(fptr.get(), TULONGLONG, const_cast<char*>( key.c_str() ), &dval, comment, &fits_status ))
                 {
                     throw FITSexception(fits_status,"FITSmanager","AppendKey");
-                }   
+                }
+            }
+            else if(TYPE == TLOGICAL)
+            {
+                int dval = 0;
+
+                if(val == "T" || val == "1")
+                    dval = 1;
+                else if(val != "F" && val != "0")
+                    throw std::invalid_argument("not a logical: "+val);
+
+                if(fits_update_key_log(fptr.get(), const_cast<char*>( key.c_str() ), dval, comment, &fits_status ))
+                {
+                    throw FITSexception(fits_status,"FITSmanager","AppendKey");
+                }
             }
              else
             {
@@ -1116,6 +1171,14 @@ namespace DSL
                     throw FITSexception(fits_status,"FITSmanager","AppendKey");
                 }
             }
+        }
+        catch(const std::invalid_argument&)
+        {
+            throw FITSexception(BAD_KEYCHAR,"FITSmanager","AppendKey","Value '"+val+"' of KEYWORD "+key+" doesn't match the requested type.");
+        }
+        catch(const std::out_of_range&)
+        {
+            throw FITSexception(BAD_KEYCHAR,"FITSmanager","AppendKey","Value '"+val+"' of KEYWORD "+key+" is out of range for the requested type.");
         }
         catch(std::exception& e)
         {

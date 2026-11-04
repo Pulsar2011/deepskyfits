@@ -15,6 +15,14 @@
 #include <sstream>      // std::stringstrea
 #include <iomanip>      // std::setw
 #include <stdexcept>
+#include <algorithm>    // std::transform
+#include <cctype>       // std::isspace, std::tolower
+#include <cmath>        // std::isfinite
+#include <locale>       // std::locale::classic
+#include <numeric>      // std::iota
+#include <type_traits>
+#include <typeindex>
+#include <vector>
 
 
 #include <limits>
@@ -25,6 +33,7 @@
 #include <DSTfits/FITStable.h>
 #include <DSTfits/FITSexception.h>
 #include <DSTfits/FITSdata.h>
+#include <DSTfits/FITSnumeric.h>
 
 namespace DSL
 {
@@ -2339,6 +2348,942 @@ namespace DSL
     }
 #pragma endregion
 
+#pragma region -- Selecting rows from a string expression
+    namespace
+    {
+        /**
+         * @brief Parser behind FITStable::where(); evaluates the expression as it reads it.
+         * @details Each condition selects its rows straight away and the set operators
+         *          combine the results, so no syntax tree outlives the call.
+         */
+        class FilterExpression
+        {
+            enum class TokenKind { Text, Symbol };
+
+            struct Token
+            {
+                std::string text;
+                TokenKind   kind;
+            };
+
+            const FITStable&   table_;
+            const std::string& expr_;
+            std::vector<Token> tokens_;
+            size_t             pos_ = 0;
+
+            [[noreturn]] void fail(const std::string& reason) const
+            {
+                throw std::invalid_argument("FITStable::where: " + reason + " in filter expression '" + expr_ + "'");
+            }
+
+            /**
+             * @brief Split the expression into text and symbol tokens.
+             * @details A quoted value is one Text token whatever it holds, which is what
+             *          keeps '&&' or '(' inside a name from being read as syntax.
+             */
+            void tokenize()
+            {
+                std::string word;
+
+                const auto flushWord = [&]()
+                {
+                    if(!word.empty())
+                    {
+                        tokens_.push_back({word, TokenKind::Text});
+                        word.clear();
+                    }
+                };
+
+                for(size_t i = 0; i < expr_.size(); ++i)
+                {
+                    const char c = expr_[i];
+
+                    if(std::isspace(static_cast<unsigned char>(c)))
+                    {
+                        flushWord();
+                        continue;
+                    }
+
+                    if(c == '\'' || c == '"')
+                    {
+                        flushWord();
+                        const size_t close = expr_.find(c, i + 1);
+                        if(close == std::string::npos)
+                            fail("unterminated quote");
+
+                        tokens_.push_back({expr_.substr(i + 1, close - i - 1), TokenKind::Text});
+                        i = close;
+                        continue;
+                    }
+
+                    // Two-character symbols come first: the '=' of "=~" must not
+                    // be taken for the single '=' accepted as "==".
+                    const std::string pair = expr_.substr(i, 2);
+                    if(pair == "==" || pair == "!=" || pair == "<=" || pair == ">=" ||
+                       pair == "=~" || pair == "!~" || pair == "&&" || pair == "||")
+                    {
+                        flushWord();
+                        tokens_.push_back({pair, TokenKind::Symbol});
+                        ++i;
+                    }
+                    else if(c == '=')
+                    {
+                        flushWord();
+                        tokens_.push_back({"==", TokenKind::Symbol});
+                    }
+                    else if(c == '<' || c == '>' || c == '(' || c == ')')
+                    {
+                        flushWord();
+                        tokens_.push_back({std::string(1, c), TokenKind::Symbol});
+                    }
+                    else
+                        word += c;
+                }
+
+                flushWord();
+
+                if(tokens_.empty())
+                    fail("nothing to evaluate");
+            }
+
+            bool atSymbol(const char* symbol) const
+            {
+                return pos_ < tokens_.size() && tokens_[pos_].kind == TokenKind::Symbol && tokens_[pos_].text == symbol;
+            }
+
+            RowSet evaluateOr()
+            {
+                RowSet result = evaluateAnd();
+                while(atSymbol("||"))
+                {
+                    ++pos_;
+                    result = result || evaluateAnd();
+                }
+                return result;
+            }
+
+            RowSet evaluateAnd()
+            {
+                RowSet result = evaluateCondition();
+                while(atSymbol("&&"))
+                {
+                    ++pos_;
+                    result = result && evaluateCondition();
+                }
+                return result;
+            }
+
+            RowSet evaluateCondition()
+            {
+                // A parenthesised group is a condition in its own right: recursing
+                // into evaluateOr() is what lets it override the && > || precedence.
+                if(atSymbol("("))
+                {
+                    ++pos_;
+                    RowSet grouped = evaluateOr();
+                    if(!atSymbol(")"))
+                        fail("missing closing ')'");
+                    ++pos_;
+                    return grouped;
+                }
+
+                if(pos_ >= tokens_.size())
+                    fail("unexpected end");
+
+                const Token& column = tokens_[pos_++];
+                if(column.kind != TokenKind::Text)
+                    fail("expected a column name but found '" + column.text + "'");
+
+                if(pos_ >= tokens_.size())
+                    fail("missing operator after column '" + column.text + "'");
+
+                const Token& op = tokens_[pos_++];
+                const bool isComparison = op.kind == TokenKind::Symbol &&
+                                          (op.text == "==" || op.text == "!=" || op.text == "<" || op.text == "<=" ||
+                                           op.text == ">"  || op.text == ">=" || op.text == "=~" || op.text == "!~");
+                if(!isComparison)
+                    fail("expected a comparison operator after column '" + column.text + "' but found '" + op.text + "'");
+
+                if(pos_ >= tokens_.size())
+                    fail("missing value after operator '" + op.text + "'");
+
+                const Token& value = tokens_[pos_++];
+                if(value.kind != TokenKind::Text)
+                    fail("expected a value after operator '" + op.text + "' but found '" + value.text + "' (quote it if it is the value)");
+
+                return applyToColumn(column.text, op.text, value.text);
+            }
+
+            /** @brief Column name and stored type, as quoted in error messages. */
+            std::string describeColumn(const std::string& column) const
+            {
+                return "column '" + column + "' (" + FITSform::getDataType(table_.getColumn(column)->getType()) + ")";
+            }
+
+            RowSet applyToColumn(const std::string& column, const std::string& op, const std::string& value)
+            {
+                std::type_index payload = std::type_index(typeid(void));
+                try
+                {
+                    payload = table_.getColumn(column)->payloadType();
+                }
+                catch(const std::out_of_range&)
+                {
+                    fail("column '" + column + "' does not exist");
+                }
+
+                if(payload == std::type_index(typeid(double)))
+                    return applyCondition<double>(column, op, value);
+                else if(payload == std::type_index(typeid(float)))
+                    return applyCondition<float>(column, op, value);
+                else if(payload == std::type_index(typeid(int8_t)))
+                    return applyCondition<int8_t>(column, op, value);
+                else if(payload == std::type_index(typeid(uint8_t)))
+                    return applyCondition<uint8_t>(column, op, value);
+                else if(payload == std::type_index(typeid(int16_t)))
+                    return applyCondition<int16_t>(column, op, value);
+                else if(payload == std::type_index(typeid(uint16_t)))
+                    return applyCondition<uint16_t>(column, op, value);
+                else if(payload == std::type_index(typeid(int32_t)))
+                    return applyCondition<int32_t>(column, op, value);
+                else if(payload == std::type_index(typeid(uint32_t)))
+                    return applyCondition<uint32_t>(column, op, value);
+                else if(payload == std::type_index(typeid(int64_t)))
+                    return applyCondition<int64_t>(column, op, value);
+                else if(payload == std::type_index(typeid(uint64_t)))
+                    return applyCondition<uint64_t>(column, op, value);
+                else if(payload == std::type_index(typeid(std::string)))
+                    return applyCondition<std::string>(column, op, value);
+                else if(payload == std::type_index(typeid(bool)))
+                    return applyCondition<bool>(column, op, value);
+                else if(payload == std::type_index(typeid(void)))
+                    return RowSet(); // No storage means no row to match.
+
+                fail(describeColumn(column) + " can't be filtered: only scalar, non-complex columns can");
+            }
+
+            template<typename T>
+            RowSet applyCondition(const std::string& column, const std::string& op, const std::string& value)
+            {
+                // Wildcards are a string affair: a pattern means nothing against a
+                // number, and quietly falling back to == would filter on something
+                // other than what was asked for.
+                if(op == "=~" || op == "!~")
+                {
+                    if constexpr(std::is_same_v<T, std::string>)
+                    {
+                        const bool negated = (op == "!~");
+
+                        return table_.select<std::string>(column)
+                                     .custom([&value, negated](const std::string& cell)
+                                             { return globMatch(cell, value) != negated; })
+                                     .build();
+                    }
+                    else
+                    {
+                        fail("operator '" + op + "' matches a wildcard pattern, so it needs a string column, not "
+                             + describeColumn(column));
+                    }
+                }
+
+                if constexpr(std::is_same_v<T, bool>)
+                {
+                    if(op != "==" && op != "!=")
+                        fail("operator '" + op + "' has no meaning on logical " + describeColumn(column));
+                }
+
+                const T target = parseValue<T>(column, value);
+
+                RowSetBuilder<T> rows = table_.select<T>(column);
+
+                if(op == "==")
+                    rows.eq(target);
+                else if(op == "!=")
+                    rows.ne(target);
+                else if(op == "<")
+                    rows.lt(target);
+                else if(op == "<=")
+                    rows.le(target);
+                else if(op == ">")
+                    rows.gt(target);
+                else
+                    rows.ge(target);
+
+                return rows.build();
+            }
+
+            /**
+             * @brief Read a value as the column's stored type.
+             * @details The whole text has to fit that type: rounding "1.5" or wrapping
+             *          "70000" to a short would select rows nobody asked for.
+             */
+            template<typename T>
+            T parseValue(const std::string& column, const std::string& value) const
+            {
+                if constexpr(std::is_same_v<T, std::string>)
+                {
+                    return value;
+                }
+                else if constexpr(std::is_same_v<T, bool>)
+                {
+                    std::string lower = value;
+                    std::transform(lower.begin(), lower.end(), lower.begin(),
+                                   [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
+
+                    if(lower == "t" || lower == "true" || lower == "1")
+                        return true;
+                    if(lower == "f" || lower == "false" || lower == "0")
+                        return false;
+
+                    fail("value '" + value + "' is not a logical (T/F/true/false/1/0) for " + describeColumn(column));
+                }
+                else if constexpr(std::is_floating_point_v<T>)
+                {
+                    T parsed{};
+
+                    try
+                    {
+                        parsed = parseWholeReal<T>(value);
+                    }
+                    catch(const std::out_of_range&)
+                    {
+                        fail("value '" + value + "' is out of range for " + describeColumn(column));
+                    }
+                    catch(const std::invalid_argument&)
+                    {
+                        fail("value '" + value + "' is not a valid number for " + describeColumn(column));
+                    }
+
+                    // Comparing with NaN or infinity selects nothing useful, so it's more
+                    // likely a mistyped value than a request.
+                    if(!std::isfinite(parsed))
+                        fail("value '" + value + "' is not a valid number for " + describeColumn(column));
+
+                    return parsed;
+                }
+                else
+                {
+                    try
+                    {
+                        return parseInteger<T>(value);
+                    }
+                    catch(const std::out_of_range&)
+                    {
+                        fail("value '" + value + "' is out of range for " + describeColumn(column));
+                    }
+                    catch(const std::invalid_argument&)
+                    {
+                        fail("value '" + value + "' is not a valid integer for " + describeColumn(column));
+                    }
+                }
+            }
+
+            /**
+             * @brief Shell-style wildcard match.
+             * @details '*' stands for any run of characters (possibly empty), '?' for exactly
+             *          one, and every other character for itself. Case-sensitive, like ==.
+             *          Iterative, backtracking on the last '*' rather than recursing: the
+             *          recursive form costs exponential time on patterns like "*a*a*a*b",
+             *          and this runs once per row.
+             */
+            static bool globMatch(const std::string& text, const std::string& pattern)
+            {
+                size_t t = 0;
+                size_t p = 0;
+                size_t starPos  = std::string::npos; // pattern index of the last '*' met
+                size_t starText = 0;                 // how much text that '*' had swallowed
+
+                while(t < text.size())
+                {
+                    if(p < pattern.size() && (pattern[p] == '?' || pattern[p] == text[t]))
+                    {
+                        ++t;
+                        ++p;
+                    }
+                    else if(p < pattern.size() && pattern[p] == '*')
+                    {
+                        starPos  = p++;
+                        starText = t;
+                    }
+                    else if(starPos != std::string::npos)
+                    {
+                        // Dead end: hand the last '*' one more character and retry.
+                        p = starPos + 1;
+                        t = ++starText;
+                    }
+                    else
+                        return false;
+                }
+
+                // Trailing '*'s still match the (empty) rest of the text.
+                while(p < pattern.size() && pattern[p] == '*')
+                    ++p;
+
+                return p == pattern.size();
+            }
+
+        public:
+            FilterExpression(const FITStable& table, const std::string& expr)
+                : table_(table), expr_(expr)
+            {
+                tokenize();
+            }
+
+            RowSet evaluate()
+            {
+                RowSet rows = evaluateOr();
+
+                // A token left over here means the expression was not fully parsed
+                // (e.g. an unbalanced ')'); silently dropping it would filter on
+                // less than the user asked for.
+                if(pos_ < tokens_.size())
+                    fail("unexpected '" + tokens_[pos_].text + "'");
+
+                return rows;
+            }
+        };
+    }
+
+    /**
+     * @brief Select rows from a filter expression given as a string.
+     * @param expression Filter expression; see the declaration for its grammar.
+     * @return Matching rows; every row if the expression is empty.
+     * @throws std::invalid_argument if the expression can't be applied to this table.
+     */
+    RowSet FITStable::where(const std::string& expression) const
+    {
+        if(expression.empty())
+        {
+            std::vector<size_t> allRows(nrows());
+            std::iota(allRows.begin(), allRows.end(), 0);
+            return RowSet(std::move(allRows));
+        }
+
+        return FilterExpression(*this, expression).evaluate();
+    }
+#pragma endregion
+
+#pragma region -- Computing a column from a string expression
+    namespace
+    {
+        /**
+         * @brief Parser behind FITStable::computeColumn(); evaluates the definition as it reads it.
+         * @details Each operand is read as doubles and each operator combines them straight
+         *          away, reusing one of its operands' buffer, so no syntax tree outlives the call.
+         */
+        class ColumnExpression
+        {
+            enum class TokenKind { Number, Name, QuotedName, Symbol };
+
+            struct Token
+            {
+                std::string text;
+                TokenKind   kind;
+                double      number;
+            };
+
+            /// All rows of an operand, flattened row after row.
+            struct Value
+            {
+                std::vector<double> re;
+                std::vector<double> im;           ///< Only filled for a complex value.
+                size_t              elements = 0; ///< Per row; 0 for a constant, which holds a single value.
+            };
+
+            const FITStable&   table_;
+            const std::string& expr_;
+            const size_t       rows_;
+            std::vector<Token> tokens_;
+            size_t             pos_ = 0;
+
+            [[noreturn]] void fail(const std::string& reason) const
+            {
+                throw std::invalid_argument("FITStable::computeColumn: " + reason + " in column definition '" + expr_ + "'");
+            }
+
+            void tokenize()
+            {
+                for(size_t i = 0; i < expr_.size(); ++i)
+                {
+                    const char c = expr_[i];
+                    const unsigned char uc = static_cast<unsigned char>(c);
+
+                    if(std::isspace(uc))
+                        continue;
+
+                    if(c == '\'' || c == '"')
+                    {
+                        const size_t close = expr_.find(c, i + 1);
+                        if(close == std::string::npos)
+                            fail("unterminated quote");
+
+                        tokens_.push_back({expr_.substr(i + 1, close - i - 1), TokenKind::QuotedName, 0.0});
+                        i = close;
+                    }
+                    else if(std::isdigit(uc) || (c == '.' && i + 1 < expr_.size() && std::isdigit(static_cast<unsigned char>(expr_[i + 1]))))
+                    {
+                        size_t consumed = 0;
+                        double number = 0.0;
+                        try
+                        {
+                            number = parseDouble(expr_.substr(i), &consumed);
+                        }
+                        catch(const std::exception&)
+                        {
+                            fail("unreadable number at '" + expr_.substr(i) + "'");
+                        }
+                        tokens_.push_back({expr_.substr(i, consumed), TokenKind::Number, number});
+                        i += consumed - 1;
+                    }
+                    else if(std::isalpha(uc) || c == '_')
+                    {
+                        size_t end = i + 1;
+                        while(end < expr_.size() && (std::isalnum(static_cast<unsigned char>(expr_[end])) || expr_[end] == '_' || expr_[end] == '.'))
+                            ++end;
+
+                        tokens_.push_back({expr_.substr(i, end - i), TokenKind::Name, 0.0});
+                        i = end - 1;
+                    }
+                    else if(std::string("+-*/^(),=").find(c) != std::string::npos)
+                    {
+                        tokens_.push_back({std::string(1, c), TokenKind::Symbol, 0.0});
+                    }
+                    else
+                    {
+                        fail("unexpected character '" + std::string(1, c) + "' (a column name holding it must be quoted)");
+                    }
+                }
+            }
+
+            bool atSymbol(const char* symbol) const
+            {
+                return pos_ < tokens_.size() && tokens_[pos_].kind == TokenKind::Symbol && tokens_[pos_].text == symbol;
+            }
+
+            void expectSymbol(const char* symbol)
+            {
+                if(!atSymbol(symbol))
+                    fail("expected '" + std::string(symbol) + "'" + (pos_ < tokens_.size() ? " before '" + tokens_[pos_].text + "'" : " at the end"));
+                ++pos_;
+            }
+
+            bool columnExists(const std::string& name) const
+            {
+                try
+                {
+                    table_.getColumn(name);
+                    return true;
+                }
+                catch(const std::out_of_range&)
+                {
+                    return false;
+                }
+            }
+
+            template<typename T>
+            bool readReal(const FITSform& col, Value& out) const
+            {
+                const std::type_index payload = col.payloadType();
+                if(payload == std::type_index(typeid(T)))
+                {
+                    const auto& values = col.values<T>();
+                    out.re.assign(values.begin(), values.end());
+                    out.elements = 1;
+                    return true;
+                }
+                if(payload == std::type_index(typeid(std::vector<T>)))
+                {
+                    out.elements = static_cast<size_t>(std::max<int64_t>(col.getNelem(), 1));
+                    out.re.reserve(rows_ * out.elements);
+                    for(const auto& cell : col.values<std::vector<T>>())
+                    {
+                        if(cell.size() != out.elements)
+                            fail("column '" + col.getName() + "' has rows of different lengths");
+                        out.re.insert(out.re.end(), cell.begin(), cell.end());
+                    }
+                    return true;
+                }
+                return false;
+            }
+
+            template<typename T>
+            bool readComplex(const FITSform& col, Value& out) const
+            {
+                const std::type_index payload = col.payloadType();
+                if(payload == std::type_index(typeid(std::pair<T, T>)))
+                {
+                    const auto& values = col.values<std::pair<T, T>>();
+                    out.re.reserve(values.size());
+                    out.im.reserve(values.size());
+                    for(const auto& z : values)
+                    {
+                        out.re.push_back(static_cast<double>(z.first));
+                        out.im.push_back(static_cast<double>(z.second));
+                    }
+                    out.elements = 1;
+                    return true;
+                }
+                if(payload == std::type_index(typeid(std::vector<std::pair<T, T>>)))
+                {
+                    out.elements = static_cast<size_t>(std::max<int64_t>(col.getNelem(), 1));
+                    out.re.reserve(rows_ * out.elements);
+                    out.im.reserve(rows_ * out.elements);
+                    for(const auto& cell : col.values<std::vector<std::pair<T, T>>>())
+                    {
+                        if(cell.size() != out.elements)
+                            fail("column '" + col.getName() + "' has rows of different lengths");
+                        for(const auto& z : cell)
+                        {
+                            out.re.push_back(static_cast<double>(z.first));
+                            out.im.push_back(static_cast<double>(z.second));
+                        }
+                    }
+                    return true;
+                }
+                return false;
+            }
+
+            Value readColumn(const std::string& name) const
+            {
+                if(!columnExists(name))
+                    fail("column '" + name + "' does not exist");
+
+                const FITSform& col = *table_.getColumn(name);
+                if(col.size() != rows_)
+                    fail("column '" + name + "' doesn't have as many rows as the table");
+
+                Value value;
+                if(readReal<double>(col, value)  || readReal<float>(col, value)    ||
+                   readReal<int8_t>(col, value)  || readReal<uint8_t>(col, value)  ||
+                   readReal<int16_t>(col, value) || readReal<uint16_t>(col, value) ||
+                   readReal<int32_t>(col, value) || readReal<uint32_t>(col, value) ||
+                   readReal<int64_t>(col, value) || readReal<uint64_t>(col, value) ||
+                   readComplex<float>(col, value) || readComplex<double>(col, value))
+                    return value;
+
+                fail("column '" + name + "' isn't numeric: string, logical and bit columns can't be computed with");
+            }
+
+            void requireReal(const Value& value, const std::string& use) const
+            {
+                if(!value.im.empty())
+                    fail("a complex value can't be used in " + use + ": take its real(), img(), abs() or arg() first");
+            }
+
+            /// Applies a two-operand function, element by element, writing into one operand's buffer.
+            template<typename Op>
+            Value applyBinary(Value a, Value b, Op op, const std::string& use) const
+            {
+                requireReal(a, use);
+                requireReal(b, use);
+
+                if(a.elements == b.elements)
+                {
+                    for(size_t i = 0; i < a.re.size(); ++i)
+                        a.re[i] = op(a.re[i], b.re[i]);
+                    return a;
+                }
+                if(b.elements == 0)
+                {
+                    for(double& v : a.re)
+                        v = op(v, b.re[0]);
+                    return a;
+                }
+                if(a.elements == 0)
+                {
+                    for(double& v : b.re)
+                        v = op(a.re[0], v);
+                    return b;
+                }
+                if(a.elements == 1)
+                {
+                    for(size_t row = 0; row < rows_; ++row)
+                        for(size_t e = 0; e < b.elements; ++e)
+                            b.re[row * b.elements + e] = op(a.re[row], b.re[row * b.elements + e]);
+                    return b;
+                }
+                if(b.elements == 1)
+                {
+                    for(size_t row = 0; row < rows_; ++row)
+                        for(size_t e = 0; e < a.elements; ++e)
+                            a.re[row * a.elements + e] = op(a.re[row * a.elements + e], b.re[row]);
+                    return a;
+                }
+                fail("vectors of " + std::to_string(a.elements) + " and " + std::to_string(b.elements) + " elements can't be combined");
+            }
+
+            Value applyReal(Value value, double (*fn)(double), const std::string& use) const
+            {
+                requireReal(value, use);
+                for(double& v : value.re)
+                    v = fn(v);
+                return value;
+            }
+
+            /// real(), img(), abs() and arg(), the only functions taking a complex value.
+            Value applyComplexPart(const std::string& name, Value value) const
+            {
+                const bool isComplex = !value.im.empty();
+
+                if(name == "real")
+                {
+                }
+                else if(name == "abs")
+                {
+                    for(size_t i = 0; i < value.re.size(); ++i)
+                        value.re[i] = isComplex ? std::hypot(value.re[i], value.im[i]) : std::fabs(value.re[i]);
+                }
+                else if(name == "arg")
+                {
+                    for(size_t i = 0; i < value.re.size(); ++i)
+                        value.re[i] = std::atan2(isComplex ? value.im[i] : 0.0, value.re[i]);
+                }
+                else if(isComplex)
+                {
+                    value.re = std::move(value.im);
+                }
+                else
+                {
+                    std::fill(value.re.begin(), value.re.end(), 0.0);
+                }
+
+                value.im.clear();
+                return value;
+            }
+
+            Value callFunction(const std::string& name)
+            {
+                expectSymbol("(");
+                std::vector<Value> args;
+                args.push_back(evaluateSum());
+                while(atSymbol(","))
+                {
+                    ++pos_;
+                    args.push_back(evaluateSum());
+                }
+                expectSymbol(")");
+
+                const auto requireArgs = [&](size_t count)
+                {
+                    if(args.size() != count)
+                        fail("function '" + name + "' takes " + std::to_string(count) + " argument(s), not " + std::to_string(args.size()));
+                };
+
+                if(name == "real" || name == "img" || name == "imag" || name == "abs" || name == "arg")
+                {
+                    requireArgs(1);
+                    return applyComplexPart(name == "imag" ? "img" : name, std::move(args[0]));
+                }
+                if(name == "pow")
+                {
+                    requireArgs(2);
+                    return applyBinary(std::move(args[0]), std::move(args[1]),
+                                       [](double a, double b) { return std::pow(a, b); }, "pow()");
+                }
+
+                static const struct { const char* name; double (*fn)(double); } functions[] = {
+                    {"sqrt",  [](double v) { return std::sqrt(v);  }},
+                    {"exp",   [](double v) { return std::exp(v);   }},
+                    {"log",   [](double v) { return std::log(v);   }},
+                    {"log10", [](double v) { return std::log10(v); }},
+                    {"sin",   [](double v) { return std::sin(v);   }},
+                    {"cos",   [](double v) { return std::cos(v);   }},
+                    {"tan",   [](double v) { return std::tan(v);   }},
+                    {"asin",  [](double v) { return std::asin(v);  }},
+                    {"acos",  [](double v) { return std::acos(v);  }},
+                    {"atan",  [](double v) { return std::atan(v);  }},
+                };
+
+                for(const auto& function : functions)
+                {
+                    if(name == function.name)
+                    {
+                        requireArgs(1);
+                        return applyReal(std::move(args[0]), function.fn, name + "()");
+                    }
+                }
+
+                fail("unknown function '" + name + "'");
+            }
+
+            Value evaluatePrimary()
+            {
+                if(pos_ >= tokens_.size())
+                    fail("unexpected end of expression");
+
+                const Token token = tokens_[pos_];
+                ++pos_;
+
+                switch(token.kind)
+                {
+                    case TokenKind::Number:
+                    {
+                        Value value;
+                        value.re.push_back(token.number);
+                        return value;
+                    }
+                    case TokenKind::QuotedName:
+                        return readColumn(token.text);
+
+                    case TokenKind::Name:
+                        return atSymbol("(") ? callFunction(token.text) : readColumn(token.text);
+
+                    case TokenKind::Symbol:
+                        if(token.text == "(")
+                        {
+                            Value grouped = evaluateSum();
+                            expectSymbol(")");
+                            return grouped;
+                        }
+                        break;
+                }
+
+                fail("unexpected '" + token.text + "'");
+            }
+
+            // '^' binds tighter than a leading '-' on its left, and groups to the right:
+            // -a^2 is -(a^2), a^b^c is a^(b^c), and a^-1 is allowed.
+            Value evaluatePower()
+            {
+                Value base = evaluatePrimary();
+                if(!atSymbol("^"))
+                    return base;
+
+                ++pos_;
+                return applyBinary(std::move(base), evaluateUnary(),
+                                   [](double a, double b) { return std::pow(a, b); }, "'^'");
+            }
+
+            Value evaluateUnary()
+            {
+                if(atSymbol("+"))
+                {
+                    ++pos_;
+                    return evaluateUnary();
+                }
+                if(atSymbol("-"))
+                {
+                    ++pos_;
+                    return applyReal(evaluateUnary(), [](double v) { return -v; }, "'-'");
+                }
+                return evaluatePower();
+            }
+
+            Value evaluateProduct()
+            {
+                Value result = evaluateUnary();
+                while(atSymbol("*") || atSymbol("/"))
+                {
+                    const bool multiply = atSymbol("*");
+                    ++pos_;
+                    Value right = evaluateUnary();
+                    result = multiply
+                        ? applyBinary(std::move(result), std::move(right), [](double a, double b) { return a * b; }, "'*'")
+                        : applyBinary(std::move(result), std::move(right), [](double a, double b) { return a / b; }, "'/'");
+                }
+                return result;
+            }
+
+            Value evaluateSum()
+            {
+                Value result = evaluateProduct();
+                while(atSymbol("+") || atSymbol("-"))
+                {
+                    const bool add = atSymbol("+");
+                    ++pos_;
+                    Value right = evaluateProduct();
+                    result = add
+                        ? applyBinary(std::move(result), std::move(right), [](double a, double b) { return a + b; }, "'+'")
+                        : applyBinary(std::move(result), std::move(right), [](double a, double b) { return a - b; }, "'-'");
+                }
+                return result;
+            }
+
+        public:
+            ColumnExpression(const FITStable& table, const std::string& definition)
+                : table_(table), expr_(definition), rows_(table.nrows())
+            {
+                tokenize();
+            }
+
+            /// Name and flattened values of the new column.
+            struct Result
+            {
+                std::string         name;
+                std::vector<double> values;
+                size_t              elements;
+            };
+
+            Result evaluate()
+            {
+                if(tokens_.size() < 2 ||
+                   (tokens_[0].kind != TokenKind::Name && tokens_[0].kind != TokenKind::QuotedName) ||
+                   tokens_[1].kind != TokenKind::Symbol || tokens_[1].text != "=")
+                    fail("expected NAME = expression");
+
+                const std::string name = tokens_[0].text;
+                if(name.empty())
+                    fail("the new column has no name");
+                if(columnExists(name))
+                    fail("column '" + name + "' already exists");
+
+                pos_ = 2;
+                Value value = evaluateSum();
+                if(pos_ != tokens_.size())
+                    fail("unexpected '" + tokens_[pos_].text + "'");
+
+                requireReal(value, "a new column");
+
+                if(value.elements == 0) // A constant: the same value on every row.
+                {
+                    const double constant = value.re[0]; // assign() can't take a reference into its own vector
+                    value.re.assign(rows_, constant);
+                    value.elements = 1;
+                }
+
+                return {name, std::move(value.re), value.elements};
+            }
+        };
+    }
+
+    /**
+     * @brief Add a column computed from the other columns, in memory only.
+     * @param definition Column definition; see the declaration for its grammar.
+     * @return The new column.
+     * @throws std::invalid_argument if the definition can't be applied to this table.
+     */
+    const FITSform& FITStable::computeColumn(const std::string& definition)
+    {
+        ColumnExpression::Result result = ColumnExpression(*this, definition).evaluate();
+
+        const size_t position = fcolumns.size() + 1;
+
+        if(result.elements == 1)
+        {
+            auto col = std::make_unique<FITScolumn<double>>(result.name, tdouble,
+                int64_t(1), static_cast<int64_t>(sizeof(double)), "", position);
+            col->values<double>() = std::move(result.values);
+            fcolumns.push_back(std::move(col));
+        }
+        else
+        {
+            auto col = std::make_unique<FITScolumn<FITSform::doubleVector>>(result.name, tdouble,
+                static_cast<int64_t>(result.elements), static_cast<int64_t>(sizeof(double)), "", position);
+
+            auto& cells = col->values<FITSform::doubleVector>();
+            cells.resize(result.values.size() / result.elements);
+            for(size_t row = 0; row < cells.size(); ++row)
+            {
+                const auto first = result.values.begin() + static_cast<std::ptrdiff_t>(row * result.elements);
+                cells[row].assign(first, first + static_cast<std::ptrdiff_t>(result.elements));
+            }
+            fcolumns.push_back(std::move(col));
+        }
+
+        return *fcolumns.back();
+    }
+#pragma endregion
+
 #pragma region -- Accessing data from column
     /**
      * @brief Access a specific column by its name.
@@ -2951,11 +3896,11 @@ namespace DSL
                         if(payload == std::type_index(typeid(FITSform::floatVector)))
                         {
                             const auto& v = row.at<FITSform::floatVector>(colName);
-                            cell = joinVector(v, [](float x){ std::ostringstream oss; oss << x; return oss.str(); });
+                            cell = joinVector(v, [](float x){ std::ostringstream oss; oss.imbue(std::locale::classic()); oss << x; return oss.str(); });
                         }
                         else
                         {
-                            std::ostringstream oss; oss << row.at<float>(colName); cell = oss.str();
+                            std::ostringstream oss; oss.imbue(std::locale::classic()); oss << row.at<float>(colName); cell = oss.str();
                         }
                         break;
 
@@ -2963,11 +3908,11 @@ namespace DSL
                         if(payload == std::type_index(typeid(FITSform::doubleVector)))
                         {
                             const auto& v = row.at<FITSform::doubleVector>(colName);
-                            cell = joinVector(v, [](double x){ std::ostringstream oss; oss << x; return oss.str(); });
+                            cell = joinVector(v, [](double x){ std::ostringstream oss; oss.imbue(std::locale::classic()); oss << x; return oss.str(); });
                         }
                         else
                         {
-                            std::ostringstream oss; oss << row.at<double>(colName); cell = oss.str();
+                            std::ostringstream oss; oss.imbue(std::locale::classic()); oss << row.at<double>(colName); cell = oss.str();
                         }
                         break;
 
@@ -2993,6 +3938,7 @@ namespace DSL
                             cell = joinVector(v, [](const FITSform::complex& z)
                             {
                                 std::ostringstream oss;
+                                oss.imbue(std::locale::classic());
                                 oss << '(' << z.first << ',' << z.second << ')';
                                 return oss.str();
                             });
@@ -3001,6 +3947,7 @@ namespace DSL
                         {
                             const FITSform::complex z = row.at<FITSform::complex>(colName);
                             std::ostringstream oss;
+                            oss.imbue(std::locale::classic());
                             oss << '(' << z.first << ',' << z.second << ')';
                             cell = oss.str();
                         }
@@ -3013,6 +3960,7 @@ namespace DSL
                             cell = joinVector(v, [](const FITSform::dblcomplex& z)
                             {
                                 std::ostringstream oss;
+                                oss.imbue(std::locale::classic());
                                 oss << '(' << z.first << ',' << z.second << ')';
                                 return oss.str();
                             });
@@ -3021,6 +3969,7 @@ namespace DSL
                         {
                             const FITSform::dblcomplex z = row.at<FITSform::dblcomplex>(colName);
                             std::ostringstream oss;
+                            oss.imbue(std::locale::classic());
                             oss << '(' << z.first << ',' << z.second << ')';
                             cell = oss.str();
                         }

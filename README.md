@@ -224,6 +224,24 @@ Working with tables usually starts by choosing a column, building a set of match
    auto v = h.view<double>(rows); // ColumnView<double> restricted to rows
 ```
 
+- Filtering from a string, e.g. a command-line option:
+```c++
+   // Operators ==, !=, <, <=, >, >=, and =~ / !~ for wildcards on string columns.
+   // && binds tighter than ||, parentheses group, and an empty string selects every row.
+   // Values are read as the column's type; a bad expression throws std::invalid_argument.
+   RowSet rows = tbl->where("(OBJNAME=~WD* || SCSID>0) && RA >= 10.5");
+```
+
+- Computing a new column from a string, in memory only (nothing touches the file):
+```c++
+   // Operators +, -, *, /, ^ and functions sqrt, exp, log, log10, sin, cos, tan, asin, acos, atan, abs, pow.
+   // Vector columns work element by element. Complex columns go through real, img, abs (modulus) or arg.
+   // Every row is computed, so filter afterwards; a bad definition throws std::invalid_argument.
+   tbl->computeColumn("COLOR = MagG - MagPb");
+   tbl->computeColumn("NORMALIZED = VEC / 10");
+   RowSet blue = tbl->where("COLOR < 1");
+```
+
 - Sort or reorder rows globally:
 ```c++
    // Suppose you computed a custom permutation "order"
