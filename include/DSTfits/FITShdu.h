@@ -50,11 +50,13 @@ namespace DSL
 
 #pragma region  * ctor/dtor
             FITSkeyword(const std::string&, const std::string&);                        //!< Constructor
-            FITSkeyword(const std::string&, const std::string&, const key_type&);       //!< Constructor
+            FITSkeyword(const std::string&, const std::string&, const key_type&);       //!< Constructor; throws FITSexception if the value doesn't match the type
             FITSkeyword(const std::string&);                                            //!< Constructor
-            FITSkeyword(const std::string&, const key_type&);                           //!< Constructor
+            FITSkeyword(const std::string&, const key_type&);                           //!< Constructor; throws FITSexception if the value doesn't match the type
             FITSkeyword(const FITSkeyword&);                                            //!< Copy constructor
             ~FITSkeyword();                                                             //!< Destructor
+
+            static FITSkeyword unchecked(const std::string& val, const std::string& cmt, const key_type& kt); //!< Keyword read from a file: its type isn't checked against its value
         
 #pragma endregion
 #pragma region  * Accessor
@@ -68,8 +70,9 @@ namespace DSL
         
 #pragma endregion
 #pragma region  * Modifier
-            void setValue(const std::string&);                         //!< Set value for key
-            void setType(const key_type& t) { ftype = t; }             //!< Set type for key
+            void setValue(const std::string&);                         //!< Set value for key; throws FITSexception if the type can't hold it and write it
+            void validate() const;                                     //!< Throws FITSexception if the type can't hold the value and write it
+            void setType(const key_type&);                             //!< Set type for key; throws FITSexception if the value doesn't match it
         
 #pragma endregion
 #pragma region  * Dump

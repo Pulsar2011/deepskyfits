@@ -173,27 +173,27 @@ TEST(FITSkeyword_SetValue, TypeConsistency)
         EXPECT_EQ(k.value(), std::string(""));
     }
 
-    // fByte: unsigned small (<=1)
+    // fByte: unsigned <=255
     {
         FITSkeyword k(std::string("0"), key_type::fByte);
         EXPECT_NO_THROW(k.setValue("0")); EXPECT_EQ(k.value(), std::string("0"));
-        EXPECT_NO_THROW(k.setValue("1")); EXPECT_EQ(k.value(), std::string("1"));
-        bool threw = false; try { k.setValue("2"); } catch (const FITSexception&) { threw = true; } EXPECT_TRUE(threw);
+        EXPECT_NO_THROW(k.setValue("255")); EXPECT_EQ(k.value(), std::string("255"));
+        bool threw = false; try { k.setValue("256"); } catch (const FITSexception&) { threw = true; } EXPECT_TRUE(threw);
         threw = false; try { k.setValue("notnum"); } catch (const FITSexception&) { threw = true; } EXPECT_TRUE(threw);
     }
 
-    // fUShort: unsigned <=255
+    // fUShort: unsigned <=65535
     {
         FITSkeyword k(std::string("0"), key_type::fUShort);
-        EXPECT_NO_THROW(k.setValue("255")); EXPECT_EQ(k.value(), std::string("255"));
-        bool threw = false; try { k.setValue("256"); } catch (...) { threw = true; } EXPECT_TRUE(threw);
-    }
-
-    // fUInt: unsigned <=65535
-    {
-        FITSkeyword k(std::string("0"), key_type::fUInt);
         EXPECT_NO_THROW(k.setValue("65535")); EXPECT_EQ(k.value(), std::string("65535"));
         bool threw = false; try { k.setValue("65536"); } catch (...) { threw = true; } EXPECT_TRUE(threw);
+    }
+
+    // fUInt: unsigned <=4294967295
+    {
+        FITSkeyword k(std::string("0"), key_type::fUInt);
+        EXPECT_NO_THROW(k.setValue("4294967295")); EXPECT_EQ(k.value(), std::string("4294967295"));
+        bool threw = false; try { k.setValue("4294967296"); } catch (...) { threw = true; } EXPECT_TRUE(threw);
     }
 
     // fULong: unsigned larger (test a 32-bit max)
@@ -203,18 +203,19 @@ TEST(FITSkeyword_SetValue, TypeConsistency)
         bool threw = false; try { k.setValue("4294967296"); } catch (...) { threw = true; } EXPECT_TRUE(threw);
     }
 
-    // fShort: signed abs <=127
+    // fShort: signed 16-bit
     {
         FITSkeyword k(std::string("0"), key_type::fShort);
-        EXPECT_NO_THROW(k.setValue("127")); EXPECT_EQ(k.value(), std::string("127"));
-        bool threw = false; try { k.setValue("128"); } catch (const FITSexception&) { threw = true; } EXPECT_TRUE(threw);
+        EXPECT_NO_THROW(k.setValue("32767")); EXPECT_EQ(k.value(), std::string("32767"));
+        bool threw = false; try { k.setValue("32768"); } catch (const FITSexception&) { threw = true; } EXPECT_TRUE(threw);
     }
 
-    // fInt: signed abs <=32767
+    // fInt: signed 32-bit
     {
         FITSkeyword k(std::string("0"), key_type::fInt);
-        EXPECT_NO_THROW(k.setValue("32767")); EXPECT_EQ(k.value(), std::string("32767"));
-        bool threw = false; try { k.setValue("40000"); } catch (const FITSexception&) { threw = true; } EXPECT_TRUE(threw);
+        EXPECT_NO_THROW(k.setValue("40000")); EXPECT_EQ(k.value(), std::string("40000"));
+        EXPECT_NO_THROW(k.setValue("2147483647")); EXPECT_EQ(k.value(), std::string("2147483647"));
+        bool threw = false; try { k.setValue("2147483648"); } catch (const FITSexception&) { threw = true; } EXPECT_TRUE(threw);
     }
 
     // fLong: signed abs <=2147483647

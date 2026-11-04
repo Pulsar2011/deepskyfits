@@ -6,6 +6,12 @@
 #include <tuple>
 #include <random>
 #include <thread>
+#include <sstream>
+#include <string>
+#include <limits>
+#include <cmath>
+
+#include "gTest_locale.h"
 
 
 using namespace DSL;
@@ -1068,4 +1074,668 @@ TEST(RowIteratorTest, ModifyMultipleColumnsPerRow)
         EXPECT_DOUBLE_EQ(original.column<double>("COL_DOUBLE").data()[idx] - 1.0,
                          it.at<double>("COL_DOUBLE"));
     }
+}
+
+TEST(WhereExpressionTest, ComparisonsMirrorTypedApi)
+{
+    const FITStable table = CreateSampleTable();
+
+    EXPECT_EQ(IndicesOf(table.where("COL_INT == 3")), IndicesOf(table.select<int32_t>("COL_INT").eq(3).build()));
+    EXPECT_EQ(IndicesOf(table.where("COL_INT != 3")), IndicesOf(table.select<int32_t>("COL_INT").ne(3).build()));
+    EXPECT_EQ(IndicesOf(table.where("COL_INT < 0")),  IndicesOf(table.select<int32_t>("COL_INT").lt(0).build()));
+    EXPECT_EQ(IndicesOf(table.where("COL_INT <= 0")), IndicesOf(table.select<int32_t>("COL_INT").le(0).build()));
+    EXPECT_EQ(IndicesOf(table.where("COL_DOUBLE > 3.14")),  IndicesOf(table.select<double>("COL_DOUBLE").gt(3.14).build()));
+    EXPECT_EQ(IndicesOf(table.where("COL_DOUBLE >= 3.14")), IndicesOf(table.select<double>("COL_DOUBLE").ge(3.14).build()));
+    EXPECT_EQ(IndicesOf(table.where("COL_STR == beta")), (std::vector<size_t>{1}));
+}
+
+TEST(WhereExpressionTest, SpacingAndValueForms)
+{
+    const FITStable table = CreateSampleTable();
+    const std::vector<size_t> threes{6, 7};
+
+    EXPECT_EQ(IndicesOf(table.where("COL_INT==3")), threes);
+    EXPECT_EQ(IndicesOf(table.where("COL_INT=3")), threes);
+    EXPECT_EQ(IndicesOf(table.where("  COL_INT   =   3  ")), threes);
+    EXPECT_EQ(IndicesOf(table.where("COL_INT == +3")), threes);
+    EXPECT_EQ(IndicesOf(table.where("'COL_INT' == 3")), threes);
+    EXPECT_EQ(IndicesOf(table.where("COL_INT==-5")), (std::vector<size_t>{0, 9}));
+    EXPECT_EQ(IndicesOf(table.where("COL_DOUBLE >= 4.2e1")), (std::vector<size_t>{11}));
+}
+
+TEST(WhereExpressionTest, PrecedenceAndGrouping)
+{
+    const FITStable table = CreateSampleTable();
+
+    EXPECT_EQ(IndicesOf(table.where("COL_INT == 28 || COL_INT == 3 && COL_DOUBLE > 3")), (std::vector<size_t>{6, 8}));
+    EXPECT_EQ(IndicesOf(table.where("(COL_INT == 28 || COL_INT == 3) && COL_DOUBLE > 3")), (std::vector<size_t>{6}));
+    EXPECT_EQ(IndicesOf(table.where("COL_INT==28||COL_INT==3&&COL_DOUBLE>3")), (std::vector<size_t>{6, 8}));
+    EXPECT_EQ(IndicesOf(table.where("((COL_INT == 28))")), (std::vector<size_t>{8}));
+}
+
+TEST(WhereExpressionTest, Wildcards)
+{
+    const FITStable table = CreateSampleTable();
+
+    EXPECT_EQ(IndicesOf(table.where("COL_STR =~ *eta")), (std::vector<size_t>{1, 5, 6, 7}));
+    EXPECT_EQ(IndicesOf(table.where("COL_STR=~?eta")), (std::vector<size_t>{1, 5}));
+    EXPECT_EQ(IndicesOf(table.where("COL_STR !~ *a")), (std::vector<size_t>{4, 11}));
+    EXPECT_EQ(IndicesOf(table.where("COL_STR =~ 'a*'")), (std::vector<size_t>{0}));
+
+    // Outside =~ and !~ a '*' is only a character.
+    EXPECT_TRUE(table.where("COL_STR == *eta").empty());
+    EXPECT_EQ(table.where("COL_STR != *eta").size(), table.nrows());
+}
+
+TEST(WhereExpressionTest, QuotedValuesAreOneToken)
+{
+    FITStable table;
+
+    auto names = std::make_shared<FITScolumn<std::string>>("NAME", tstring, "", 1);
+    for (const std::string& value : std::vector<std::string>{"WD 1", "a&&b", "", "(x)", "A=B", "O'Brien"})
+    {
+        names->push_back(value);
+    }
+    table.InsertColumn(names);
+
+    EXPECT_EQ(IndicesOf(table.where("NAME = 'WD 1'")), (std::vector<size_t>{0}));
+    EXPECT_EQ(IndicesOf(table.where("NAME='WD 1'")), (std::vector<size_t>{0}));
+    EXPECT_EQ(IndicesOf(table.where("NAME == 'a&&b'")), (std::vector<size_t>{1}));
+    EXPECT_EQ(IndicesOf(table.where("NAME == ''")), (std::vector<size_t>{2}));
+    EXPECT_EQ(IndicesOf(table.where("NAME == '(x)'")), (std::vector<size_t>{3}));
+    EXPECT_EQ(IndicesOf(table.where("NAME == 'A=B'")), (std::vector<size_t>{4}));
+    EXPECT_EQ(IndicesOf(table.where("NAME == \"O'Brien\"")), (std::vector<size_t>{5}));
+}
+
+TEST(WhereExpressionTest, EmptyExpressionSelectsEveryRow)
+{
+    const FITStable table = CreateSampleTable();
+
+    EXPECT_EQ(table.where("").size(), table.nrows());
+    EXPECT_THROW(table.where("   "), std::invalid_argument);
+}
+
+TEST(WhereExpressionTest, ValuesFollowColumnType)
+{
+    FITStable table;
+
+    auto i8 = std::make_shared<FITScolumn<int8_t>>("I8", tsbyte, "", 1);
+    for (int8_t value : std::vector<int8_t>{-128, 0, 5})
+    {
+        i8->push_back(value);
+    }
+    table.InsertColumn(i8);
+
+    auto u8 = std::make_shared<FITScolumn<uint8_t>>("U8", tbyte, "", 1);
+    for (uint8_t value : std::vector<uint8_t>{0, 200, 255})
+    {
+        u8->push_back(value);
+    }
+    table.InsertColumn(u8);
+
+    auto i16 = std::make_shared<FITScolumn<int16_t>>("I16", tshort, "", 1);
+    for (int16_t value : std::vector<int16_t>{-300, 0, 70})
+    {
+        i16->push_back(value);
+    }
+    table.InsertColumn(i16);
+
+    auto flag = std::make_shared<FITScolumn<bool>>("FLAG", tlogical, "", 1);
+    for (bool value : std::vector<bool>{true, false, true})
+    {
+        flag->push_back(value);
+    }
+    table.InsertColumn(flag);
+
+    EXPECT_EQ(IndicesOf(table.where("I8 == -128")), (std::vector<size_t>{0}));
+    EXPECT_EQ(IndicesOf(table.where("U8 > 200")), (std::vector<size_t>{2}));
+    EXPECT_EQ(IndicesOf(table.where("I16 >= 0")), (std::vector<size_t>{1, 2}));
+
+    EXPECT_EQ(IndicesOf(table.where("FLAG == T")), (std::vector<size_t>{0, 2}));
+    EXPECT_EQ(IndicesOf(table.where("FLAG != true")), (std::vector<size_t>{1}));
+    EXPECT_EQ(IndicesOf(table.where("FLAG = 0")), (std::vector<size_t>{1}));
+
+    EXPECT_THROW(table.where("I8 == -129"), std::invalid_argument);
+    EXPECT_THROW(table.where("U8 == 256"), std::invalid_argument);
+    EXPECT_THROW(table.where("U8 > -1"), std::invalid_argument);
+    EXPECT_THROW(table.where("I16 > 70000"), std::invalid_argument);
+    EXPECT_THROW(table.where("FLAG < 1"), std::invalid_argument);
+    EXPECT_THROW(table.where("FLAG == maybe"), std::invalid_argument);
+}
+
+TEST(WhereExpressionTest, ValuesMustFitEntirely)
+{
+    const FITStable table = CreateSampleTable();
+
+    EXPECT_THROW(table.where("COL_INT >= 1.5"), std::invalid_argument);
+    EXPECT_THROW(table.where("COL_INT > 12abc"), std::invalid_argument);
+    EXPECT_THROW(table.where("COL_INT > 99999999999"), std::invalid_argument);
+    EXPECT_THROW(table.where("COL_INT == +-3"), std::invalid_argument);
+    EXPECT_THROW(table.where("COL_DOUBLE > 1.5x"), std::invalid_argument);
+    EXPECT_THROW(table.where("COL_DOUBLE > abc"), std::invalid_argument);
+    EXPECT_THROW(table.where("COL_DOUBLE > ''"), std::invalid_argument);
+    EXPECT_THROW(table.where("COL_DOUBLE > 1e999"), std::invalid_argument);
+    EXPECT_THROW(table.where("COL_DOUBLE > nan"), std::invalid_argument);
+    EXPECT_THROW(table.where("COL_DOUBLE < inf"), std::invalid_argument);
+}
+
+TEST(WhereExpressionTest, MalformedExpressionsThrow)
+{
+    const FITStable table = CreateSampleTable();
+
+    for (const std::string& expression : std::vector<std::string>{
+             "COL_INT",
+             "COL_INT >",
+             "COL_INT 3 4",
+             "COL_INT > )",
+             "COL_INT > 0 COL_INT",
+             "COL_INT > 0 &&",
+             "&& COL_INT > 0",
+             "(COL_INT > 0",
+             "COL_INT > 0)",
+             "()",
+             "COL_STR == 'beta",
+             "COL_INT =~ 3*"})
+    {
+        EXPECT_THROW(table.where(expression), std::invalid_argument) << expression;
+    }
+}
+
+TEST(WhereExpressionTest, UnknownColumnIsNamedInTheError)
+{
+    const FITStable table = CreateSampleTable();
+
+    try
+    {
+        table.where("NOPE > 0");
+        FAIL() << "expected std::invalid_argument";
+    }
+    catch (const std::invalid_argument& e)
+    {
+        EXPECT_NE(std::string(e.what()).find("NOPE"), std::string::npos);
+    }
+}
+
+TEST(WhereExpressionTest, VectorColumnsAreRejected)
+{
+    FITStable table;
+
+    auto vec = std::make_shared<FITScolumn<FITSform::floatVector>>("VEC", tfloat, int64_t(2), int64_t(4), "", 1);
+    vec->push_back(FITSform::floatVector{1.f, 2.f});
+    table.InsertColumn(vec);
+
+    EXPECT_THROW(table.where("VEC > 0"), std::invalid_argument);
+}
+
+TEST(WhereExpressionTest, WideIntegersKeepFullPrecision)
+{
+    FITStable table;
+
+    // 2^53 and 2^53+1 are the same number once they go through a double.
+    auto u64 = std::make_shared<FITScolumn<uint64_t>>("U64", tulonglong, "", 1);
+    for (uint64_t value : std::vector<uint64_t>{9007199254740992ULL, 9007199254740993ULL, 18446744073709551615ULL})
+    {
+        u64->push_back(value);
+    }
+    table.InsertColumn(u64);
+
+    auto i64 = std::make_shared<FITScolumn<int64_t>>("I64", tlonglong, "", 1);
+    for (int64_t value : std::vector<int64_t>{-9007199254740993LL, 9007199254740992LL, 9007199254740993LL})
+    {
+        i64->push_back(value);
+    }
+    table.InsertColumn(i64);
+
+    EXPECT_EQ(IndicesOf(table.where("U64 == 9007199254740993")), (std::vector<size_t>{1}));
+    EXPECT_EQ(IndicesOf(table.where("U64 == 18446744073709551615")), (std::vector<size_t>{2}));
+    EXPECT_EQ(IndicesOf(table.where("I64 == -9007199254740993")), (std::vector<size_t>{0}));
+    EXPECT_EQ(IndicesOf(table.where("I64 > 9007199254740992")), (std::vector<size_t>{2}));
+
+    EXPECT_THROW(table.where("U64 == 18446744073709551616"), std::invalid_argument);
+    EXPECT_THROW(table.where("U64 > -1"), std::invalid_argument);
+    EXPECT_THROW(table.where("I64 == 9223372036854775808"), std::invalid_argument);
+}
+
+TEST(WhereExpressionTest, UnsignedAndFloatColumns)
+{
+    FITStable table;
+
+    auto u16 = std::make_shared<FITScolumn<uint16_t>>("U16", tushort, "", 1);
+    for (uint16_t value : std::vector<uint16_t>{0, 40000, 65535})
+    {
+        u16->push_back(value);
+    }
+    table.InsertColumn(u16);
+
+    auto u32 = std::make_shared<FITScolumn<uint32_t>>("U32", tuint, "", 1);
+    for (uint32_t value : std::vector<uint32_t>{0u, 3000000000u, 4294967295u})
+    {
+        u32->push_back(value);
+    }
+    table.InsertColumn(u32);
+
+    auto f32 = std::make_shared<FITScolumn<float>>("F32", tfloat, "", 1);
+    for (float value : std::vector<float>{0.1f, 0.2f, 1.5f})
+    {
+        f32->push_back(value);
+    }
+    table.InsertColumn(f32);
+
+    EXPECT_EQ(IndicesOf(table.where("U16 == 65535")), (std::vector<size_t>{2}));
+    EXPECT_EQ(IndicesOf(table.where("U32 >= 3000000000")), (std::vector<size_t>{1, 2}));
+
+    // Read as a double, 0.1 would differ from the stored 0.1f and match nothing.
+    EXPECT_EQ(IndicesOf(table.where("F32 == 0.1")), (std::vector<size_t>{0}));
+
+    EXPECT_THROW(table.where("U16 == 65536"), std::invalid_argument);
+    EXPECT_THROW(table.where("U32 == 4294967296"), std::invalid_argument);
+    EXPECT_THROW(table.where("F32 > 1e50"), std::invalid_argument);
+}
+
+TEST(WhereExpressionTest, RowsSelectTheMatchingValuesOfOtherColumns)
+{
+    FITStable table = CreateSampleTable();
+
+    const RowSet rows = table.where("COL_STR =~ *eta && COL_INT > 3");
+
+    std::vector<double> selected;
+    rows.forEach([&](size_t row){ selected.push_back(table.column<double>("COL_DOUBLE").data()[row]); });
+
+    // beta, zeta, eta and theta end in "eta"; of those only zeta holds more than 3.
+    EXPECT_EQ(selected, (std::vector<double>{-2.3}));
+}
+
+namespace
+{
+    template<typename T>
+    void InsertValues(FITStable& table, const std::string& name, const dtype& type, const std::vector<T>& values)
+    {
+        auto column = std::make_shared<FITScolumn<T>>(name, type, "", 1);
+        for (const T& value : values)
+        {
+            column->push_back(value);
+        }
+        table.InsertColumn(column);
+    }
+}
+
+TEST(WhereExpressionTest, HexadecimalOnEveryNumericColumn)
+{
+    FITStable table;
+
+    InsertValues<int8_t>  (table, "I8",  tsbyte,     {-128, 127, 16});
+    InsertValues<uint8_t> (table, "U8",  tbyte,      {0, 200, 255});
+    InsertValues<int16_t> (table, "I16", tshort,     {-32768, 32767, 16});
+    InsertValues<uint16_t>(table, "U16", tushort,    {0, 40000, 65535});
+    InsertValues<int32_t> (table, "I32", tint,       {std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max(), 16});
+    InsertValues<uint32_t>(table, "U32", tuint,      {0u, 3000000000u, 4294967295u});
+    InsertValues<int64_t> (table, "I64", tlonglong,  {std::numeric_limits<int64_t>::min(), std::numeric_limits<int64_t>::max(), 9007199254740993LL});
+    InsertValues<uint64_t>(table, "U64", tulonglong, {9007199254740992ULL, 9007199254740993ULL, std::numeric_limits<uint64_t>::max()});
+    InsertValues<float>   (table, "F32", tfloat,     {0.5f, 1.5f, 16.f});
+    InsertValues<double>  (table, "D64", tdouble,    {0.5, 42.0, 16.0});
+
+    const std::vector<size_t> first{0}, second{1}, third{2};
+
+    EXPECT_EQ(IndicesOf(table.where("I8 == -0x80")), first);
+    EXPECT_EQ(IndicesOf(table.where("I8 == 0x7F")), second);
+    EXPECT_EQ(IndicesOf(table.where("U8 == 0xC8")), second);
+    EXPECT_EQ(IndicesOf(table.where("U8 == 0xff")), third);
+    EXPECT_EQ(IndicesOf(table.where("I16 == -0x8000")), first);
+    EXPECT_EQ(IndicesOf(table.where("I16 == 0x7FFF")), second);
+    EXPECT_EQ(IndicesOf(table.where("U16 == 0xFFFF")), third);
+    EXPECT_EQ(IndicesOf(table.where("I32 == -0x80000000")), first);
+    EXPECT_EQ(IndicesOf(table.where("I32 == 0x7FFFFFFF")), second);
+    EXPECT_EQ(IndicesOf(table.where("U32 == 0xFFFFFFFF")), third);
+    EXPECT_EQ(IndicesOf(table.where("I64 == -0x8000000000000000")), first);
+    EXPECT_EQ(IndicesOf(table.where("I64 == 0x7FFFFFFFFFFFFFFF")), second);
+    EXPECT_EQ(IndicesOf(table.where("I64 == 0x20000000000001")), third); // 2^53+1: no double on the way
+    EXPECT_EQ(IndicesOf(table.where("U64 == 0x20000000000001")), second);
+    EXPECT_EQ(IndicesOf(table.where("U64 == 0XFFFFFFFFFFFFFFFF")), third);
+    EXPECT_EQ(IndicesOf(table.where("F32 == 0x10")), third);
+    EXPECT_EQ(IndicesOf(table.where("F32 == 0x1.8p0")), second);
+    EXPECT_EQ(IndicesOf(table.where("D64 == 0x2A")), second);
+    EXPECT_EQ(IndicesOf(table.where("D64 == 0x1p-1")), first);
+
+    EXPECT_EQ(IndicesOf(table.where("I32==+0x10")), third);
+    EXPECT_EQ(IndicesOf(table.where("(I8=0x10) && U8>=0xC8")), third);
+
+    // A leading zero is still decimal, not octal: 010 is 10, which no row holds, not 8.
+    EXPECT_TRUE(table.where("I32 == 010").empty());
+    EXPECT_EQ(IndicesOf(table.where("I32 == 016")), third);
+
+    EXPECT_THROW(table.where("I8 == 0x80"), std::invalid_argument);
+    EXPECT_THROW(table.where("U8 == 0x100"), std::invalid_argument);
+    EXPECT_THROW(table.where("U8 > -0x1"), std::invalid_argument);
+    EXPECT_THROW(table.where("I16 == 0x8000"), std::invalid_argument);
+    EXPECT_THROW(table.where("U16 == 0x10000"), std::invalid_argument);
+    EXPECT_THROW(table.where("I32 == 0x80000000"), std::invalid_argument);
+    EXPECT_THROW(table.where("U32 == 0x100000000"), std::invalid_argument);
+    EXPECT_THROW(table.where("I64 == 0x8000000000000000"), std::invalid_argument);
+    EXPECT_THROW(table.where("U64 == 0x10000000000000000"), std::invalid_argument);
+
+    EXPECT_THROW(table.where("I32 == 0x"), std::invalid_argument);
+    EXPECT_THROW(table.where("I32 == 0xZZ"), std::invalid_argument);
+    EXPECT_THROW(table.where("I32 == 0x1.8"), std::invalid_argument);
+    EXPECT_THROW(table.where("D64 == 0x"), std::invalid_argument);
+    EXPECT_THROW(table.where("D64 == 0xZZ"), std::invalid_argument);
+    EXPECT_THROW(table.where("F32 > 0x1p200"), std::invalid_argument);
+}
+
+TEST(WhereExpressionTest, DecimalPointIsADotWhateverTheLocale)
+{
+    const FITStable table = CreateSampleTable();
+    const std::vector<size_t> expected{4, 6, 11};
+
+    ASSERT_EQ(IndicesOf(table.where("COL_DOUBLE > 3.13")), expected);
+
+    CommaDecimalLocale commaLocale;
+
+    // Proves the locale is really in force, or the checks below would prove nothing.
+    std::ostringstream printed;
+    printed << 1.5;
+    ASSERT_EQ(printed.str(), "1,5");
+
+    EXPECT_EQ(IndicesOf(table.where("COL_DOUBLE > 3.13")), expected);
+    EXPECT_EQ(IndicesOf(table.where("COL_DOUBLE == 0.25")), (std::vector<size_t>{2}));
+    EXPECT_EQ(IndicesOf(table.where("COL_DOUBLE >= 4.2e1")), (std::vector<size_t>{11}));
+    EXPECT_THROW(table.where("COL_DOUBLE > 3,13"), std::invalid_argument);
+}
+
+TEST(TableCsvTest, DecimalPointIsADotWhateverTheLocale)
+{
+    FITStable table;
+
+    auto dbl = std::make_shared<FITScolumn<double>>("DBL", tdouble, "", 1);
+    dbl->push_back(0.25);
+    table.InsertColumn(dbl);
+
+    auto flt = std::make_shared<FITScolumn<float>>("FLT", tfloat, "", 1);
+    flt->push_back(0.5f);
+    table.InsertColumn(flt);
+
+    auto fltVec = std::make_shared<FITScolumn<FITSform::floatVector>>("FV", tfloat, int64_t(2), int64_t(4), "", 1);
+    fltVec->push_back(FITSform::floatVector{1.5f, 2.5f});
+    table.InsertColumn(fltVec);
+
+    auto dblVec = std::make_shared<FITScolumn<FITSform::doubleVector>>("DV", tdouble, int64_t(2), int64_t(8), "", 1);
+    dblVec->push_back(FITSform::doubleVector{3.5, 4.5});
+    table.InsertColumn(dblVec);
+
+    auto cplx = std::make_shared<FITScolumn<FITSform::complex>>("CX", tcplx, "", 1);
+    cplx->push_back(FITSform::complex(5.5f, 6.5f));
+    table.InsertColumn(cplx);
+
+    auto dblCplx = std::make_shared<FITScolumn<FITSform::dblcomplex>>("DC", tdbcplx, "", 1);
+    dblCplx->push_back(FITSform::dblcomplex(7.5, 8.5));
+    table.InsertColumn(dblCplx);
+
+    CommaDecimalLocale commaLocale;
+
+    // Created under the comma locale, this stream would write 1,5 by itself.
+    std::ostringstream csv;
+    table.toCSV(csv, '\t');
+    const std::string text = csv.str();
+
+    for (const std::string& expected : {"0.25", "0.5", "{1.5;2.5}", "{3.5;4.5}", "(5.5,6.5)", "(7.5,8.5)"})
+    {
+        EXPECT_NE(text.find(expected), std::string::npos) << expected << " not in:\n" << text;
+    }
+}
+
+TEST(WhereExpressionTest, TableReadBackFromFile)
+{
+#ifndef CI_CIWORKER
+    const std::string fileName = "./build/testdata/test_fitstable_where.fits";
+#else
+    const std::string fileName = "./testdata/test_fitstable_where.fits";
+#endif
+
+    FITStable written;
+
+    auto scsid = std::make_shared<FITScolumn<int16_t>>("SCSID", tshort, "", 1);
+    for (int16_t value : std::vector<int16_t>{0, 1, 2, -1})
+    {
+        scsid->push_back(value);
+    }
+    written.InsertColumn(scsid);
+
+    // Above 32767 a uint16 only survives the file through BZERO.
+    auto counts = std::make_shared<FITScolumn<uint16_t>>("COUNTS", tushort, "", 1);
+    for (uint16_t value : std::vector<uint16_t>{7, 40000, 65535, 0})
+    {
+        counts->push_back(value);
+    }
+    written.InsertColumn(counts);
+
+    auto ra = std::make_shared<FITScolumn<double>>("RA", tdouble, "", 1);
+    for (double value : std::vector<double>{10.5, 20.25, -3.0, 0.0})
+    {
+        ra->push_back(value);
+    }
+    written.InsertColumn(ra);
+
+    auto flag = std::make_shared<FITScolumn<bool>>("FLAG", tlogical, "", 1);
+    for (bool value : std::vector<bool>{true, false, true, false})
+    {
+        flag->push_back(value);
+    }
+    written.InsertColumn(flag);
+
+    // Names shorter than the widest one come back from padded storage.
+    auto name = std::make_shared<FITScolumn<std::string>>("OBJNAME", tstring, "", 1);
+    for (const std::string& value : std::vector<std::string>{"WD 1", "WD12", "X", "lambda"})
+    {
+        name->push_back(value);
+    }
+    written.InsertColumn(name);
+
+    ASSERT_NO_THROW(written.write(fileName, 0, true));
+
+    fitsfile* rawFptr = nullptr;
+    int status = 0;
+    ASSERT_EQ(fits_open_file(&rawFptr, fileName.c_str(), READONLY, &status), 0);
+    std::shared_ptr<fitsfile> fptr(rawFptr, [](fitsfile*){}); // manual close
+
+    int hdutype = 0;
+    ASSERT_EQ(fits_movabs_hdu(fptr.get(), 2, &hdutype, &status), 0);
+    const FITStable table(fptr, 2);
+    EXPECT_EQ(fits_close_file(fptr.get(), &status), 0);
+
+    ASSERT_EQ(table.nrows(), 4u);
+
+    EXPECT_EQ(table.where("").size(), 4u);
+    EXPECT_EQ(IndicesOf(table.where("SCSID > 0")), (std::vector<size_t>{1, 2}));
+    EXPECT_EQ(IndicesOf(table.where("COUNTS > 32767")), (std::vector<size_t>{1, 2}));
+    EXPECT_EQ(IndicesOf(table.where("RA >= 20 && SCSID <= 1")), (std::vector<size_t>{1}));
+    EXPECT_EQ(IndicesOf(table.where("FLAG == T")), (std::vector<size_t>{0, 2}));
+    EXPECT_EQ(IndicesOf(table.where("OBJNAME == X")), (std::vector<size_t>{2}));
+    EXPECT_EQ(IndicesOf(table.where("OBJNAME == 'WD 1'")), (std::vector<size_t>{0}));
+    EXPECT_EQ(IndicesOf(table.where("OBJNAME =~ WD*")), (std::vector<size_t>{0, 1}));
+    EXPECT_EQ(IndicesOf(table.where("OBJNAME !~ WD*")), (std::vector<size_t>{2, 3}));
+    EXPECT_EQ(IndicesOf(table.where("(OBJNAME =~ WD* || SCSID < 0) && FLAG == F")), (std::vector<size_t>{1, 3}));
+
+    EXPECT_THROW(table.where("SCSID > 70000"), std::invalid_argument);
+    EXPECT_THROW(table.where("MISSING > 0"), std::invalid_argument);
+}
+
+namespace
+{
+    /// Four rows: real columns A and B, integer I, string S, 2-vectors V and W, a 3-vector T, complex Z.
+    FITStable CreateComputeTable()
+    {
+        FITStable table;
+
+        auto a = std::make_shared<FITScolumn<double>>("A", tdouble, "", 1);
+        for (double value : {1.0, 2.0, 3.0, 4.0}) a->push_back(value);
+        table.InsertColumn(a);
+
+        auto b = std::make_shared<FITScolumn<float>>("B", tfloat, "", 2);
+        for (float value : {0.5f, 0.0f, 2.0f, -1.0f}) b->push_back(value);
+        table.InsertColumn(b);
+
+        auto i = std::make_shared<FITScolumn<int32_t>>("I", tint, "", 3);
+        for (int32_t value : {10, 20, 30, 40}) i->push_back(value);
+        table.InsertColumn(i);
+
+        auto s = std::make_shared<FITScolumn<std::string>>("S", tstring, "", 4);
+        for (const char* value : {"a", "b", "c", "d"}) s->push_back(std::string(value));
+        table.InsertColumn(s);
+
+        auto v = std::make_shared<FITScolumn<FITSform::doubleVector>>("V", tdouble, int64_t(2), int64_t(8), "", 5);
+        for (int row = 0; row < 4; ++row) v->push_back(FITSform::doubleVector{double(row), double(10 + row)});
+        table.InsertColumn(v);
+
+        auto w = std::make_shared<FITScolumn<FITSform::floatVector>>("W", tfloat, int64_t(2), int64_t(4), "", 6);
+        for (int row = 0; row < 4; ++row) w->push_back(FITSform::floatVector{1.0f, 2.0f});
+        table.InsertColumn(w);
+
+        auto t = std::make_shared<FITScolumn<FITSform::doubleVector>>("T", tdouble, int64_t(3), int64_t(8), "", 7);
+        for (int row = 0; row < 4; ++row) t->push_back(FITSform::doubleVector{1.0, 2.0, 3.0});
+        table.InsertColumn(t);
+
+        auto z = std::make_shared<FITScolumn<FITSform::complex>>("Z", tcplx, "", 8);
+        for (int row = 0; row < 4; ++row) z->push_back(FITSform::complex{3.0f, 4.0f});
+        table.InsertColumn(z);
+
+        return table;
+    }
+
+    /// Computes "R = <expression>" on a fresh table and returns the scalar result.
+    std::vector<double> Computed(const std::string& expression)
+    {
+        FITStable table = CreateComputeTable();
+        return table.computeColumn("R = " + expression).values<double>();
+    }
+
+    /// The definition must be refused, and leave the table as it was.
+    void ExpectRefused(const std::string& definition)
+    {
+        FITStable table = CreateComputeTable();
+        const size_t columns = table.ncols();
+        EXPECT_THROW(table.computeColumn(definition), std::invalid_argument) << definition;
+        EXPECT_EQ(table.ncols(), columns) << definition;
+    }
+}
+
+TEST(ComputeColumnTest, ArithmeticAndPrecedence)
+{
+    EXPECT_EQ(Computed("A - B"), (std::vector<double>{0.5, 2.0, 1.0, 5.0}));
+    EXPECT_EQ(Computed("A + 2 * I"), (std::vector<double>{21.0, 42.0, 63.0, 84.0}));
+    EXPECT_EQ(Computed("(A + 2) * I"), (std::vector<double>{30.0, 80.0, 150.0, 240.0}));
+    EXPECT_EQ(Computed("I / 10 - A"), (std::vector<double>{0.0, 0.0, 0.0, 0.0}));
+    EXPECT_EQ(Computed("A-1"), (std::vector<double>{0.0, 1.0, 2.0, 3.0}));
+    EXPECT_EQ(Computed("'A' * 1.5e1"), (std::vector<double>{15.0, 30.0, 45.0, 60.0}));
+}
+
+TEST(ComputeColumnTest, PowerBindsTightestAndGroupsToTheRight)
+{
+    EXPECT_EQ(Computed("-A^2"), (std::vector<double>{-1.0, -4.0, -9.0, -16.0}));
+    EXPECT_EQ(Computed("2 * A^2"), (std::vector<double>{2.0, 8.0, 18.0, 32.0}));
+    EXPECT_EQ(Computed("2^3^2 + 0 * A"), (std::vector<double>{512.0, 512.0, 512.0, 512.0}));
+    EXPECT_DOUBLE_EQ(Computed("A^-1")[3], 0.25);
+    EXPECT_EQ(Computed("pow(A, 2)"), (std::vector<double>{1.0, 4.0, 9.0, 16.0}));
+}
+
+TEST(ComputeColumnTest, Functions)
+{
+    EXPECT_EQ(Computed("sqrt(A * A)"), (std::vector<double>{1.0, 2.0, 3.0, 4.0}));
+    EXPECT_EQ(Computed("log10(A / A * 100)"), (std::vector<double>{2.0, 2.0, 2.0, 2.0}));
+    EXPECT_EQ(Computed("abs(B)"), (std::vector<double>{0.5, 0.0, 2.0, 1.0}));
+    EXPECT_DOUBLE_EQ(Computed("exp(log(A))")[2], 3.0);
+}
+
+TEST(ComputeColumnTest, ConstantFillsEveryRow)
+{
+    EXPECT_EQ(Computed("7"), (std::vector<double>{7.0, 7.0, 7.0, 7.0}));
+    EXPECT_EQ(Computed("abs(-3) + 1"), (std::vector<double>{4.0, 4.0, 4.0, 4.0}));
+}
+
+TEST(ComputeColumnTest, DivisionByZeroIsNotAnError)
+{
+    const std::vector<double> ratio = Computed("A / B");
+    EXPECT_DOUBLE_EQ(ratio[0], 2.0);
+    EXPECT_TRUE(std::isinf(ratio[1]));
+
+    EXPECT_TRUE(std::isnan(Computed("B / B")[1]));
+}
+
+TEST(ComputeColumnTest, VectorsWorkElementByElement)
+{
+    FITStable table = CreateComputeTable();
+
+    const auto& scaled = table.computeColumn("SCALED = V / 10").values<FITSform::doubleVector>();
+    ASSERT_EQ(scaled.size(), 4u);
+    EXPECT_EQ(scaled[2], (FITSform::doubleVector{0.2, 1.2}));
+
+    const auto& byScalar = table.computeColumn("BY_SCALAR = A * V").values<FITSform::doubleVector>();
+    EXPECT_EQ(byScalar[1], (FITSform::doubleVector{2.0, 22.0}));
+
+    const auto& sum = table.computeColumn("SUM = V + W").values<FITSform::doubleVector>();
+    EXPECT_EQ(sum[3], (FITSform::doubleVector{4.0, 15.0}));
+
+    EXPECT_EQ(table.getColumn("SCALED")->getNelem(), 2);
+    EXPECT_EQ(table.getColumn("SCALED")->getType(), tdouble);
+
+    ExpectRefused("BAD = V + T");
+}
+
+TEST(ComputeColumnTest, ComplexGoesThroughItsFunctions)
+{
+    EXPECT_EQ(Computed("real(Z)"), (std::vector<double>{3.0, 3.0, 3.0, 3.0}));
+    EXPECT_EQ(Computed("img(Z)"), (std::vector<double>{4.0, 4.0, 4.0, 4.0}));
+    EXPECT_EQ(Computed("imag(Z)"), (std::vector<double>{4.0, 4.0, 4.0, 4.0}));
+    EXPECT_EQ(Computed("abs(Z)"), (std::vector<double>{5.0, 5.0, 5.0, 5.0}));
+    EXPECT_DOUBLE_EQ(Computed("arg(Z)")[0], std::atan2(4.0, 3.0));
+    EXPECT_EQ(Computed("abs(Z) * 2"), (std::vector<double>{10.0, 10.0, 10.0, 10.0}));
+
+    EXPECT_EQ(Computed("real(A)"), (std::vector<double>{1.0, 2.0, 3.0, 4.0}));
+    EXPECT_EQ(Computed("img(A)"), (std::vector<double>{0.0, 0.0, 0.0, 0.0}));
+    EXPECT_DOUBLE_EQ(Computed("arg(B)")[3], std::atan2(0.0, -1.0));
+
+    ExpectRefused("BAD = Z");
+    ExpectRefused("BAD = Z * 2");
+    ExpectRefused("BAD = -Z");
+    ExpectRefused("BAD = sqrt(Z)");
+}
+
+TEST(ComputeColumnTest, EveryRowIsComputedAndFilteredAfterwards)
+{
+    FITStable table = CreateComputeTable();
+    const RowSet before = table.where("A > 2");
+
+    EXPECT_EQ(table.computeColumn("C = A * 2").size(), table.nrows());
+
+    EXPECT_EQ(IndicesOf(table.where("C > 4")), IndicesOf(before));
+    EXPECT_EQ(table.ncols(), CreateComputeTable().ncols() + 1);
+    EXPECT_EQ(table.getColumn("C")->getName(), "C");
+
+    // The column it is computed from may be another computed column.
+    EXPECT_EQ(table.computeColumn("D = C + 1").values<double>(), (std::vector<double>{3.0, 5.0, 7.0, 9.0}));
+}
+
+TEST(ComputeColumnTest, QuotedNames)
+{
+    FITStable table = CreateComputeTable();
+    EXPECT_EQ(table.computeColumn("'MAG-G' = A + 1").values<double>(), (std::vector<double>{2.0, 3.0, 4.0, 5.0}));
+    EXPECT_EQ(table.computeColumn("OUT = 'MAG-G' * 2").values<double>(), (std::vector<double>{4.0, 6.0, 8.0, 10.0}));
+}
+
+TEST(ComputeColumnTest, BadDefinitionsLeaveTheTableUnchanged)
+{
+    for (const char* definition : {
+             "", "   ", "A", "= A", "A + 1", "NEW", "NEW =", "NEW = A +", "NEW = (A", "NEW = A)", "NEW = A B",
+             "NEW = 1.5.2", "NEW = A == 1", "NEW = 'A", "NEW = A % 2", "'' = A",
+             "NEW = MISSING", "NEW = missing(A)", "NEW = sqrt()", "NEW = sqrt(A, B)", "NEW = pow(A)",
+             "NEW = S", "NEW = S + 1"})
+    {
+        ExpectRefused(definition);
+    }
+
+    // A name the table already has: neither a column of the file nor a computed one is replaced.
+    ExpectRefused("A = B");
+
+    FITStable table = CreateComputeTable();
+    table.computeColumn("C = A");
+    EXPECT_THROW(table.computeColumn("C = B"), std::invalid_argument);
+    EXPECT_EQ(table.getColumn("C")->values<double>()[0], 1.0);
 }

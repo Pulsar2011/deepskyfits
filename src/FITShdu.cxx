@@ -12,6 +12,7 @@
 
 #include <DSTfits/FITShdu.h>
 #include <DSTfits/FITSexception.h>
+#include <DSTfits/FITSnumeric.h>
 
 #include <limits>
 #include <cmath>
@@ -26,6 +27,8 @@
 #include <iomanip>
 #include <cstdio>
 #include <cstdlib>
+#include <iostream>
+#include <type_traits>
 
 // Ensure basic integer sizes for narrowing casts / CFITSIO interoperability
 static_assert(CHAR_BIT == 8, "This code assumes 8-bit chars");
@@ -43,30 +46,184 @@ namespace DSL
          * @details Tries @p minDigits .. @p maxDigits significant digits and keeps the first
          * that round-trips through @p parse; @p maxDigits (max_digits10 of the type) always
          * does. Exact without padding: 0.0018888888 stays 0.0018888888, 150.5 stays 150.5.
+         * The decimal point is a '.' whatever the locale.
          *
          * A decimal point is added to an integral result ("4" -> "4.0") so the value still
          * reads as a real, not an integer. Non-finite values keep their plain text, FITS
          * having no representation for them anyway.
          */
         template<typename T>
-        std::string exactRealString(T v, int minDigits, int maxDigits, T (*parse)(const char*, char**))
+        std::string exactRealString(T v, int minDigits, int maxDigits, T (*parse)(const std::string&, size_t*))
         {
             if(!std::isfinite(v))
                 return std::to_string(v);
 
-            char buf[40];
+            std::string s;
             for(int p = minDigits; p <= maxDigits; p++)
             {
-                std::snprintf(buf, sizeof(buf), "%.*G", p, static_cast<double>(v));
-                if(parse(buf, nullptr) == v)
-                    break;
+                s = formatReal(static_cast<double>(v), p);
+                try
+                {
+                    if(parse(s, nullptr) == v)
+                        break;
+                }
+                catch(const std::out_of_range&)
+                {
+                    // Rounded up past the largest value of the type: it needs more digits.
+                }
             }
 
-            std::string s(buf);
             if(s.find_first_of(".E") == std::string::npos)
                 s += ".0";
 
             return s;
+        }
+
+        template<typename W>
+        W toInteger(const std::string& text, size_t* consumed)
+        {
+            const int base = integerBase(text);
+
+            if constexpr(std::is_same_v<W, int>)
+                return std::stoi(text, consumed, base);
+            else if constexpr(std::is_same_v<W, long>)
+                return std::stol(text, consumed, base);
+            else if constexpr(std::is_same_v<W, long long>)
+                return std::stoll(text, consumed, base);
+            else if constexpr(std::is_same_v<W, unsigned long>)
+                return std::stoul(text, consumed, base);
+            else
+                return std::stoull(text, consumed, base);
+        }
+
+        /**
+         * @brief Integer value of a keyword, asked for through one of the integer getters.
+         *
+         * @details An integer conversion stops at the first character it can't read, which on
+         * a real number gives the wrong answer: 1 for "1.5E+3", 1 for "0x1.8p1". So a real is
+         * read whole and its integer part returned: 1500, 3.
+         *
+         * A warning says so when a fractional part is lost, and for any hexadecimal real.
+         * A whole decimal such as "32768." stays silent: FITS files commonly store BZERO so.
+         *
+         * @param key Keyword name, for the warning.
+         * @param text Keyword value.
+         * @param getter Name of the calling getter, for the warning.
+         * @throws std::out_of_range if the integer part doesn't fit @p W.
+         */
+        template<typename W>
+        W integerKeywordValue(const std::string& key, const std::string& text, const char* getter)
+        {
+            size_t consumed = 0;
+            const W integer = toInteger<W>(text, &consumed);
+            if(consumed == text.size())
+                return integer;
+
+            size_t realConsumed = 0;
+            const double real = parseDouble(text, &realConsumed);
+            if(realConsumed <= consumed)
+                return integer; // Not a real: what follows the number isn't part of it.
+
+            const double integerPart = std::trunc(real);
+
+            const double limit = std::ldexp(1.0, std::numeric_limits<W>::digits);
+            const double lowest = std::is_signed_v<W> ? -limit : 0.0;
+            if(integerPart >= limit || integerPart < lowest)
+                throw std::out_of_range(std::string(getter) + ": value " + text + " of key " + key + " is out of range");
+
+            const W value = static_cast<W>(integerPart);
+
+            if(integerPart != real || isHexNumber(text))
+                std::cerr << FITSwarning("FITShdu", getter, "Value "+text+" of key "+key+" isn't an integer: returning its integer part, "+std::to_string(value)+".").what() << std::flush;
+
+            return value;
+        }
+
+        /**
+         * @brief What a keyword of this type can hold and be written with: the capacity
+         *        of its Write...ValueForKey() and of its CFITSIO type.
+         * @details Not the ranges Process() uses, which only pick the smallest type for a value
+         *          read from a file: fInt is written as TINT, so it takes 12345678.
+         * @throws std::invalid_argument, std::out_of_range if the value doesn't match.
+         * @throws FITSexception if the type isn't a numeric one.
+         */
+        void checkWrittenCapacity(const std::string& value, const key_type& type)
+        {
+            switch(type)
+            {
+                case fShort:     parseInteger<int16_t>(value);  break;
+                case fInt:       parseInteger<int32_t>(value);  break;
+                case fLong:      parseInteger<int32_t>(value);  break;
+                case fLongLong:  parseInteger<int64_t>(value);  break;
+                case fByte:      parseInteger<uint8_t>(value);  break;
+                case fUShort:    parseInteger<uint16_t>(value); break;
+                case fUInt:      parseInteger<uint32_t>(value); break;
+                case fULong:     parseInteger<uint32_t>(value); break;
+                case fULongLong: parseInteger<uint64_t>(value); break;
+
+                case fBool:
+                    if(parseInteger<uint8_t>(value) > 1)
+                        throw std::out_of_range("Only 0 or 1: "+value);
+                    break;
+
+                case fFloat:     parseWholeReal<float>(value);  break;
+                case fDouble:    parseWholeReal<double>(value); break;
+
+                default:
+                    throw FITSexception(BAD_KEYCHAR, "FITSkeyword", "setValue", "Unknown target type when setting value: "+value);
+            }
+        }
+
+        bool holdsUnsignedInteger(const std::string& text)
+        {
+            try
+            {
+                parseInteger<uint64_t>(text);
+                return true;
+            }
+            catch(const std::invalid_argument&)
+            {
+                return false;
+            }
+            catch(const std::out_of_range&)
+            {
+                return false;
+            }
+        }
+
+        /**
+         * @brief A whole, non-negative value as integer text, whichever way the file wrote it.
+         * @details "0.00000000E+00" and "2.147483648E9" are how files commonly store BZERO.
+         * @return The integer as text, empty if the value isn't such a number.
+         */
+        std::string wholeUnsignedText(const std::string& value)
+        {
+            if(holdsUnsignedInteger(value))
+                return value;
+
+            try
+            {
+                const double real = parseWholeReal<double>(value);
+
+                if(real >= 0.0 && real < std::ldexp(1.0, 64) && std::trunc(real) == real)
+                    return std::to_string(static_cast<uint64_t>(real));
+            }
+            catch(const std::invalid_argument&) {}
+            catch(const std::out_of_range&) {}
+
+            return std::string();
+        }
+
+        void validateBeforeWriting(FITSDictionary::const_iterator it)
+        {
+            try
+            {
+                it->second.validate();
+            }
+            catch(const FITSexception&)
+            {
+                throw FITSexception(BAD_KEYCHAR, "FITShdu", "Write", "KEYWORD "+it->first+" holds '"+it->second.value()+"', which doesn't match its type "+FITSkeyword::GetDataType(it->second.type())+".");
+            }
         }
     }
 
@@ -159,7 +316,22 @@ namespace DSL
             fcomment = std::string(cmt);
             fvalue   = std::string(val);
             ftype    = kt;
+            validate();
         }
+    }
+
+    /**
+     *  @details Construct KEYWORD container from what a file holds. A file can't be refused for
+     *  being unusual, so the type isn't checked against the value here. Writing it out will be.
+     *  @param val KEYWORD physical value as string
+     *  @param cmt KEYWORD description
+     *  @param kt KEYWORD type
+     */
+    FITSkeyword FITSkeyword::unchecked(const std::string& val, const std::string& cmt, const key_type& kt)
+    {
+        FITSkeyword keyword(val, cmt, fChar);
+        keyword.ftype = kt;
+        return keyword;
     }
     
     /**
@@ -176,6 +348,7 @@ namespace DSL
             fcomment = std::string();
             fvalue   = std::string(val);
             ftype    = kt;
+            validate();
         }
     }
     
@@ -242,11 +415,11 @@ namespace DSL
         {
             ftype = fChar;
         }
-        else if(fvalue.find('.') != std::string::npos && (
-                fvalue.find('e') != std::string::npos ||
-                fvalue.find('E') != std::string::npos    ))
+        // An exponent makes a real, with or without a point: 1E-5 isn't the integer 1.
+        else if(fvalue.find('e') != std::string::npos ||
+                fvalue.find('E') != std::string::npos    )
             {
-                double val = std::stod(fvalue, nullptr);
+                double val = parseDouble(fvalue, nullptr);
                 if(std::abs(val) > static_cast<double>(std::numeric_limits<float>::max()) || std::abs(val) < 1.e-7) 
                     ftype = fDouble;
                 else
@@ -254,7 +427,7 @@ namespace DSL
             }
         else if(fvalue.find('.') != std::string::npos)
             {
-                double val = std::stod(fvalue, nullptr);
+                double val = parseDouble(fvalue, nullptr);
                 if(std::abs(val) > static_cast<double>(std::numeric_limits<float>::max()) || std::abs(val) < 1.e-7) 
                     ftype = fDouble;
                 else
@@ -323,155 +496,60 @@ namespace DSL
             return;
         }
 
-        // Empty value -> treat as clearing
-        if(value.empty() && ftype == fChar)
-        {
-            fvalue = value;
-            return;
-        }
-        else if(value.empty())
+        if(value.empty())
             throw FITSexception(0, "FITSkeyword", "setValue", "Non string KEYWORD can't be empty.");
-
-        // Numeric format check (integer, float, or exponent)
-        static const std::regex num_re("^[+-]?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?$");
-        if(!std::regex_match(value, num_re))
-        {
-            throw FITSexception(0, "FITSkeyword", "setValue", "KEYWORD type unconsistancy for key "+value+".");
-        }
 
         try
         {
-            switch(ftype)
-            {
-                case fShort: // mapped from Process: abs(num) <= 127
-                {
-                    int64_t num = std::stoll(value);
-                    if(std::llabs(num) > INT8_MAX)
-                        throw FITSexception(0, "FITSkeyword", "setValue", "Value out of range for fShort: "+value);
-                    fvalue.clear();
-                    fvalue += std::string(value);
-                    break;
-                }
-
-                case fInt: // abs(num) <= 32767
-                {
-                    int64_t num = std::stoll(value);
-                    if(std::llabs(num) > INT16_MAX)
-                        throw FITSexception(0, "FITSkeyword", "setValue", "Value out of range for fInt: "+value);
-                    fvalue.clear();
-                    fvalue += std::string(value);
-                    break;
-                }
-
-                case fLong: // abs(num) <= 2147483647
-                {
-                    int64_t num = std::stoll(value);
-                    if(std::llabs(num) > INT32_MAX)
-                        throw FITSexception(0, "FITSkeyword", "setValue", "Value out of range for fLong: "+value);
-                    fvalue.clear();
-                    fvalue += std::string(value);
-                    break;
-                }
-
-                case fLongLong:
-                {
-                    int64_t num = std::stoll(value);
-                    if(std::llabs(num) > INT64_MAX)
-                        throw FITSexception(0, "FITSkeyword", "setValue", "Value out of range for fLong: "+value);
-                    fvalue.clear();
-                    fvalue += std::string(value);
-                    break;
-                }
-
-                case fByte: // unsigned small: num <= 1
-                {
-                    uint64_t num = std::stoll(value);
-                    if(num > 1)
-                        throw FITSexception(0, "FITSkeyword", "setValue", "Value out of range for fByte: "+value);
-                    fvalue.clear();
-                    fvalue += std::string(value);
-                    break;
-                }
-
-                case fUShort: // num <= 255
-                {
-                    uint64_t num = std::stoll(value);
-                    if(num > UINT8_MAX)
-                        throw FITSexception(0, "FITSkeyword", "setValue", "Value out of range for fUShort: "+value);
-                    fvalue.clear();
-                    fvalue += std::string(value);
-                    break;
-                }
-
-                case fUInt: // num <= 65535
-                {
-                    uint64_t num = std::stoll(value);
-                    if(num > UINT16_MAX)
-                        throw FITSexception(0, "FITSkeyword", "setValue", "Value out of range for fUInt: "+value);
-                    fvalue.clear();
-                    fvalue += std::string(value);
-                    break;
-                }
-
-                case fULong: // larger unsigned
-                {
-                    uint64_t num = std::stoll(value);
-                    if(num > UINT32_MAX)
-                        throw FITSexception(0, "FITSkeyword", "setValue", "Value out of range for fUInt: "+value);
-                    fvalue.clear();
-                    fvalue += std::string(value);
-                    break;
-                }
-
-                case fULongLong: // larger unsigned
-                {
-                    uint64_t num = std::stoull(value);
-                    if(num > UINT64_MAX)
-                        throw FITSexception(0, "FITSkeyword", "setValue", "Value out of range for fUInt: "+value);
-                    fvalue.clear();
-                    fvalue += std::string(value);
-                    break;
-                }
-
-                case fBool:
-                {
-                    int b = std::stoi(value);
-                    if(std::abs(b) > 1)
-                        throw FITSexception(0, "FITSkeyword", "setValue", "Value out of range for fBool: "+value);
-                    fvalue.clear();
-                    fvalue += std::string(value);
-                    break;
-                }
-
-                case fFloat:
-                {
-                    fvalue.clear();
-                    fvalue += std::string(value);
-                    break;
-                }
-
-                case fDouble:
-                {
-                    fvalue.clear();
-                    fvalue += std::string(value);
-                    break;
-                }
-
-                default:
-                    // Unknown type -> refuse
-                    throw FITSexception(BAD_KEYCHAR, "FITSkeyword", "setValue", "Unknown target type when setting value: "+value);
-            }
+            checkWrittenCapacity(value, ftype);
         }
-        catch(const std::invalid_argument& e)
+        catch(const std::invalid_argument&)
         {
-            throw FITSexception(0, "FITSkeyword", "setValue", std::string("Invalid numeric value: ")+value);
+            throw FITSexception(0, "FITSkeyword", "setValue", "Value '"+value+"' doesn't match the KEYWORD type "+GetDataType(ftype)+".");
         }
-        catch(const std::out_of_range& e)
+        catch(const std::out_of_range&)
         {
-            throw FITSexception(0, "FITSkeyword", "setValue", std::string("Numeric value out of range: ")+value);
+            throw FITSexception(0, "FITSkeyword", "setValue", "Value '"+value+"' is out of range for the KEYWORD type "+GetDataType(ftype)+".");
+        }
+
+        fvalue = value;
+    }
+
+    /**
+     *  @details Check that the value is what the KEYWORD type can hold and be written with. Only
+     *  a KEYWORD made with unchecked() can hold one that isn't.
+     *  @throws FITSexception if it isn't.
+     */
+    void FITSkeyword::validate() const
+    {
+        if(ftype == fChar || ftype == fUndef)
+            return;
+
+        try
+        {
+            checkWrittenCapacity(fvalue, ftype);
+        }
+        catch(const std::invalid_argument&)
+        {
+            throw FITSexception(0, "FITSkeyword", "validate", "Value '"+fvalue+"' doesn't match the KEYWORD type "+GetDataType(ftype)+".");
+        }
+        catch(const std::out_of_range&)
+        {
+            throw FITSexception(0, "FITSkeyword", "validate", "Value '"+fvalue+"' is out of range for the KEYWORD type "+GetDataType(ftype)+".");
         }
     }
-    
+
+    /**
+     *  @details Change the KEYWORD type.
+     *  @param type New KEYWORD type.
+     *  @throws FITSexception if the current value doesn't match it, in which case nothing changes.
+     */
+    void FITSkeyword::setType(const key_type& type)
+    {
+        unchecked(fvalue, fcomment, type).validate();
+        ftype = type;
+    }
+
 #pragma mark * Dump
     /**
      *  @details Print out the KEYWORD physical value and its descritpion.
@@ -591,7 +669,7 @@ namespace DSL
         for(FITSDictionary::const_iterator it = in_hdu.hdu.begin(); it != in_hdu.hdu.end(); it++)
         {
             if(it->first == "PCOUNT" || it->first == "GCOUNT")
-                hdu.insert(std::pair<key_code,FITSkeyword>(it->first,FITSkeyword(it->second.value(), it->second.comment(), DSL::key_type::fULongLong)));
+                hdu.insert(std::pair<key_code,FITSkeyword>(it->first,FITSkeyword::unchecked(it->second.value(), it->second.comment(), DSL::key_type::fULongLong)));
             else
                 hdu.insert(std::pair<key_code,FITSkeyword>(it->first,FITSkeyword(it->second)));
         }
@@ -730,20 +808,18 @@ namespace DSL
             
             if(iKey == hdu.end())
             {
-                if(key.find("NAXIS") != std::string::npos)
-                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fULongLong)));
+                if(key.find("NAXIS") != std::string::npos && holdsUnsignedInteger(value))
+                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword::unchecked(value, comment, fULongLong)));
                 else if(key == "BITPIX")
-                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fInt)));
-                else if(key == "BZERO")
-                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fULongLong)));
+                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword::unchecked(value, comment, fInt)));
+                else if(key == "BZERO" && !wholeUnsignedText(value).empty())
+                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword::unchecked(wholeUnsignedText(value), comment, fULongLong)));
                 else if(key == "BSCALE")
-                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fDouble)));
-                else if(key == "BLANK")
-                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fUInt)));
+                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword::unchecked(value, comment, fDouble)));
                 else if(key == "PCOUNT")
-                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fULongLong)));
+                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword::unchecked(value, comment, fULongLong)));
                 else if(key == "GCOUNT")
-                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment, fULongLong)));
+                    hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword::unchecked(value, comment, fULongLong)));
                 else
                     hdu.insert(std::pair<key_code,FITSkeyword>(key,FITSkeyword(value, comment)));
             }
@@ -880,7 +956,7 @@ namespace DSL
             return false;
         }
         
-        if(tt == fUndef || tt == fChar)
+        if(tt == fUndef || (tt == fChar && !isHexNumber(outString)))
             throw FITSexception(0,"FITShdu","GetBoolValueForKey","Value for key "+key+" isn't a numerical value.");
         
         try
@@ -893,7 +969,7 @@ namespace DSL
             std::cerr<<e.what()<<std::flush;
         }
         
-        return static_cast<bool>( std::stoi(outString) );
+        return static_cast<bool>( std::stoi(outString, nullptr, integerBase(outString)) );
     }
     
     
@@ -913,10 +989,10 @@ namespace DSL
             return std::numeric_limits<int8_t>::min();
         }
         
-        if(tt == fUndef || tt == fChar)
+        if(tt == fUndef || (tt == fChar && !isHexNumber(outString)))
             throw FITSexception(0,"FITShdu","GetShortValueForKey","Value for key "+key+" isn't a numerical value.");
         
-        return static_cast<int8_t>( std::stoi(outString) );
+        return static_cast<int8_t>( integerKeywordValue<int>(key, outString, "GetInt8ValueForKey") );
     }
 
     uint8_t FITShdu::GetUInt8ValueForKey  (const std::string& key) const
@@ -929,10 +1005,10 @@ namespace DSL
             return std::numeric_limits<uint8_t>::min();
         }
         
-        if(tt == fUndef || tt == fChar)
+        if(tt == fUndef || (tt == fChar && !isHexNumber(outString)))
             throw FITSexception(0,"FITShdu","GetSUhortValueForKey","Value for key "+key+" isn't a numerical value.");
         
-        return static_cast<uint8_t>( std::stoul(outString) );
+        return static_cast<uint8_t>( integerKeywordValue<unsigned long>(key, outString, "GetUInt8ValueForKey") );
     }
 
     /**
@@ -951,10 +1027,10 @@ namespace DSL
             return std::numeric_limits<int16_t>::min();
         }
         
-        if(tt == fUndef || tt == fChar)
+        if(tt == fUndef || (tt == fChar && !isHexNumber(outString)))
             throw FITSexception(0,"FITShdu","GetIntValueForKey","Value for key "+key+" isn't a numerical value.");
         
-        return  static_cast<int16_t>(std::stoi(outString));
+        return  static_cast<int16_t>(integerKeywordValue<int>(key, outString, "GetInt16ValueForKey"));
     }
     
     /**
@@ -973,10 +1049,10 @@ namespace DSL
             return std::numeric_limits<uint16_t>::min();
         }
         
-        if(tt == fUndef || tt == fChar)
+        if(tt == fUndef || (tt == fChar && !isHexNumber(outString)))
             throw FITSexception(0,"FITShdu","GetUIntValueForKey","Value for key "+key+" isn't a numerical value.");
         
-        return  static_cast<uint16_t>( std::stoi(outString) );
+        return  static_cast<uint16_t>( integerKeywordValue<int>(key, outString, "GetUInt16ValueForKey") );
     }
     
     /**
@@ -995,10 +1071,10 @@ namespace DSL
             return std::numeric_limits<int32_t>::min();
         }
         
-        if(tt == fUndef || tt == fChar)
+        if(tt == fUndef || (tt == fChar && !isHexNumber(outString)))
             throw FITSexception(0,"FITShdu","GetLongValueForKey","Value for key "+key+" isn't a numerical value.");
         
-        return static_cast<int32_t>(std::stol(outString));
+        return static_cast<int32_t>(integerKeywordValue<long>(key, outString, "GetInt32ValueForKey"));
     }
 
     /**
@@ -1017,10 +1093,10 @@ namespace DSL
             return std::numeric_limits<uint32_t>::min();
         }
         
-        if(tt == fUndef || tt == fChar)
+        if(tt == fUndef || (tt == fChar && !isHexNumber(outString)))
             throw FITSexception(0,"FITShdu","GetLongValueForKey","Value for key "+key+" isn't a numerical value.");
         
-        return static_cast<uint32_t>(std::stoul(outString));
+        return static_cast<uint32_t>(integerKeywordValue<unsigned long>(key, outString, "GetUInt32ValueForKey"));
     }
     
     /**
@@ -1039,10 +1115,10 @@ namespace DSL
             return std::numeric_limits<int64_t>::min();
         }
         
-        if(tt == fUndef || tt == fChar)
+        if(tt == fUndef || (tt == fChar && !isHexNumber(outString)))
             throw FITSexception(0,"FITShdu","GetLongLongValueForKey","Value for key "+key+" isn't a numerical value.");
         
-        return static_cast<int64_t>(std::stoll(outString));
+        return static_cast<int64_t>(integerKeywordValue<long long>(key, outString, "GetInt64ValueForKey"));
     }
 
     /**
@@ -1061,10 +1137,10 @@ namespace DSL
             return std::numeric_limits<uint64_t>::min();
         }
         
-        if(tt == fUndef || tt == fChar)
+        if(tt == fUndef || (tt == fChar && !isHexNumber(outString)))
             throw FITSexception(0,"FITShdu","GetLongLongValueForKey","Value for key "+key+" isn't a numerical value.");
         
-        return static_cast<uint64_t>(std::stoull(outString));
+        return static_cast<uint64_t>(integerKeywordValue<unsigned long long>(key, outString, "GetUInt64ValueForKey"));
     }
     
     /**
@@ -1083,10 +1159,10 @@ namespace DSL
             return std::numeric_limits<float>::quiet_NaN();
         }
         
-        if(tt == fUndef || tt == fChar)
+        if(tt == fUndef || (tt == fChar && !isHexNumber(outString)))
             throw FITSexception(0,"FITShdu","GetFloatValueForKey","Value for key "+key+" isn't a numerical value.");
         
-        return std::stof(outString);
+        return parseFloat(outString);
     }
     
     /**
@@ -1105,10 +1181,10 @@ namespace DSL
             return std::numeric_limits<double>::quiet_NaN();
         }
         
-        if(tt == fUndef || tt == fChar)
+        if(tt == fUndef || (tt == fChar && !isHexNumber(outString)))
             throw FITSexception(0,"FITShdu","GetDoubleValueForKey","Value for key "+key+" isn't a numerical value.");
         
-        return std::stod(outString);
+        return parseDouble(outString);
     }
     
     /**
@@ -1155,14 +1231,14 @@ namespace DSL
             return 0;
         
         size_t n = 1;
-        uint64_t dim64 = std::stoull(it->second.value());
+        uint64_t dim64 = std::stoull(it->second.value(), nullptr, integerBase(it->second.value()));
         size_t dim = static_cast<size_t>(dim64);
         while(it != hdu.end())
         {
             n++;
             it = hdu.find(std::string("NAXIS")+std::to_string(n));
             if(it != hdu.end())
-                dim *= std::stoull(it->second.value());
+                dim *= std::stoull(it->second.value(), nullptr, integerBase(it->second.value()));
         }
         
         return dim;
@@ -1213,6 +1289,8 @@ namespace DSL
 
             if( it->first == "BZERO" )
                 continue;
+
+            validateBeforeWriting(it);
             
             switch(it->second.type())
             {
@@ -1224,6 +1302,8 @@ namespace DSL
                     WriteInt8ValueForKey( it, fptr );
                     break;
                 
+                case fByte:
+                case fBool:
                 case fUShort:
                     WriteUInt8ValueForKey( it, fptr );
                     break;
@@ -1306,16 +1386,19 @@ namespace DSL
             if(ibz == hdu.end() || ibs == hdu.end())
                 throw FITSexception(KEY_NO_EXIST,"FITShdu","Write","BZERO and BSCALE must be both present to be written");
 
+            validateBeforeWriting(ibs);
+            validateBeforeWriting(ibz);
+
             if(ibs->second.type() == fDouble || ibs->second.type() == fFloat)
                 WriteDoubleValueForKey( ibs, fptr );
-            else if (std::stod(ibs->second.value()) < 0)
+            else if (parseDouble(ibs->second.value()) < 0)
                 WriteInt64ValueForKey( ibs, fptr );
             else
                 WriteUInt64ValueForKey( ibs, fptr );
 
             if(ibz->second.type() == fDouble || ibz->second.type() == fFloat)
                 WriteDoubleValueForKey( ibz, fptr );
-            else if (std::stod(ibz->second.value()) < 0)
+            else if (parseDouble(ibz->second.value()) < 0)
                 WriteInt64ValueForKey( ibz, fptr );
             else 
                 WriteUInt64ValueForKey( ibz, fptr );
@@ -1375,7 +1458,7 @@ namespace DSL
         if(it == hdu.end())
             throw FITSexception(SEEK_ERROR,"FITShdu","WriteBoolValueForKey","Reach end of header");
         
-        int val = std::stoi(it->second.value());
+        int val = std::stoi(it->second.value(), nullptr, integerBase(it->second.value()));
         std::string keystr = it->first;
         std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
 
@@ -1407,7 +1490,7 @@ namespace DSL
             throw FITSexception(SEEK_ERROR,"FITShdu","WriteShortValueForKeyv","Reach end of header");
 
         // parse into fixed-width then cast to platform 'short' for CFITSIO
-        int16_t tmp = static_cast<int16_t>(std::stoi(it->second.value()));
+        int16_t tmp = static_cast<int16_t>(std::stoi(it->second.value(), nullptr, integerBase(it->second.value())));
         short val = static_cast<short>(tmp);
         std::string keystr = it->first;
         std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
@@ -1439,7 +1522,7 @@ namespace DSL
         if(it == hdu.end())
             throw FITSexception(SEEK_ERROR,"FITShdu","WriteShortValueForKeyv","Reach end of header");
 
-        uint16_t tmp = static_cast<uint16_t>(std::stoul(it->second.value()));
+        uint16_t tmp = static_cast<uint16_t>(std::stoul(it->second.value(), nullptr, integerBase(it->second.value())));
         unsigned short val = static_cast<unsigned short>(tmp);
         std::string keystr = it->first;
         std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
@@ -1451,7 +1534,7 @@ namespace DSL
 
         {
             CFITSIOGuard  guard;
-            if( fits_update_key(fptr.get(), TSHORT, keybuf.data(), &val, cmtbuf.data(), &status ) )
+            if( fits_update_key(fptr.get(), TUSHORT, keybuf.data(), &val, cmtbuf.data(), &status ) )
                 throw FITSexception(status,"FITShdu","Write");
         }
 
@@ -1471,7 +1554,7 @@ namespace DSL
         if(it == hdu.end())
             throw FITSexception(SEEK_ERROR,"FITShdu","WriteIntValueForKey","Reach end of header");
 
-        int32_t tmp = static_cast<int32_t>(std::stoi(it->second.value()));
+        int32_t tmp = static_cast<int32_t>(std::stoi(it->second.value(), nullptr, integerBase(it->second.value())));
         int val = static_cast<int>(tmp);
         std::string keystr = it->first;
         std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
@@ -1503,8 +1586,8 @@ namespace DSL
         if(it == hdu.end())
             throw FITSexception(SEEK_ERROR,"FITShdu","WriteIntValueForKey","Reach end of header");
 
-        uint32_t tmp = static_cast<uint32_t>(std::stoul(it->second.value()));
-        int val = static_cast<int>(static_cast<int32_t>(tmp));
+        uint32_t tmp = static_cast<uint32_t>(std::stoul(it->second.value(), nullptr, integerBase(it->second.value())));
+        unsigned int val = static_cast<unsigned int>(tmp);
         std::string keystr = it->first;
         std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
 
@@ -1515,7 +1598,7 @@ namespace DSL
 
         {
             CFITSIOGuard  guard;
-            if(fits_update_key(fptr.get(), TINT, keybuf.data(), &val, cmtbuf.data(), &status ) )
+            if(fits_update_key(fptr.get(), TUINT, keybuf.data(), &val, cmtbuf.data(), &status ) )
                 throw FITSexception(status,"FITShdu","Write");
         }
 
@@ -1535,7 +1618,7 @@ namespace DSL
         if(it == hdu.cend())
             throw FITSexception(SEEK_ERROR,"FITShdu","WriteLongValueForKey","Reach end of header");
 
-        int32_t tmp = static_cast<int32_t>(std::stol(it->second.value()));
+        int32_t tmp = static_cast<int32_t>(std::stol(it->second.value(), nullptr, integerBase(it->second.value())));
         long val = static_cast<long>(tmp);
         std::string keystr = it->first;
         std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
@@ -1567,7 +1650,7 @@ namespace DSL
         if(it == hdu.end())
             throw FITSexception(SEEK_ERROR,"FITShdu","WriteLongValueForKey","Reach end of header");
 
-        uint32_t tmp = static_cast<uint32_t>(std::stoul(it->second.value()));
+        uint32_t tmp = static_cast<uint32_t>(std::stoul(it->second.value(), nullptr, integerBase(it->second.value())));
         unsigned long val = static_cast<unsigned long>(tmp);
         std::string keystr = it->first;
         std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
@@ -1599,7 +1682,7 @@ namespace DSL
         if(it == hdu.end())
             throw FITSexception(SEEK_ERROR,"FITShdu","WriteLongValueForKey","Reach end of header");
 
-        int64_t tmp = static_cast<int64_t>(std::stoll(it->second.value()));
+        int64_t tmp = static_cast<int64_t>(std::stoll(it->second.value(), nullptr, integerBase(it->second.value())));
         long long val = static_cast<long long>(tmp);
         std::string keystr = it->first;
         std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
@@ -1631,7 +1714,7 @@ namespace DSL
         if(it == hdu.end())
             throw FITSexception(SEEK_ERROR,"FITShdu","WriteLongValueForKey","Reach end of header");
 
-        uint64_t tmp = static_cast<uint64_t>(std::stoull(it->second.value()));
+        uint64_t tmp = static_cast<uint64_t>(std::stoull(it->second.value(), nullptr, integerBase(it->second.value())));
         unsigned long long val = static_cast<unsigned long long>(tmp);
         std::string keystr = it->first;
         std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
@@ -1665,7 +1748,7 @@ namespace DSL
         if(it == hdu.end())
             throw FITSexception(SEEK_ERROR,"FITShdu","WriteLongValueForKey","Reach end of header");
         
-        float val = std::stof(it->second.value());
+        float val = parseFloat(it->second.value());
         std::string keystr = it->first;
         std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
 
@@ -1699,7 +1782,7 @@ namespace DSL
             throw FITSexception(SEEK_ERROR,"FITShdu","WriteLongValueForKey","Reach end of header");
         
 
-        double val = std::stod(it->second.value());
+        double val = parseDouble(it->second.value());
 
         std::string keystr = it->first;
         std::vector<char> keybuf(keystr.c_str(), keystr.c_str()+keystr.size()+1);
@@ -1776,15 +1859,20 @@ namespace DSL
     {
         // Structural keywords are integers whatever the caller says: the string
         // overloads default to fChar, and a quoted PCOUNT/GCOUNT/BITPIX/NAXISn makes
-        // the extension unreadable for CFITSIO. Same types as Process() assigns.
+        // the extension unreadable for CFITSIO. Same types as reading a file assigns.
         key_type kt = requested;
         if(kt == fChar)
         {
-            if(keyword == "PCOUNT" || keyword == "GCOUNT" || keyword == "BITPIX")
+            if(keyword == "BITPIX")
+                kt = fInt; // Negative for real images.
+            else if(keyword == "PCOUNT" || keyword == "GCOUNT")
                 kt = fULongLong;
             else if(keyword.rfind("NAXIS", 0) == 0)
                 kt = fULongLong;
         }
+
+        // Before anything changes, so a refused value leaves the keyword as it was.
+        const FITSkeyword updated(value, cmt, kt);
 
         FITSDictionary::iterator it = hdu.find(keyword);
         if(it != hdu.end())
@@ -1798,8 +1886,6 @@ namespace DSL
                         <<"TYPE WILL BE MODIFIED.\033[34m "<<keyword<<"\033[0m "<<it->second.type()<<" ["<<FITSkeyword::GetDataType(it->second.type())<<"] -> "<<kt<<" ["<<FITSkeyword::GetDataType(kt)<<"]"<<std::endl
                         <<"\033[0m"<<std::flush;
                     it->second.Dump(ss);
-
-                    it->second.setType(kt);
                     
                     throw FITSwarning("FITShdu","ValueForKey",ss.str());
                 }
@@ -1810,13 +1896,13 @@ namespace DSL
                     std::cerr<<e.what()<<std::endl;
             }
 
-            it->second.setValue(value);
+            it->second = FITSkeyword(value, it->second.comment(), kt);
             return;
         }
 
         // New keyword: created with the requested type, not the FITSkeyword default —
         // otherwise a numeric keyword added this way is written as a quoted string.
-        hdu.insert(std::pair<key_code,FITSkeyword>(keyword, FITSkeyword(value,cmt,kt)));
+        hdu.insert(std::pair<key_code,FITSkeyword>(keyword, updated));
     }
 
     /**
@@ -1971,7 +2057,7 @@ namespace DSL
         // which truncated any value carrying more (WCS terms first among them).
         ValueForKey(keyword,
                     exactRealString<float>(value, std::numeric_limits<float>::digits10, std::numeric_limits<float>::max_digits10,
-                                           [](const char* s, char** e)->float { return std::strtof(s, e); }),
+                                           parseFloat),
                     fFloat, cmt);
     }
     
@@ -1994,7 +2080,7 @@ namespace DSL
         // which truncated CDi_j, PVi_m, CRVAL, ... written through this overload.
         ValueForKey(keyword,
                     exactRealString<double>(value, std::numeric_limits<double>::digits10, std::numeric_limits<double>::max_digits10,
-                                            [](const char* s, char** e)->double { return std::strtod(s, e); }),
+                                            parseDouble),
                     fDouble, cmt);
     }
 

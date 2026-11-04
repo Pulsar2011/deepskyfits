@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 #include <DSTfits/FITSwcs.h>
 
+#include "gTest_locale.h"
+
 #include <cmath>
+#include <sstream>
 #include <stdexcept>
 
 using namespace DSL;
@@ -1196,6 +1199,35 @@ TEST(SkyCoo_SpaceMotion, staticConvertFrameOverloadsAgreeWhenTheStarIsFarAway)
     EXPECT_DOUBLE_EQ(decW,   dec);
     EXPECT_DOUBLE_EQ(pmRAW,  pmRA);
     EXPECT_DOUBLE_EQ(pmDECW, pmDEC);
+}
+
+#pragma endregion
+
+#pragma region locale
+
+TEST(SkyCoordinatesDump, DecimalPointIsADotWhateverTheLocale)
+{
+    CommaDecimalLocale commaLocale;
+
+    const EquatorialCoordinates target(10.5, -20.25, 1.5, 2.5);
+
+    // Created under the comma locale, this stream would write 1,5 by itself.
+    std::ostringstream singleLine;
+    target.dump(singleLine, true);
+
+    EXPECT_NE(singleLine.str().find(",10.5,-20.25,1.500000,2.500000,"), std::string::npos) << singleLine.str();
+
+    std::ostringstream multiLine;
+    target.dump(multiLine, false);
+
+    EXPECT_NE(multiLine.str().find("10.5"), std::string::npos) << multiLine.str();
+    EXPECT_NE(multiLine.str().find("1.5"), std::string::npos) << multiLine.str();
+    EXPECT_EQ(multiLine.str().find("10,5"), std::string::npos) << multiLine.str();
+
+    // The stream's own locale is given back.
+    singleLine.str("");
+    singleLine << 1.5;
+    EXPECT_EQ(singleLine.str(), "1,5");
 }
 
 #pragma endregion

@@ -21,6 +21,7 @@
 #include <DSTfits/FITSwcs.h>
 #include <DSTfits/FITShdu.h>
 #include <DSTfits/FITSexception.h>
+#include <DSTfits/FITSnumeric.h>
 
 #include <wcslib/wcserr.h>
 #include <wcslib/wcsfix.h>
@@ -1238,14 +1239,16 @@ namespace DSL
 #pragma region * Dumping
             void SkyCoordinates::dump(std::ostream& os, bool singleline) const
             {
+                const ClassicLocaleScope classicNumbers(os);
+
                 if(singleline)
                 {
                     os << "," << fphi
                        << "," << ftheta
-                       << "," << (std::abs(fpmPhi) > std::numeric_limits<double>::epsilon() ? std::to_string(fpmPhi) : "           ")
-                       << "," << (std::abs(fpmTheta) > std::numeric_limits<double>::epsilon() ? std::to_string(fpmTheta) : "           ")
-                       << "," << (std::abs(fparallax) > std::numeric_limits<double>::epsilon() ? std::to_string(fparallax) : "           ")
-                       << "," << (std::abs(fradialVelocity) > std::numeric_limits<double>::epsilon() ? std::to_string(fradialVelocity) : "           ")
+                       << "," << (std::abs(fpmPhi) > std::numeric_limits<double>::epsilon() ? formatFixed(fpmPhi, 6) : "           ")
+                       << "," << (std::abs(fpmTheta) > std::numeric_limits<double>::epsilon() ? formatFixed(fpmTheta, 6) : "           ")
+                       << "," << (std::abs(fparallax) > std::numeric_limits<double>::epsilon() ? formatFixed(fparallax, 6) : "           ")
+                       << "," << (std::abs(fradialVelocity) > std::numeric_limits<double>::epsilon() ? formatFixed(fradialVelocity, 6) : "           ")
                        << "," << fepoch;
                        switch(fcoordSys)
                        {

@@ -1031,6 +1031,61 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         }
 
         /**
+         * @brief Select rows from a filter expression given as a string.
+         * @details
+         *  Meant for selections that are only known at run time, such as a command-line option:
+         *  @code
+         *  RowSet rows = tbl->where("(OBJNAME=~WD* || SCSID>0) && RA >= 10.5");
+         *  @endcode
+         *  - A condition reads <tt>COLUMN operator value</tt>; spaces around the operator are optional.
+         *  - Operators are ==, !=, <, <=, >, >=, with a single = accepted as ==.
+         *    Logical columns only take == and !=, with T/F/true/false/1/0 as values.
+         *  - On string columns, =~ and !~ match the value as a shell-style wildcard
+         *    ('*' for any run of characters, '?' for exactly one). Without them, * and ? are literal.
+         *  - Conditions combine with && and ||, && binding tighter; parentheses group them.
+         *  - Quotes (' or ") keep a value containing spaces or operators in one piece, and allow an empty value.
+         *  - The value is read as the column's stored type and must fit it entirely:
+         *    1.5 on an integer column is an error, not 1. Hexadecimal is accepted on every
+         *    numeric column: 0xFF, -0x10, and on real columns 0x1.8p1.
+         * @param expression Filter expression. An empty string selects every row.
+         * @return Matching rows.
+         * @throws std::invalid_argument on a syntax error, an unknown column, a value that doesn't
+         *         fit its column, or a vector or complex column.
+         */
+        RowSet where(const std::string& expression) const;
+
+        /**
+         * @brief Add a column computed from the other columns, in memory only.
+         * @details
+         *  Meant for quantities only known at run time, such as a user's input:
+         *  @code
+         *  tbl->computeColumn("COLOR = MagG - MagPb");
+         *  tbl->computeColumn("NORMALIZED = VEC / 10");
+         *  @endcode
+         *  Every row is computed: filter afterwards with where(). Nothing is read from or
+         *  written to a file; only an explicit write() would ever store the column.
+         *  - A definition reads <tt>NAME = expression</tt>. A name holding anything other than
+         *    letters, digits, '_' and '.' must be quoted (' or ").
+         *  - Operators are +, -, *, / and ^, with parentheses to group them. ^ binds tightest
+         *    and groups to the right: -a^2 is -(a^2) and a^b^c is a^(b^c).
+         *  - Numbers always use '.' as decimal point. Functions are sqrt, exp, log, log10, sin,
+         *    cos, tan, asin, acos, atan, abs and pow(x, y).
+         *  - Integer, float and double columns are read as double, and the result is a double
+         *    column, or a vector of double, without unit. Division by zero gives Inf or NaN.
+         *  - Vector columns work element by element. A constant or a scalar column applies to
+         *    every element; two vector columns must have the same number of elements.
+         *  - A complex column is only accepted inside real(), img() (or imag()), abs() and arg():
+         *    abs() is the modulus and arg() is atan2(imaginary, real), in radians.
+         * @param definition Column definition.
+         * @return The new column.
+         * @throws std::invalid_argument on a syntax error, an unknown column or function, a
+         *         string, logical or bit column, a complex value used outside these functions,
+         *         vectors of different lengths, or a name the table already has. The table is
+         *         left unchanged.
+         */
+        const FITSform& computeColumn(const std::string& definition);
+
+        /**
          * @brief Get iterator to first row.
          */
         RowIterator begin();
