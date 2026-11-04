@@ -798,7 +798,8 @@ namespace DSL
             throw FITSexception(fits_status,"FITSmanager","UpdateTable",ss.str());
         }
 
-        std::cerr<<"\033[31m[FITSmanager::UpdateTable]\033[0m table "<<tname<<"[\033[31m"<<hdublck<<"\033[0m] will be deleted and replaced with new table."<<std::endl;
+        if((verbose & verboseLevel::VERBOSE_BASIC)== verboseLevel::VERBOSE_BASIC)
+            std::cerr<<"\033[31m[FITSmanager::UpdateTable]\033[0m table "<<tname<<"[\033[31m"<<hdublck<<"\033[0m] will be deleted and replaced with new table."<<std::endl;
         fits_delete_hdu(fptr.get(), &hdutype_int, &fits_status);
 
         if(fits_status)
