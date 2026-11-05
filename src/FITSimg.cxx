@@ -3,10 +3,10 @@
 //  
 //  Created by GILLARD William
 //  Centre de Physic des Particules de Marseille
-//  Licensed under CC BY-NC 4.0
-//  You may share and adapt this code with attribution, 
-//  but not for commercial purposes.
-//  Licence text: https://creativecommons.org/licenses/by-nc/4.0/
+//  Licensed under PolyForm Noncommercial 1.0.0
+//  You may use, share and adapt this code for noncommercial purposes.
+//  Commercial use requires a separate licence from the author.
+//  Licence text: https://polyformproject.org/licenses/noncommercial/1.0.0/
 
 
 #include <cstdio>
