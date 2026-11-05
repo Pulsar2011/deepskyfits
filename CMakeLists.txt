@@ -333,6 +333,18 @@ add_library(
     ${version_file}
 )
 
+# Propagate the git tag to the library. A clone without a reachable tag (e.g. a shallow CI clone)
+# has no numeric version: the library stays unversioned and no CMake package is installed.
+if(VERSION MATCHES "^v[0-9]+\\.[0-9]+\\.[0-9]+")
+    set(DSTfits_NUMERIC_VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
+    set_target_properties(DSTfits PROPERTIES
+        VERSION   "${DSTfits_NUMERIC_VERSION}"
+        SOVERSION "${VERSION_MAJOR}"
+    )
+else()
+    message(WARNING "No version tag found (git describe gave '${VERSION}'): DSTfits will not be versioned")
+endif()
+
 # target-level configuration must come after the target is created
 add_dependencies(DSTfits cfitsio_external wcslib_external)
 target_include_directories(DSTfits PRIVATE ${WCSLIB_INCLUDE_DIR})
@@ -575,6 +587,44 @@ if(CMAKE_INSTALL_PREFIX)
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
     )
+
+    if(DSTfits_NUMERIC_VERSION)
+        # CMake package, so that dependent projects can call find_package(DSTfits <version>)
+        include(CMakePackageConfigHelpers)
+        set(DSTfits_CMAKE_DIR lib/cmake/DSTfits)
+        configure_package_config_file(
+            ${CMAKE_SOURCE_DIR}/modules/DSTfitsConfig.cmake.in
+            ${CMAKE_CURRENT_BINARY_DIR}/build/cmake/DSTfitsConfig.cmake
+            INSTALL_DESTINATION ${DSTfits_CMAKE_DIR}
+        )
+        write_basic_package_version_file(
+            ${CMAKE_CURRENT_BINARY_DIR}/build/cmake/DSTfitsConfigVersion.cmake
+            VERSION ${DSTfits_NUMERIC_VERSION}
+            COMPATIBILITY AnyNewerVersion
+        )
+        INSTALL(FILES
+            ${CMAKE_CURRENT_BINARY_DIR}/build/cmake/DSTfitsConfig.cmake
+            ${CMAKE_CURRENT_BINARY_DIR}/build/cmake/DSTfitsConfigVersion.cmake
+            DESTINATION ${DSTfits_CMAKE_DIR}
+        )
+
+        # CMake never removes files from the install directory: drop the versioned libraries
+        # (libDSTfits.1.5.0.dylib, libDSTfits.so.1.5.0, ...) left behind by previous installs.
+        install(CODE "set(DSTfits_KEEP_VERSIONS \"${DSTfits_NUMERIC_VERSION};${VERSION_MAJOR}\")")
+        install(CODE [[
+            file(GLOB _dsf_libs "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libDSTfits.*")
+            foreach(_dsf_lib ${_dsf_libs})
+                get_filename_component(_dsf_name "${_dsf_lib}" NAME)
+                if(_dsf_name MATCHES "^libDSTfits\\.(so\\.)?([0-9.]*[0-9])(\\.dylib)?$")
+                    list(FIND DSTfits_KEEP_VERSIONS "${CMAKE_MATCH_2}" _dsf_keep)
+                    if(_dsf_keep EQUAL -1)
+                        message(STATUS "Removing old library: ${_dsf_lib}")
+                        file(REMOVE "${_dsf_lib}")
+                    endif()
+                endif()
+            endforeach()
+        ]])
+    endif()
 
     # cfitsio is built via ExternalProject -> not a CMake target; install the produced archive directly
     set(CFITSIO_OUTPUT_LIB ${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a)

@@ -1,0 +1,11 @@
+@PACKAGE_INIT@
+
+if(NOT TARGET DSTfits::DSTfits)
+    add_library(DSTfits::DSTfits SHARED IMPORTED)
+    set_target_properties(DSTfits::DSTfits PROPERTIES
+        IMPORTED_LOCATION "${PACKAGE_PREFIX_DIR}/lib/libDSTfits${CMAKE_SHARED_LIBRARY_SUFFIX}"
+        INTERFACE_INCLUDE_DIRECTORIES "${PACKAGE_PREFIX_DIR}/include"
+    )
+endif()
+
+check_required_components(DSTfits)
