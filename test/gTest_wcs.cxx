@@ -22,11 +22,7 @@ TEST(FITS_wcs, readFromHdu)
     verbose |= verboseLevel::VERBOSE_WCS;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifndef CI_CIWORKER
-    FITSmanager fm("build/testdata/DSS.fits", true);
-#else
     FITSmanager fm("testdata/DSS.fits", true);
-#endif
 
     std::shared_ptr<FITShdu> hdu = fm.GetPrimaryHeader();
     FITShdu hdu_ref = FITShdu(*hdu);
@@ -58,11 +54,7 @@ TEST(FITS_wcs, readFromPHdu)
     verbose |= verboseLevel::VERBOSE_WCS;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifndef CI_CIWORKER
-    FITSmanager fm("build/testdata/DSS.fits", true);
-#else
     FITSmanager fm("testdata/DSS.fits", true);
-#endif
 
     std::shared_ptr<FITShdu> hdu = fm.GetPrimaryHeader();
 
@@ -94,11 +86,7 @@ TEST(FITS_wcs, readFromFitfile)
     verbose |= verboseLevel::VERBOSE_WCS;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifndef CI_CIWORKER
-    FITSmanager fm("build/testdata/DSS.fits", true);
-#else
     FITSmanager fm("testdata/DSS.fits", true);
-#endif
     int hdu_num = 0;
 
     fm.MoveToPrimary();
@@ -131,11 +119,7 @@ TEST(FITS_wcs, ConvertBackToString)
     verbose |= verboseLevel::VERBOSE_WCS;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifndef CI_CIWORKER
-    FITSmanager fm("build/testdata/DSS.fits", true);
-#else
     FITSmanager fm("testdata/DSS.fits", true);
-#endif  
 
     std::shared_ptr<FITShdu> hdu = fm.GetPrimaryHeader();
     FITSwcs wcs(hdu);
@@ -223,11 +207,7 @@ TEST(FITS_wcs, ConvertBackToHdu)
     verbose |= verboseLevel::VERBOSE_WCS;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifndef CI_CIWORKER
-    FITSmanager fm("build/testdata/DSS.fits", true);
-#else
     FITSmanager fm("testdata/DSS.fits", true);
-#endif  
 
     std::shared_ptr<FITShdu> hdu = fm.GetPrimaryHeader();
     FITSwcs wcs(hdu);
@@ -265,11 +245,7 @@ TEST(FITS_wcs, InvalidWcsIndex)
     verbose |= verboseLevel::VERBOSE_WCS;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifndef CI_CIWORKER
-    FITSmanager fm("build/testdata/DSS.fits", true);
-#else
     FITSmanager fm("testdata/DSS.fits", true);
-#endif 
 
     std::shared_ptr<FITShdu> hdu = fm.GetPrimaryHeader();
     FITSwcs wcs(hdu);
@@ -460,11 +436,7 @@ TEST(FITS_wcs, COPY_CONSTRUCTOR)
     verbose = verboseLevel::VERBOSE_NONE;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifndef CI_CIWORKER
-    FITSmanager fm("build/testdata/DSS.fits", true);
-#else
     FITSmanager fm("testdata/DSS.fits", true);
-#endif
 
     std::shared_ptr<FITShdu> hdu = fm.GetPrimaryHeader();
     FITSwcs wcs1(hdu);
@@ -507,11 +479,7 @@ TEST(FITS_wcs, SUBCOPY_CONSTRUCTOR)
     verbose = verboseLevel::VERBOSE_NONE;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifndef CI_CIWORKER
-    FITSmanager fm("build/testdata/DSS.fits", true);
-#else
     FITSmanager fm("testdata/DSS.fits", true);
-#endif
 
     
     std::shared_ptr<FITShdu> hdu = fm.GetPrimaryHeader();
@@ -558,11 +526,7 @@ TEST(FITS_wcs, SUBFRAMECOPY_CONSTRUCTOR_INT)
     //verbose |= verboseLevel::VERBOSE_DEBUG;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifndef CI_CIWORKER
-    FITSmanager fm("build/testdata/DSS.fits", true);
-#else
     FITSmanager fm("testdata/DSS.fits", true);
-#endif
 
     
     std::shared_ptr<FITShdu> hdu = fm.GetPrimaryHeader();
@@ -616,11 +580,7 @@ TEST(FITS_wcs, SUBFRAMECOPY_CONSTRUCTOR_DBL)
     //verbose |= verboseLevel::VERBOSE_DEBUG;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifndef CI_CIWORKER
-    FITSmanager fm("build/testdata/DSS.fits", true);
-#else
     FITSmanager fm("testdata/DSS.fits", true);
-#endif
 
     
     std::shared_ptr<FITShdu> hdu = fm.GetPrimaryHeader();
@@ -673,11 +633,7 @@ TEST(FITS_wcs, swapWCS)
     verbose = verboseLevel::VERBOSE_NONE;
 
     // This is a placeholder test. Replace with actual tests for FITSwcs functionality.
-#ifndef CI_CIWORKER
-    FITSmanager fm("build/testdata/DSS.fits", true);
-#else
     FITSmanager fm("testdata/DSS.fits", true);
-#endif
 
     std::shared_ptr<FITShdu> hdu = fm.GetPrimaryHeader();
     FITSwcs wcs1(hdu);

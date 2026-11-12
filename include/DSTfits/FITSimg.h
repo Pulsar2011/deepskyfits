@@ -190,6 +190,16 @@ namespace DSL
         virtual pixelCoords World2Pixel( const worldCoords&, const int& wcsIndex=0) const; //!< Get pixel coordinates based on WCS
         virtual std::valarray<size_t> World2PixelArray( const worldVectors&, const int& wcsIndex=0) const; //!< Get pixel coordinates based on WCS
         virtual pixelVectors World2PixelVector( const worldVectors&, const int& wcsIndex=0) const; //!< Get pixel coordinates based on WCS
+
+        /*
+         * What the world coordinates above are. By default they come from the FITS WCS of the header
+         * (getWCS()); an image with another kind of WCS, such as an ASDF image with a GWCS, overrides these
+         * together with the conversions. Code that only displays or converts coordinates should ask these
+         * rather than getNumberOfWCS() or getWCS(), which know only the FITS WCS.
+         */
+        virtual bool HasWorldCoordinates() const; //!< Tell whether WorldCoordinates() gives world coordinates rather than the pixel itself
+        virtual std::vector<std::string> WorldAxisNames(const int& wcsIndex=0) const; //!< Name of each world axis (CTYPEi by default); empty if there is no such WCS
+        virtual std::vector<std::string> WorldAxisUnits(const int& wcsIndex=0) const; //!< Unit of each world axis (CUNITi by default); empty if there is no such WCS
 #pragma endregion
 #pragma region * Pixel index/coordinates
 

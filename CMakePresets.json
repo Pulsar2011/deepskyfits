@@ -1,0 +1,43 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "default",
+            "displayName": "Release build in build/",
+            "binaryDir": "${sourceDir}/build",
+            "warnings": { "dev": false },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "debug",
+            "displayName": "Debug build in build-debug/",
+            "binaryDir": "${sourceDir}/build-debug",
+            "warnings": { "dev": false },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "asan",
+            "displayName": "Debug build with AddressSanitizer in build-asan/",
+            "binaryDir": "${sourceDir}/build-asan",
+            "warnings": { "dev": false },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "WITH_ASAN": "ON"
+            }
+        }
+    ],
+    "buildPresets": [
+        { "name": "default", "configurePreset": "default" },
+        { "name": "debug", "configurePreset": "debug" },
+        { "name": "asan", "configurePreset": "asan" }
+    ],
+    "testPresets": [
+        { "name": "default", "configurePreset": "default", "output": { "outputOnFailure": true } },
+        { "name": "debug", "configurePreset": "debug", "output": { "outputOnFailure": true } },
+        { "name": "asan", "configurePreset": "asan", "output": { "outputOnFailure": true } }
+    ]
+}

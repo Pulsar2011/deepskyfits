@@ -388,11 +388,7 @@ TEST(FITShdu_Constructor, FromString)
 
 TEST(FITShdu_Constructor, FromFitsFile)
 {
-#ifndef CI_CIWORKER
-    FITSmanager ff("build/testdata/rosat_pspc_rdf2_3_bk1.fits");
-#else
     FITSmanager ff("testdata/rosat_pspc_rdf2_3_bk1.fits");
-#endif
     ff.MoveToPrimary();
     const std::shared_ptr<fitsfile>& hdu_ref = ff.CurrentHDU();
 
@@ -517,14 +513,9 @@ TEST(FITShdu_Dump, NoCrash)
 
 TEST(FITShdu_Modifier, ModifyFitsHeader)
 {
-    // Prepare test fixture: remove existing destination and copy source fixture into build/testdata
-#ifndef CI_CIWORKER
-    const std::string src_path = "build/testdata/rosat_pspc_rdf2_3_bk1.fits";
-    const std::string dst_path = "build/testdata/rosat_pspc_rdf2_3_bk1_cpy.fits";
-#else
+    // Prepare test fixture: remove existing destination and copy source fixture into testdata
     const std::string src_path = "testdata/rosat_pspc_rdf2_3_bk1.fits";
     const std::string dst_path = "testdata/rosat_pspc_rdf2_3_bk1_cpy.fits";
-#endif
 
     // remove destination if exists (ignore errors)
     std::remove(dst_path.c_str());
@@ -538,11 +529,7 @@ TEST(FITShdu_Modifier, ModifyFitsHeader)
     srcfs.close();
     dstfs.close();
 
-#ifndef CI_CIWORKER
-    FITSmanager ff("build/testdata/rosat_pspc_rdf2_3_bk1_cpy.fits",false);
-#else
     FITSmanager ff("testdata/rosat_pspc_rdf2_3_bk1_cpy.fits",false);
-#endif
     ff.MoveToPrimary();
     const std::shared_ptr<fitsfile>& hdu_ref = ff.CurrentHDU();
 
@@ -566,11 +553,7 @@ TEST(FITShdu_Modifier, ModifyFitsHeader)
     hdu.Write(hdu_ref);
     ff.Close();
 
-#ifndef CI_CIWORKER
-    FITSmanager fr("build/testdata/rosat_pspc_rdf2_3_bk1_cpy.fits",true);
-#else
     FITSmanager fr("testdata/rosat_pspc_rdf2_3_bk1_cpy.fits",true);
-#endif  
     fr.MoveToPrimary();
     const std::shared_ptr<fitsfile>& hdu_cpy = fr.CurrentHDU();
 

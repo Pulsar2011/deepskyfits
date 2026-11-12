@@ -24,27 +24,33 @@ Clone with submodules (required: googletest, cfitsio, Minuit2, doxygen-awesome-c
 ## Build and install
 
 ### Prerequisites:
-- CMake ≥ 3.5, a C++17+ compiler, Make or Ninja
+- CMake ≥ 3.24, a C++17+ compiler, Make or Ninja (make is also needed for the CFITSIO and WCSLIB builds)
 - System libs used by externals: zlib, bzip2, curl
 - GSL (CMake finds it as REQUIRED)
-- Internet access (to download wcslib tarball during build)
+- Internet access (to download the WCSLIB tarball and the test data during the build)
 
 ### Notes about dependencies:
-- *CFITSIO* builds from the submodule via ExternalProject_Add
-- *WCSLIB* is downloaded and built via ExternalProject_Add (static)
-- *Minuit2* and *googletest* come from submodules
+- *CFITSIO* builds from the submodule via ExternalProject_Add (static)
+- *WCSLIB* is downloaded and built via ExternalProject_Add (static); pass `-DWCSLIB_TARBALL=/path/wcslib-8.5.tar.bz2` to build offline
+- *Minuit2* (shared), *superNOVAS* (static) and *googletest* come from submodules
 - *Doxygen* is optional (target: doc)
-- *superNOVAS* is downloaded and built via ExternalProject_Add  (static)
 
 ### Basic build:
+Everything is built out of source: configuring in the source directory (`cmake .`) is refused.
 ```
-mkdir -p build
-cmake -S . -B build
-  -DWITH_DEBUG=ON                        # optional: debug flags, ASan
-  -DCMAKE_INSTALL_PREFIX=/desired/prefix # optional, default printed by CMake
+cmake --preset default        # Release, in build/      (or: cmake -B build)
 cmake --build build -j
 ```
+Other presets: `debug` (Debug, in `build-debug/`) and `asan` (Debug + AddressSanitizer, in `build-asan/`):
+```
+cmake --preset asan
+cmake --build --preset asan -j
+```
+Options: `-DCMAKE_INSTALL_PREFIX=/desired/prefix` (default: `$DeepSkyROOT`, or the parent directory),
+`-DWITH_ASAN=ON`, `-DBUILD_TESTS=OFF`. `-DWITH_DEBUG=ON` is deprecated: it means Debug + AddressSanitizer.
 
+Former in-source builds left files in the sources (CMakeCache.txt, `include/cfitsio`, `lib/`, ...);
+remove them once with `cmake -P cmake/CleanInSourceBuild.cmake`.
 
 ### Install (optional):
 ```
@@ -53,9 +59,9 @@ cmake --build build --target install
 
 What CMake does:
 - Picks the highest supported C++ standard (23→20→17)
-- **Builds** internal static *CFITSIO* and *WCSLIB* (no system CFITSIO needed)
-- Produces the shared library **libDSTfits** and test executables
-- Generates helper scripts to copy CFITSIO/Minuit2 headers for install
+- **Builds** internal static *CFITSIO* and *WCSLIB* (no system CFITSIO needed) in `build/external`
+- Produces the shared library **libDSTfits** in `build/lib` and the test executables in `build/bin`
+- Installs the DSTfits, CFITSIO, WCSLIB, Minuit2 and superNOVAS headers and libraries, and a CMake package (`find_package(DSTfits)`)
 
 --------------------------------------------------------------------------------
 
@@ -65,11 +71,11 @@ Tests are based on GoogleTest and come with automated test data download.
 
 - Build tests (already done with the regular build)
 - Run tests:
-  - From build dir: `ctest` or: `ctest -V for verbose`
-  - With Makefiles: `make test`
+  - `ctest --preset default` (or `asan`, `debug`), or from the build dir: `ctest` / `ctest -V` for verbose
 - Notes:
-  - A custom target download_testdata fetches sample FITS files; test executables depend on it
-  - The wcslib *tofits* utility is built and used by a test dependency
+  - The tests run from the build directory; their data and output files are in `build/testdata`
+  - A custom target testdata fetches sample FITS files; test executables depend on it
+  - The wcslib *tofits* utility writes `testdata/DSS.fits` for the WCS tests
 
 --------------------------------------------------------------------------------
 
