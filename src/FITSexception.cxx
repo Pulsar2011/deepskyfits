@@ -85,7 +85,11 @@ namespace DSL
     }
 
     const char* WCSexception::what() const noexcept
-    {        
+    {
+        // A CFITSIO code (BAD_OPTION, BAD_DIMEN...) isn't in the WCSLIB table: reading wcs_errmsg[err] would crash
+        if(err < WCSERR_SUCCESS || err > WCSERR_UNSET)
+            return FITSexception::what();
+
         std::string ss = std::string("\n");
         
         ss += "\033[1;35;47m***";

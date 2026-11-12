@@ -49,6 +49,28 @@ TEST(FITSexception, what_contains_provided_info)
     ASSERT_FALSE(s.empty())<<s;
 }
 
+TEST(WCSexception, what_with_a_wcslib_code)
+{
+    WCSexception ex(5, "WcsClass", "WcsFunc", "bad parameter");     // WCSERR_BAD_PARAM
+    std::string s = ex.what();
+    ASSERT_NE(s.find("WcsClass"), std::string::npos)<<s;
+    ASSERT_NE(s.find("bad parameter"), std::string::npos)<<s;
+    ASSERT_NE(s.find("WCS Error Code: 5"), std::string::npos)<<s;
+}
+
+TEST(WCSexception, what_with_a_cfitsio_code)
+{
+    // A CFITSIO code is outside the WCSLIB message table; what() used to read past its end and crash
+    for(int code : {-1, 15, 115, 347, 9999})
+    {
+        WCSexception ex(code, "WcsClass", "WcsFunc", "not a wcslib code");
+        std::string s = ex.what();
+        ASSERT_NE(s.find("WcsClass"), std::string::npos)<<code<<": "<<s;
+        ASSERT_NE(s.find("not a wcslib code"), std::string::npos)<<code<<": "<<s;
+        EXPECT_EQ(ex.errorCode(), code);
+    }
+}
+
 #pragma endregion
 #pragma region - Warning
 
