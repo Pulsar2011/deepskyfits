@@ -4,7 +4,7 @@
         {
             "label": "make gtest",
             "type": "shell",
-            "command": "cmake -DWITH_DEBUG=YES -DCMAKE_BUILD_TYPE=Debug . && make -j$(sysctl -n hw.logicalcpu) DSTfits gTest_version gTest_manager gTest_hdu gTest_FitsImage && dsymutil build/exe/gTest_version build/exe/gTest_manager build/exe/gTest_hdu build/exe/gTest_FitsImage 2>/dev/null || true",
+            "command": "cmake --preset asan && cmake --build --preset asan -j$(sysctl -n hw.logicalcpu) && (dsymutil build-asan/bin/gTest_* 2>/dev/null || true)",
             "options": {
                 "cwd": "${workspaceFolder}"
             },

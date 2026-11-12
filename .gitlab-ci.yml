@@ -6,41 +6,36 @@
 # Note that environment variables can be set in several places
 # See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
 
+# Every job runs in a fresh container of this image: packages installed by one job are not seen by
+# the others, so each job installs only what it needs. buildpack-deps:trixie is Debian 13 with the
+# build tools already in: GCC 14, make, autoconf/automake/libtool, pkg-config, git and the zlib,
+# bzip2 and curl headers. Its apt provides clang 19, CMake 3.31 and Doxygen 1.9.8.
 image:
-  name: gcc:13-bookworm
+  name: buildpack-deps:trixie
 
 variables:
   GIT_SUBMODULE_STRATEGY: normal
   DEBIAN_FRONTEND: noninteractive
+  # Compilers are named explicitly: left to itself, CMake takes /usr/bin/cc and c++, which are GCC 14.
+  # Every job that configures (build, create-pages) must install clang, and llvm for llvm-ar, used by
+  # the link-time optimisation of the release build. For GCC 14, set CC: gcc and CXX: g++.
+  CC: clang
+  CXX: clang++
 
 stages:
-- .pre
 - build
 - test
 - deploy
 
-before_script:
-  - apt-get update
-  - apt-get install -y cmake make
-  - apt-get install -y libgsl-dev
-  - apt-get install -y doxygen graphviz
-  - apt-get install -y build-essential clang pkg-config autoconf automake libtool ca-certificates
-  - apt-get install -y clang gdb libboost-filesystem-dev libboost-chrono-dev libboost-thread-dev libboost-regex-dev npm
-
-deps:
-  stage: .pre
-  script:
-    - echo "No-op dependencies are installed per job"
-
 build:
   stage: build
-  dependencies:
-    - deps
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq --no-install-recommends cmake libgsl-dev clang llvm gdb libboost-filesystem-dev libboost-chrono-dev libboost-thread-dev libboost-regex-dev npm
   script:
-    - mkdir -p build
-    - cd build
-    - cmake -Wno-dev -DCMAKE_CXX_STANDARD=23 -DCMAKE_CXX_STANDARD_REQUIRED=ON -DCMAKE_CXX_EXTENSIONS=OFF -DCI_CIWORKER=ON ..
-    - make -j 2
+    # Same presets as on the workstations (CMakePresets.json): Release build in build/
+    - cmake --preset default -DCI_CIWORKER=ON
+    - cmake --build --preset default --parallel 2
   artifacts:
     expire_in: 2 hrs
     paths:
@@ -48,26 +43,31 @@ build:
 
 test:
   stage: test
-  dependencies:
-    - build
   needs:
     - job: build
       artifacts: true
+  before_script:
+    # cmake for ctest, GSL for the test executables
+    - apt-get update -qq
+    - apt-get install -y -qq --no-install-recommends cmake libgsl-dev clang gdb libboost-filesystem-dev libboost-chrono-dev libboost-thread-dev libboost-regex-dev npm
   script:
-  - cd build
-  - ctest --output-on-failure
+  - ctest --preset default
 
 create-pages:
   stage: deploy
   needs:
     - job: build
       artifacts: true
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq --no-install-recommends cmake libgsl-dev clang llvm doxygen graphviz npm
   script:
     - mkdir public
     - npm install mathjax@2
-    - cmake .
-    - make doc
-    - mv doc/html/* ./public
+    # Configure again: the build job had no Doxygen, so its build tree has no doc target (nothing is recompiled)
+    - cmake --preset default -DCI_CIWORKER=ON
+    - cmake --build --preset default --target doc
+    - mv build/doc/html/* ./public
     - mv node_modules/mathjax ./public/mathjax
     - ls public
   pages:

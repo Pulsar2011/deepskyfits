@@ -1,15 +1,31 @@
-#-------------------- Configuration du projet
 #-------------------- CMAKE Configuration
-CMAKE_MINIMUM_REQUIRED(VERSION 3.5)
+# 3.24: required by the SuperNOVAS submodule
+cmake_minimum_required(VERSION 3.24)
 
-project(DeepSkyProject CXX)
-message("${Green}-- Project source directory :" ${CMAKE_SOURCE_DIR} "${ColourReset}")
-
-set(CMAKE_BUILD_DIRECTORY ./build)
-
-if(DEFINED ENV{DeepSkyROOT})
-    set(DeepSkyROOT $ENV{DeepSkyROOT})
+# -Wno-dev by default (developer and deprecation warnings, mostly from the submodules): no need to
+# pass it, nor to alias cmake with it, which breaks 'cmake --build' and 'cmake --install'.
+# 'cmake -Wdev ...' shows them again.
+if(NOT DEFINED CACHE{CMAKE_SUPPRESS_DEVELOPER_WARNINGS})
+    set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS ON CACHE INTERNAL "Suppress developer warnings (-Wno-dev)")
 endif()
+
+# Everything is generated in a build directory, never in the sources: from the project directory,
+# 'cmake --preset default' (or 'cmake -B build'); from a build directory, 'cmake <path to project>'.
+get_filename_component(_src "${CMAKE_SOURCE_DIR}" REALPATH)
+get_filename_component(_bin "${CMAKE_BINARY_DIR}" REALPATH)
+if(_src STREQUAL _bin)
+    message(FATAL_ERROR
+        "In-source builds are not allowed. Remove what this run (and any former in-source build) created:\n"
+        "    cmake -P cmake/CleanInSourceBuild.cmake\n"
+        "then, from the project directory:\n"
+        "    cmake --preset default        (or: cmake -B build)\n"
+        "    cmake --build build -j\n"
+        "    cmake --build build --target install\n"
+        "Other presets: debug (build-debug/), asan (build-asan/).\n"
+        "Or from a build directory: mkdir build && cd build && cmake .. && make")
+endif()
+
+project(DeepSkyFits LANGUAGES C CXX)
 
 if(NOT WIN32)
     string(ASCII 27 Esc)
@@ -31,689 +47,462 @@ if(NOT WIN32)
     set(BoldWhite   "${Esc}[1;37m")
 endif()
 
-if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-    set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/../. CACHE PATH "default install path" FORCE)
-endif(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+message("${BoldCyan}----------- DeepSkyFits (DSTfits) -----------${ColourReset}")
+message("${Green}-- Project source directory :${ColourReset} ${CMAKE_SOURCE_DIR}")
+message("${Green}-- Project build directory  :${ColourReset} ${CMAKE_BINARY_DIR}")
 
-set(EXECUTABLE_OUTPUT_PATH ./build/exe/)
-set(LIBRARY_OUTPUT_PATH ./build/lib/)
+if(DEFINED ENV{DeepSkyROOT})
+    set(DeepSkyROOT $ENV{DeepSkyROOT})
+else()
+    set(DeepSkyROOT ${CMAKE_SOURCE_DIR}/..)
+endif()
+get_filename_component(DeepSkyROOT "${DeepSkyROOT}" ABSOLUTE)
+
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX ${DeepSkyROOT} CACHE PATH "default install path" FORCE)
+endif()
+
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/modules")
+
+#-------------------- Options
+option(WITH_ASAN   "Build DSTfits and its tests with AddressSanitizer" OFF)
+option(BUILD_TESTS "Build the GoogleTest suite" ON)
+option(CI_CIWORKER "Build for the GitLab CI runner" OFF)
+option(WITH_DEBUG  "Deprecated: same as CMAKE_BUILD_TYPE=Debug and WITH_ASAN=ON (use the asan preset)" OFF)
+
+if(WITH_DEBUG)
+    message(WARNING "WITH_DEBUG is deprecated: use 'cmake --preset asan' (Debug + AddressSanitizer, in build-asan/)")
+    set(CMAKE_BUILD_TYPE Debug)
+    set(WITH_ASAN ON)
+endif()
+
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
 
 if(CI_CIWORKER)
     add_compile_definitions(CI_CIWORKER)
 endif()
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/modules")
+# Products of this build: executables in bin/, libraries in lib/ (objects stay in CMakeFiles/)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
-message("${BoldYellow}-- CMAKE INSTALL PREFIX : ${ColourReset}" ${CMAKE_INSTALL_PREFIX})
+# The highest standard the compiler supports, from C++23 down
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED OFF)
+set(CMAKE_CXX_EXTENSIONS OFF)
+# Static parts (cfitsio, wcslib, SuperNOVAS) end up inside the shared libDSTfits
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-#-------------------- COMPILER
-include(CheckCXXCompilerFlag)
-CHECK_CXX_COMPILER_FLAG("-std=c++23" COMPILER_SUPPORTS_CXX23)
-CHECK_CXX_COMPILER_FLAG("-std=c++20" COMPILER_SUPPORTS_CXX20)
-CHECK_CXX_COMPILER_FLAG("-std=c++17" COMPILER_SUPPORTS_CXX17)
-CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
-CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
-
-if(COMPILER_SUPPORTS_CXX23)
-    message("-- USE CXX23 STANDARD")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++23")
-    set(CMAKE_CXX_STANDARD "23")
-elseif(COMPILER_SUPPORTS_CXX20)
-    message("-- USE CXX20 STANDARD")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20")
-    set(CMAKE_CXX_STANDARD "20")
-elseif(COMPILER_SUPPORTS_CXX17)
-    message("-- USE CXX17 STANDARD")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
-    set(CMAKE_CXX_STANDARD "17")
-elseif(COMPILER_SUPPORTS_CXX11)
-    message("-- USE CXX11 STANDARD")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-    set(CMAKE_CXX_STANDARD "11")
-elseif(COMPILER_SUPPORTS_CXX0X)
-    message("-- USE CX0X STANDARD")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
-else()
-	message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++23, C++20, C++17 nor C++11 nor C++0x support. Please use a different C++ compiler.")
+include(ProcessorCount)
+ProcessorCount(NCORES)
+if(NCORES EQUAL 0)
+    set(NCORES 4)
 endif()
 
-set(BUILD_SHARED_LIBS "YES")
+#-------------------- COMPILER
+# These flags apply to every C++ target of this directory, the submodules included (Minuit2, gtest).
+set(_release "$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>")
+set(_debug   "$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Debug>>")
 
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -v")
-
-#-------------------- GCC specifics
-IF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-    # Linux specific code
-    cmake_policy(SET CMP0069 NEW)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Wall -pipe -pthread -fexceptions -fPIC -Wno-unknown-pragmas -Wmisleading-indentation -flto -mtune=native -ffp-contract=on -fomit-frame-pointer")
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    set(OperatingSystem "Linux")
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-pipe;-pthread;-fexceptions;-Wno-unknown-pragmas;-Wmisleading-indentation;-mtune=native;-ffp-contract=on>")
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m64")
-        ADD_DEFINITIONS(-DLinuxx86_64)
+        add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-m64>")
+        add_compile_definitions(Linuxx86_64)
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
-        ADD_DEFINITIONS(-DLinuxaarch64)
+        add_compile_definitions(Linuxaarch64)
     endif()
-
-    # Enable Interprocedural Optimization (LTO) when supported on Linux
+    add_compile_options("$<${_release}:-flto>")
+    add_link_options(-pthread "$<$<CONFIG:Release>:-flto>")
+    # Interprocedural optimization (LTO) of the release build, when supported
     include(CheckIPOSupported)
     check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error)
     if(ipo_supported)
-        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
     endif()
-
-    set(OperatingSystem "Linux")
-    set(CMAKE_CXX_STANDARD_REQUIRED ON)
-    set(CMAKE_CXX_EXTENSIONS OFF)
-ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-
-#-------------------- DARWIN specifics
-IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    # macOS specific code with architecture distinction
+elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+    set(OperatingSystem "Mac OS X")
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-mcpu=native;-mtune=native;-ffp-contract=on>")
+    add_compile_definitions(Darwin)
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
-        # Apple Silicon (ARM64)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -fPIC -flto=thin -mcpu=native -mtune=native -ffp-contract=on -fomit-frame-pointer")
-        set(OperatingSystem "Mac OS X")
-        ADD_DEFINITIONS(-DDarwin -DDarwinarm64)
+        add_compile_definitions(Darwinarm64)
         set(CMAKE_OSX_ARCHITECTURES "arm64")
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64")
-        # Apple Intel (x86_64)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -m64 -fPIC -flto=thin -mcpu=native -mtune=native -ffp-contract=on -fomit-frame-pointer")
-        set(OperatingSystem "Mac OS X")
-        ADD_DEFINITIONS(-DDarwin -DDarwinx86_64)
+        add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-m64>")
+        add_compile_definitions(Darwinx86_64)
         set(CMAKE_OSX_ARCHITECTURES "x86_64")
-    else()
-        # Fallback
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -fPIC -flto=thin -mcpu=native -mtune=native -ffp-contract=on -fomit-frame-pointer")
-        set(OperatingSystem "Mac OS X")
-        ADD_DEFINITIONS(-DDarwin)
     endif()
-ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    add_compile_options("$<${_release}:-flto=thin>")
+    add_link_options("$<$<CONFIG:Release>:-flto=thin>")
+endif()
 
-option(WITH_DEBUG "Activate debug mode" OFF)
-if(WITH_DEBUG)
-	message("${Blue}-- DEBUG MODE ACTIVATED${ColourReset}")
-	add_definitions(-D__DEBUG__)
-	set(CMAKE_BUILD_TYPE DEBUG)
-	# LTO (flto/flto=thin) prevents LLDB from resolving debug info on macOS:
-	# it replaces .o files with LLVM bitcode, leaving the debug map with empty
-	# OSO entries that LLDB cannot follow. Strip it for debug builds.
-	string(REPLACE "-flto=thin" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-	string(REPLACE "-flto" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-	set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0 -fsanitize=address -fno-omit-frame-pointer")
-else(WITH_DEBUG)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
-endif(WITH_DEBUG)
+add_compile_options("$<${_release}:-O3;-fomit-frame-pointer>")
+# No LTO in debug: on macOS it replaces the .o files with LLVM bitcode, leaving the debug map with
+# empty OSO entries that LLDB cannot follow.
+add_compile_options("$<${_debug}:-O0;-g>")
+add_compile_definitions("$<$<CONFIG:Debug>:__DEBUG__>")
 
-message("${Green}-- CXX COMPILER:${ColourReset} ${CMAKE_CXX_COMPILER}")
-message("${Green}-- DEFAULT CXX FLAGES:${ColourReset} ${CMAKE_CXX_FLAGS}")
+if(WITH_ASAN)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-fsanitize=address;-fno-omit-frame-pointer;-g>")
+    add_link_options(-fsanitize=address)
+endif()
 
-#-------------------- APPEND GIT VERSION TAG
-# Make a version file containing the current version from git.
+message("${BoldYellow}-- CMAKE INSTALL PREFIX : ${ColourReset}${CMAKE_INSTALL_PREFIX}")
+message("${Green}-- DeepSkyROOT :${ColourReset} ${DeepSkyROOT}")
+message("${Green}-- BUILD TYPE :${ColourReset} ${CMAKE_BUILD_TYPE}")
+message("${Green}-- CXX COMPILER :${ColourReset} ${CMAKE_CXX_COMPILER}")
+message("${Green}-- USE CXX STANDARD :${ColourReset} ${CMAKE_CXX_STANDARD}")
+if(WITH_ASAN)
+    message("${Blue}-- AddressSanitizer ACTIVATED${ColourReset}")
+endif()
+
+#-------------------- VERSION FROM THE GIT TAG
 find_package(Git)
 include(GetGitRevisionDescription)
 git_describe(VERSION --always --tags --long)
 
-#parse the version information into pieces.
 string(REGEX REPLACE "^v([0-9]+)\\..*" "\\1" VERSION_MAJOR "${VERSION}")
 string(REGEX REPLACE "^v[0-9]+\\.([0-9]+).*" "\\1" VERSION_MINOR "${VERSION}")
 string(REGEX REPLACE "^v[0-9]+\\.[0-9]+\\.([0-9]+).*" "\\1" VERSION_PATCH "${VERSION}")
 string(REGEX REPLACE "^v[0-9]+\\.[0-9]+\\.[0-9]+.(-*)" "\\1" VERSION_SHA1 "${VERSION}")
 set(VERSION_SHORT "v${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
-message("-- PKG VERSION : " ${VERSION})
-message("-- PKG VERSION : " ${VERSION_SHORT})
-message("-- PKG MAJOR   : " ${VERSION_MAJOR})
-message("-- PKG MINOR   : " ${VERSION_MINOR})
-message("-- PKG PATCH   : " ${VERSION_PATCH})
-message("-- PKG SHA1    : " ${VERSION_SHA1})
+message("-- PKG VERSION : ${VERSION} (${VERSION_SHORT}, sha1 ${VERSION_SHA1})")
 
-set(CMAKE_PROJECT_VERSION "${VERSION}")
+set(CMAKE_PROJECT_VERSION       "${VERSION}")
 set(CMAKE_PROJECT_VERSION_MAJOR "${VERSION_MAJOR}")
 set(CMAKE_PROJECT_VERSION_MINOR "${VERSION_MINOR}")
 set(CMAKE_PROJECT_VERSION_PATCH "${VERSION_PATCH}")
 
-configure_file(${CMAKE_MODULE_PATH}/DSF_version.cxx.in ${CMAKE_CURRENT_BINARY_DIR}/src/DSF_version.cxx)
-set(version_file "${CMAKE_CURRENT_BINARY_DIR}/src/DSF_version.cxx")
-
-configure_file(${CMAKE_MODULE_PATH}/gTest_version.h.in ${CMAKE_CURRENT_BINARY_DIR}/test/gTest_version.h)
-
-#-------------------- Inclusion des en-têtes publics
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR}/test ./include ./include/DSTfits)
-
-message("-- PROJECT DIR: " ${CMAKE_SOURCE_DIR})
-message("-- PROJECT BINARY DIR: " ${PROJECT_BINARY_DIR})
-message("-- CURRENT BINARY DIR: " ${CMAKE_CURRENT_BINARY_DIR})
-message("-- CMAKE SOURCE DIR  : " ${CMAKE_SOURCE_DIR})
-
-#-------------------- Find GSL dependencies
-find_package(GSL REQUIRED)
-include_directories(AFTER ${GSL_INCLUDE_DIRS})
-#link_directories(${GSL_LIBRARY})
-
-if(${GSL_FOUND})
-    message("${Blue}-- GSL INC DIR ${ColourReset} ${GSL_INCLUDE_DIRS}")
-    message("${Blue}-- GSL LIBRARY DIR ${ColourReset} ${GSL_LIBRARY}")
-    message("${Blue}-- GSL LIB ${ColourReset} ${GSL_LIBRARIES}")
-endif(${GSL_FOUND})
-
-#-------------------- Add gtest testsuite
-set(CMAKE_LIBRARY_PATH "${PROJECT_BINARY_DIR}/gtest/lib" ${CMAKE_LIBRARY_PATH})
-
-message("-- CMAKE INCLUDE DIR  : " ${CMAKE_INCLUDE_PATH})
-message("-- CMAKE LIBRARY DIR  : " ${CMAKE_LIBRARY_PATH})
-
-#-------------------- Find Boost dependencies
-#message("${Red}----------- SEARCH BOOST Framework -----------${ColourReset}")
-#find_package(Boost REQUIRED COMPONENTS filesystem chrono)
-#if(${Boost_FOUND})
-#    message("${Blue}-- Boost INC DIR ${ColourReset} ${Boost_INCLUDE_DIRS}")
-#    message("${Blue}-- Boost LIBRARY DIR ${ColourReset} ${Boost_LIBRARY_DIRS}")
-#    message("${Blue}-- Boost LIB ${ColourReset} ${Boost_LIBRARIES}")
-#endif(${Boost_FOUND})
-#set(Boost_USE_MULTITHREADED ON)
-
-#-------------------- LIST SOURCE FILE
-
-file(GLOB CORE_SRC "src/*.cxx")
-file(GLOB CORE_HEADER "include/DSTfits/*.h")
-file(GLOB TEST_SRC "test/*.cxx")
-file(GLOB FITSIO_HEADER "cfitsio/*.h")
-
-set(HEADER_FILES ${CORE_HEADER})
-file(GLOB FITS_HEADER "include/cfitsio/*.h")
-file(GLOB MINUIT_HEADER "include/Minuit2/*.h")
-file(GLOB MINUIT2_HEADER "include/Minuit2/Minuit2/*.h")
-file(GLOB MINUITF_HEADER "include/Minuit2/Fit/*.h")
-file(GLOB MINUITM_HEADER "include/Minuit2/Math/*.h")
-file(GLOB SUPERNOVAS_HEADER "include/supernovas/*.h")
-
-
-#-------------------- Configuration de la bibliothèque
-
-include(ExternalProject)
-
-set(CFITSIO_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include/cfitsio)
-
-if(WITH_DEBUG AND EXISTS "${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a")
-    message("${Blue}-- DEBUG: Skipping cfitsio rebuild, using existing library${ColourReset}")
-    add_custom_target(cfitsio_external)
-else()
-    ExternalProject_Add(
-        cfitsio_external
-        SOURCE_DIR ${CMAKE_SOURCE_DIR}/cfitsio
-        BINARY_DIR ${CMAKE_SOURCE_DIR}/build/cfitsio
-        CONFIGURE_COMMAND CC=${CMAKE_C_COMPILER} CFLAGS=-fPIC ${CMAKE_SOURCE_DIR}/cfitsio/configure --enable-static --disable-shared --prefix=${CMAKE_SOURCE_DIR}/build --with-gnu-ld --with-bzip2
-        BUILD_COMMAND make -j 4 libcfitsio.la
-        INSTALL_COMMAND ${CMAKE_COMMAND} -E make_directory ${CFITSIO_INCLUDE_DIR}
-            && ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/build/cfitsio/.libs/libcfitsio.a ${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a
-            && cmake -P ${CMAKE_SOURCE_DIR}/cmake/copy_cfitsio_headers.cmake
-        BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a
-    )
-endif()
-
-#-------------------- Configuration de la bibliothèque WCSFIT
-
-set(WCSLIB_VERSION 8.5)
-set(WCSLIB_URLS
-    "https://www.atnf.csiro.au/people/mcalabre/WCS/wcslib-${WCSLIB_VERSION}.tar.bz2"
-    "https://www.atnf.csiro.au/computing/software/wcs/WCS/wcslib-${WCSLIB_VERSION}.tar.bz2"
-    "https://www.atnf.csiro.au/computing/software/wcs/wcslib-releases/wcslib-${WCSLIB_VERSION}.tar.bz2"
-)
-string(REPLACE ";" " " WCSLIB_URLS_SP "${WCSLIB_URLS}")
-set(WCSLIB_INSTALL_DIR ${CMAKE_SOURCE_DIR}/build/wcslib)
-set(WCSLIB_SRC_DIR ${CMAKE_SOURCE_DIR}/wcslib/wcslib-${WCSLIB_VERSION})
-
-# Ensure download dir exists and add a download target using wget (fallback to file(DOWNLOAD) if wget missing)
-file(MAKE_DIRECTORY "${CMAKE_SOURCE_DIR}/wcslib")
-file(MAKE_DIRECTORY "${WCSLIB_INSTALL_DIR}")
-set(WCSLIB_TARBALL "${CMAKE_SOURCE_DIR}/wcslib-${WCSLIB_VERSION}.tar.bz2")
-
-# expose include/lib paths for targets
-set(WCSLIB_INCLUDE_DIR "${WCSLIB_INSTALL_DIR}/include" CACHE PATH "wcslib include dir")
-set(WCSLIB_LIBRARY     "${WCSLIB_INSTALL_DIR}/lib/libwcs-${WCSLIB_VERSION}.a" CACHE FILEPATH "wcslib static library")
-
-if(WITH_DEBUG AND EXISTS "${WCSLIB_LIBRARY}")
-    message("${Blue}-- DEBUG: Skipping wcslib rebuild, using existing library${ColourReset}")
-    add_custom_target(download_wcslib)
-    add_custom_target(extract_wcslib)
-    add_custom_target(wcslib_external)
-else()
-    add_custom_target(download_wcslib
-        COMMAND /usr/bin/env bash -c "set -e; if [ ! -f \"${WCSLIB_TARBALL}\" ]; then echo 'Downloading wcslib to ${WCSLIB_TARBALL}...'; for u in ${WCSLIB_URLS_SP}; do echo \"Trying: $u\"; if command -v wget >/dev/null 2>&1; then wget -t 3 --retry-connrefused -O \"${WCSLIB_TARBALL}\" \"$u\" && exit 0 || true; elif command -v curl >/dev/null 2>&1; then curl -fsSL --retry 3 \"$u\" -o \"${WCSLIB_TARBALL}\" && exit 0 || true; fi; done; echo 'All wcslib download URLs failed' >&2; exit 1; else echo 'wcslib tarball already exists: ${WCSLIB_TARBALL}'; fi"
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/wcslib"
-        COMMENT "Download wcslib tarball if missing"
-        VERBATIM
-    )
-
-    add_custom_target(extract_wcslib
-        COMMAND ${CMAKE_COMMAND} -E echo "Extracting ${WCSLIB_TARBALL} to ${CMAKE_SOURCE_DIR}/wcslib"
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/wcslib"
-        COMMAND /usr/bin/env tar -xjf "${WCSLIB_TARBALL}" -C "${CMAKE_SOURCE_DIR}/wcslib"
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/wcslib"
-        VERBATIM
-    )
-
-    ExternalProject_Add(
-        wcslib_external
-        SOURCE_DIR      ${WCSLIB_SRC_DIR}
-        PREFIX          ${CMAKE_SOURCE_DIR}/build/wcslib
-        DOWNLOAD_COMMAND ""
-        UPDATE_COMMAND   ""
-        CONFIGURE_COMMAND CC=${CMAKE_C_COMPILER} CFLAGS=-fPIC ${WCSLIB_SRC_DIR}/configure --prefix=${WCSLIB_INSTALL_DIR} --with-cfitsioinc=${CFITSIO_INCLUDE_DIR} --with-cfitsiolib=${CMAKE_SOURCE_DIR}/build/lib --disable-shared
-        BUILD_COMMAND     ${CMAKE_MAKE_PROGRAM} -j ${CMAKE_BUILD_PARALLEL_LEVEL}
-        INSTALL_COMMAND   ${CMAKE_MAKE_PROGRAM} install
-        BUILD_IN_SOURCE   1
-        BUILD_BYPRODUCTS  ${WCSLIB_INSTALL_DIR}/lib/libwcs.a ${WCSLIB_INSTALL_DIR}/bin/tofits
-    )
-
-    add_dependencies(wcslib_external cfitsio_external extract_wcslib)
-    add_dependencies(extract_wcslib download_wcslib)
-endif()
-
-add_custom_target(tofits
-    COMMAND /usr/bin/env bash -c "${CMAKE_SOURCE_DIR}/build/wcslib/bin/tofits <${CMAKE_SOURCE_DIR}/wcslib/wcslib-${WCSLIB_VERSION}/C/test/DSS.keyrec> ${CMAKE_SOURCE_DIR}/build/testdata/DSS.fits"
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    COMMENT "Run tofit: ${CMAKE_SOURCE_DIR}/build/wcslib/bin/tofits <${CMAKE_SOURCE_DIR}/wcslib/wcslib-${WCSLIB_VERSION}/C/test/DSS.keyrec> ${CMAKE_SOURCE_DIR}/build/testdata/DSS.fits"
-    VERBATIM
-)
-
-add_dependencies(tofits wcslib_external)
-
-
-# Provide explicit cfitsio static library path variable for later linking
-set(CFITSIO_OUTPUT_LIB "${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a" CACHE FILEPATH "cfitsio static archive produced by external build")
-file(GLOB WCSLIB_HEADER "build/wcslib/include/wcslib-${WCSLIB_VERSION}/*.h")
-
-#-------------------- Configuration de la bibliothèque
-
-add_library(
-    DSTfits
-    SHARED
-    ${CORE_SRC}
-    ${CORE_HEADER}
-    ${version_file}
-)
-
-# Propagate the git tag to the library. A clone without a reachable tag (e.g. a shallow CI clone)
-# has no numeric version: the library stays unversioned and no CMake package is installed.
+# A clone without a reachable tag (e.g. a shallow CI clone) has no numeric version: the library
+# stays unversioned and no CMake package is installed.
 if(VERSION MATCHES "^v[0-9]+\\.[0-9]+\\.[0-9]+")
     set(DSTfits_NUMERIC_VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
-    set_target_properties(DSTfits PROPERTIES
-        VERSION   "${DSTfits_NUMERIC_VERSION}"
-        SOVERSION "${VERSION_MAJOR}"
-    )
+    set(PROJECT_VERSION "${DSTfits_NUMERIC_VERSION}")
 else()
     message(WARNING "No version tag found (git describe gave '${VERSION}'): DSTfits will not be versioned")
 endif()
 
-# target-level configuration must come after the target is created
-add_dependencies(DSTfits cfitsio_external wcslib_external)
-target_include_directories(DSTfits PRIVATE ${WCSLIB_INCLUDE_DIR})
-target_include_directories(DSTfits PRIVATE ${CFITSIO_INCLUDE_DIR})
+# Generated sources stay in the build directory
+set(GENERATED_DIR ${CMAKE_BINARY_DIR}/generated)
+configure_file(${CMAKE_SOURCE_DIR}/modules/DSF_version.cxx.in ${GENERATED_DIR}/src/DSF_version.cxx)
+configure_file(${CMAKE_SOURCE_DIR}/modules/gTest_version.h.in ${GENERATED_DIR}/test/gTest_version.h)
 
-include_directories(include/cfitsio)
-include_directories(build/wcslib/include)
+#-------------------- GSL
+message("${Red}----------- SEARCH GSL -----------${ColourReset}")
+find_package(GSL REQUIRED)
+message("${Blue}-- GSL INC DIR ${ColourReset} ${GSL_INCLUDE_DIRS}")
+message("${Blue}-- GSL LIB ${ColourReset} ${GSL_LIBRARIES}")
 
-#-------------------- Configuration des test
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build/lib)
+#-------------------- Dependencies built from the submodules
+message("${Red}----------- SUBMODULES : cfitsio, wcslib, Minuit2, SuperNOVAS -----------${ColourReset}")
+set(_submodules cfitsio/configure Minuit2/CMakeLists.txt SuperNOVAS/CMakeLists.txt)
+if(BUILD_TESTS)
+    list(APPEND _submodules googletest/CMakeLists.txt)
+endif()
+foreach(sub IN LISTS _submodules)
+    if(NOT EXISTS ${CMAKE_SOURCE_DIR}/${sub})
+        message(FATAL_ERROR "${BoldRed}${sub} is missing: run 'git submodule update --init'${ColourReset}")
+    endif()
+endforeach()
 
-include_directories(Minuit2/inc)
+include(ExternalProject)
+set(EXTERNAL_DIR ${CMAKE_BINARY_DIR}/external)
 
-if(WITH_DEBUG)
-    file(GLOB EXISTING_MINUIT2_LIBS
-        "${CMAKE_SOURCE_DIR}/build/lib/libMinuit2.dylib"
-        "${CMAKE_SOURCE_DIR}/build/lib/libMinuit2.so"
-        "${CMAKE_SOURCE_DIR}/build/lib/libMinuit2.a"
+# The autotools builds need make, whatever the generator (CMAKE_MAKE_PROGRAM is ninja with Ninja)
+find_program(MAKE_EXECUTABLE NAMES gmake make REQUIRED)
+
+#---------- cfitsio: static, absorbed into libDSTfits; headers used straight from the submodule
+set(CFITSIO_SRC_DIR     ${CMAKE_SOURCE_DIR}/cfitsio)
+set(CFITSIO_INCLUDE_DIR ${CFITSIO_SRC_DIR})
+set(CFITSIO_LIBRARY     ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libcfitsio.a)
+ExternalProject_Add(cfitsio_external
+    PREFIX            ${EXTERNAL_DIR}/cfitsio
+    SOURCE_DIR        ${CFITSIO_SRC_DIR}
+    BINARY_DIR        ${EXTERNAL_DIR}/cfitsio-build
+    CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CC=${CMAKE_C_COMPILER} CFLAGS=-fPIC
+                      ${CFITSIO_SRC_DIR}/configure --enable-static --disable-shared
+                      --prefix=${EXTERNAL_DIR}/cfitsio-install --with-gnu-ld --with-bzip2
+    BUILD_COMMAND     ${MAKE_EXECUTABLE} -j ${NCORES} libcfitsio.la
+    INSTALL_COMMAND   ${CMAKE_COMMAND} -E copy_if_different <BINARY_DIR>/.libs/libcfitsio.a ${CFITSIO_LIBRARY}
+    BUILD_BYPRODUCTS  ${CFITSIO_LIBRARY}
+)
+add_library(cfitsio_static STATIC IMPORTED)
+set_target_properties(cfitsio_static PROPERTIES
+    IMPORTED_LOCATION ${CFITSIO_LIBRARY}
+    INTERFACE_INCLUDE_DIRECTORIES ${CFITSIO_INCLUDE_DIR}
+)
+add_dependencies(cfitsio_static cfitsio_external)
+message("${Blue}-- cfitsio  ${ColourReset} static, from ${CFITSIO_SRC_DIR}")
+
+#---------- wcslib: downloaded, static, absorbed into libDSTfits
+set(WCSLIB_VERSION 8.5)
+set(WCSLIB_SHA256 f1fd1b78fbfdbabda363f8045e0c59e32735eca45482a5302191e56fe062eace)
+set(WCSLIB_TARBALL "" CACHE FILEPATH "Local wcslib-${WCSLIB_VERSION}.tar.bz2, to build without downloading it")
+if(WCSLIB_TARBALL)
+    set(WCSLIB_URLS ${WCSLIB_TARBALL})
+else()
+    set(WCSLIB_URLS
+        "https://www.atnf.csiro.au/people/mcalabre/WCS/wcslib-${WCSLIB_VERSION}.tar.bz2"
+        "https://www.atnf.csiro.au/computing/software/wcs/WCS/wcslib-${WCSLIB_VERSION}.tar.bz2"
+        "https://www.atnf.csiro.au/computing/software/wcs/wcslib-releases/wcslib-${WCSLIB_VERSION}.tar.bz2"
     )
 endif()
+set(WCSLIB_SRC_DIR     ${EXTERNAL_DIR}/wcslib-src)
+set(WCSLIB_INSTALL_DIR ${EXTERNAL_DIR}/wcslib-install)
+set(WCSLIB_INCLUDE_DIR ${WCSLIB_INSTALL_DIR}/include)
+set(WCSLIB_LIBRARY     ${WCSLIB_INSTALL_DIR}/lib/libwcs-${WCSLIB_VERSION}.a)
+set(WCSLIB_TOFITS      ${WCSLIB_INSTALL_DIR}/bin/tofits)
+# An imported target needs its include directory to exist when the project is generated
+file(MAKE_DIRECTORY ${WCSLIB_INCLUDE_DIR})
+ExternalProject_Add(wcslib_external
+    DEPENDS           cfitsio_external
+    PREFIX            ${EXTERNAL_DIR}/wcslib
+    URL               ${WCSLIB_URLS}
+    URL_HASH          SHA256=${WCSLIB_SHA256}
+    DOWNLOAD_DIR      ${EXTERNAL_DIR}/download
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SOURCE_DIR        ${WCSLIB_SRC_DIR}
+    BUILD_IN_SOURCE   1
+    CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CC=${CMAKE_C_COMPILER} CFLAGS=-fPIC
+                      ./configure --prefix=${WCSLIB_INSTALL_DIR}
+                      --with-cfitsioinc=${CFITSIO_INCLUDE_DIR} --with-cfitsiolib=${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}
+                      --disable-shared
+    BUILD_COMMAND     ${MAKE_EXECUTABLE} -j ${NCORES}
+    INSTALL_COMMAND   ${MAKE_EXECUTABLE} install
+    BUILD_BYPRODUCTS  ${WCSLIB_LIBRARY} ${WCSLIB_TOFITS}
+)
+add_library(wcslib_static STATIC IMPORTED)
+set_target_properties(wcslib_static PROPERTIES
+    IMPORTED_LOCATION ${WCSLIB_LIBRARY}
+    INTERFACE_INCLUDE_DIRECTORIES ${WCSLIB_INCLUDE_DIR}
+)
+add_dependencies(wcslib_static wcslib_external)
+message("${Blue}-- wcslib   ${ColourReset} ${WCSLIB_VERSION}, static, downloaded into ${EXTERNAL_DIR}/download")
 
-if(WITH_DEBUG AND EXISTING_MINUIT2_LIBS)
-    message("${Blue}-- DEBUG: Skipping Minuit2 rebuild, using existing library${ColourReset}")
-    list(GET EXISTING_MINUIT2_LIBS 0 MINUIT2_LIB_FILE)
-    add_library(Minuit2 SHARED IMPORTED GLOBAL)
-    set_target_properties(Minuit2 PROPERTIES IMPORTED_LOCATION "${MINUIT2_LIB_FILE}")
-else()
-    add_subdirectory(Minuit2 EXCLUDE_FROM_ALL)
-    add_dependencies(DSTfits Minuit2)
-endif()
+#---------- Minuit2: shared, installed (the other DeepSky projects link it)
+# Minuit2 asks for CMake 3.1, which CMake 4 no longer accepts
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+set(BUILD_SHARED_LIBS ON)
+add_subdirectory(Minuit2 EXCLUDE_FROM_ALL)
+unset(CMAKE_POLICY_VERSION_MINIMUM)
+message("${Blue}-- Minuit2  ${ColourReset} shared, from ${CMAKE_SOURCE_DIR}/Minuit2")
 
-
-#-------------------- Configuration de la bibliothèque SuperNOVAS
-# Built static so it is absorbed into libDSTfits.so (no separate runtime lib to ship).
-
+#---------- SuperNOVAS: static + PIC, absorbed into libDSTfits
+# Plain variables: SuperNOVAS' option() calls honour them (CMP0077), without touching the cache.
+set(BUILD_SHARED_LIBS OFF)
+set(BUILD_TESTING     OFF)
+set(BUILD_EXAMPLES    OFF)
+set(BUILD_BENCHMARK   OFF)
+set(BUILD_DOC         OFF)
 # SuperNOVAS ships a C++ API (namespace `supernovas`, include <supernovas.h>) in a library of
 # its own, libsupernovas++, gated behind ENABLE_CPP. DSTfits still calls the C99 API: the C++ one
 # has no catalog-epoch propagation (no transform_cat(PROPER_MOTION, ...) equivalent) and its
 # Equatorial::to_system() carries only a direction vector, so it would drop proper motion,
 # parallax and radial velocity. Building it here keeps it available for when that gap closes.
-set(ENABLE_CPP ON CACHE BOOL "Build the SuperNOVAS C++ API (libsupernovas++)" FORCE)
+set(ENABLE_CPP        ON)
+add_subdirectory(SuperNOVAS EXCLUDE_FROM_ALL)
+unset(BUILD_TESTING)
+# SuperNOVAS/src/cpp/CMakeLists.txt pins its target to C++11, but supernovas.h includes
+# <optional>, which is C++17. Override it here rather than patching the vendored tree, so
+# the fix survives re-vendoring the dependency.
+if(TARGET cpp)
+    set_property(TARGET cpp PROPERTY CXX_STANDARD 17)
+    set_property(TARGET cpp PROPERTY CXX_STANDARD_REQUIRED ON)
+endif()
+message("${Blue}-- SuperNOVAS${ColourReset} static, from ${CMAKE_SOURCE_DIR}/SuperNOVAS")
 
-if(WITH_DEBUG)
-    file(GLOB EXISTING_SUPERNOVAS_LIBS
-        "${CMAKE_SOURCE_DIR}/build/lib/libsupernovas.a"
-        "${CMAKE_SOURCE_DIR}/build/lib/libsupernovas.dylib"
-        "${CMAKE_SOURCE_DIR}/build/lib/libsupernovas.so"
-    )
-    # The C++ half is a separate artefact: without it the fast path below would hand back a
-    # supernovas::cpp that does not exist, so treat a missing libsupernovas++ as "not prebuilt".
-    file(GLOB EXISTING_SUPERNOVAS_CPP_LIBS
-        "${CMAKE_SOURCE_DIR}/build/lib/libsupernovas++.a"
-        "${CMAKE_SOURCE_DIR}/build/lib/libsupernovas++.dylib"
-        "${CMAKE_SOURCE_DIR}/build/lib/libsupernovas++.so"
+#-------------------- libDSTfits
+message("${Red}----------- libDSTfits -----------${ColourReset}")
+set(DSTFITS_SOURCES
+    src/FITSexception.cxx
+    src/FITShdu.cxx
+    src/FITSimg.cxx
+    src/FITSmanager.cxx
+    src/FITSnumeric.cxx
+    src/FITSstatistic.cxx
+    src/FITStable.cxx
+    src/FITSunit.cxx
+    src/FITSwcs.cxx
+    ${GENERATED_DIR}/src/DSF_version.cxx
+)
+file(GLOB DSTFITS_PUBLIC_HEADERS ${CMAKE_SOURCE_DIR}/include/DSTfits/*.h)
+
+add_library(DSTfits SHARED ${DSTFITS_SOURCES} ${DSTFITS_PUBLIC_HEADERS})
+if(DSTfits_NUMERIC_VERSION)
+    set_target_properties(DSTfits PROPERTIES
+        VERSION   "${DSTfits_NUMERIC_VERSION}"
+        SOVERSION "${VERSION_MAJOR}"
     )
 endif()
-
-if(WITH_DEBUG AND EXISTING_SUPERNOVAS_LIBS AND EXISTING_SUPERNOVAS_CPP_LIBS)
-    message("${Blue}-- DEBUG: Skipping SuperNOVAS rebuild, using existing library${ColourReset}")
-    list(GET EXISTING_SUPERNOVAS_LIBS 0 SUPERNOVAS_LIB_FILE)
-    add_library(supernovas STATIC IMPORTED GLOBAL)
-    set_target_properties(supernovas PROPERTIES
-        IMPORTED_LOCATION "${SUPERNOVAS_LIB_FILE}"
-        INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/include/supernovas"
-    )
-    add_library(supernovas::core ALIAS supernovas)
-
-    list(GET EXISTING_SUPERNOVAS_CPP_LIBS 0 SUPERNOVAS_CPP_LIB_FILE)
-    add_library(supernovas_cpp STATIC IMPORTED GLOBAL)
-    set_target_properties(supernovas_cpp PROPERTIES
-        IMPORTED_LOCATION "${SUPERNOVAS_CPP_LIB_FILE}"
-        INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/include/supernovas"
-        INTERFACE_LINK_LIBRARIES supernovas::core
-    )
-    add_library(supernovas::cpp ALIAS supernovas_cpp)
-else()
-    # Static build + PIC so its object code is embedded directly into the DSTfits shared library
-    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-    set(BUILD_TESTING     OFF CACHE BOOL "" FORCE)
-    set(BUILD_EXAMPLES    OFF CACHE BOOL "" FORCE)
-    set(BUILD_BENCHMARK   OFF CACHE BOOL "" FORCE)
-    set(BUILD_DOC         OFF CACHE BOOL "" FORCE)
-    add_subdirectory(SuperNOVAS EXCLUDE_FROM_ALL)
-    add_dependencies(DSTfits core)
-
-    # SuperNOVAS/src/cpp/CMakeLists.txt pins its target to C++11, but supernovas.h includes
-    # <optional>, which is C++17. Override it here rather than patching the vendored tree, so
-    # the fix survives re-vendoring the dependency.
-    if(TARGET cpp)
-        set_property(TARGET cpp PROPERTY CXX_STANDARD 17)
-        set_property(TARGET cpp PROPERTY CXX_STANDARD_REQUIRED ON)
-        add_dependencies(DSTfits cpp)
-    endif()
-endif()
-
-target_include_directories(DSTfits PRIVATE ${CMAKE_SOURCE_DIR}/SuperNOVAS/include)
-include_directories(include/supernovas)
-
-
-#-------------------- Configuration des test
-add_subdirectory(googletest   EXCLUDE_FROM_ALL)
-include_directories(${PARENT_PATH_OF_GTEST}/googltest/googltest/include)
-enable_testing()
-
+target_include_directories(DSTfits
+    PUBLIC  ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/include/DSTfits
+            ${CFITSIO_INCLUDE_DIR} ${WCSLIB_INCLUDE_DIR}
+    PRIVATE ${GSL_INCLUDE_DIRS}
+)
 target_link_libraries(DSTfits
-    PRIVATE ${CFITSIO_OUTPUT_LIB}
-    PRIVATE Minuit2
-    PRIVATE supernovas::core
-    PRIVATE bz2
-    PRIVATE curl
-    PRIVATE z
-    PRIVATE ${WCSLIB_LIBRARY}
-    PRIVATE GSL::gsl
-    PRIVATE GSL::gslcblas
+    PUBLIC  Minuit2
+    PRIVATE cfitsio_static wcslib_static supernovas::core bz2 curl z GSL::gsl GSL::gslcblas
 )
+if(TARGET cpp)
+    add_dependencies(DSTfits cpp)
+endif()
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+set_target_properties(DSTfits PROPERTIES INSTALL_RPATH "${CMAKE_INSTALL_RPATH}")
 
+#-------------------- Tests
+if(BUILD_TESTS)
+    message("${Red}----------- GoogleTest -----------${ColourReset}")
+    set(DSTFITS_TESTS ON)
+    enable_testing()
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+    set(BUILD_GMOCK   OFF CACHE BOOL "" FORCE)
+    add_subdirectory(googletest EXCLUDE_FROM_ALL)
+    include(GoogleTest)
 
-#-------------------- Download sample FITS files for testing
-set(TESTDATA_DIR ${CMAKE_SOURCE_DIR}/build/testdata)
-file(MAKE_DIRECTORY ${TESTDATA_DIR})
-
-set(SAMPLE_FITS_URL
-    "https://heasarc.gsfc.nasa.gov/FTP/fits_info/sample_files/images/rosat_pspc_rdf2_3_bk1.fits"
-    "https://heasarc.gsfc.nasa.gov/FTP/fits_info/sample_files/images/rosat_pspc_rdf2_3_im2.fits"
-    "http://fits.gsfc.nasa.gov/samples/testkeys.fits"
-)
-
-set(SAMPLE_FITS_FILE "")
-foreach(url ${SAMPLE_FITS_URL})
-    get_filename_component(fname ${url} NAME)
-    list(APPEND SAMPLE_FITS_FILE "${TESTDATA_DIR}/${fname}")
-    add_custom_command(
-        OUTPUT "${TESTDATA_DIR}/${fname}"
-        COMMAND wget -O "${TESTDATA_DIR}/${fname}" "${url}"
-        COMMENT "Downloading sample FITS file: ${fname}"
+    # Test data: sample files downloaded once, and DSS.fits written by wcslib's tofits.
+    # The tests run from the build directory and read/write testdata/ there.
+    set(TESTDATA_DIR ${CMAKE_BINARY_DIR}/testdata)
+    file(MAKE_DIRECTORY ${TESTDATA_DIR})
+    set(SAMPLE_FITS_URLS
+        "https://heasarc.gsfc.nasa.gov/FTP/fits_info/sample_files/images/rosat_pspc_rdf2_3_bk1.fits"
+        "https://heasarc.gsfc.nasa.gov/FTP/fits_info/sample_files/images/rosat_pspc_rdf2_3_im2.fits"
+        "http://fits.gsfc.nasa.gov/samples/testkeys.fits"
     )
-endforeach()
+    set(TESTDATA_FILES "")
+    foreach(url IN LISTS SAMPLE_FITS_URLS)
+        get_filename_component(fname ${url} NAME)
+        list(APPEND TESTDATA_FILES ${TESTDATA_DIR}/${fname})
+        add_custom_command(
+            OUTPUT  ${TESTDATA_DIR}/${fname}
+            COMMAND ${CMAKE_COMMAND} -DURL=${url} -DOUT=${TESTDATA_DIR}/${fname} -P ${CMAKE_SOURCE_DIR}/cmake/DownloadFile.cmake
+            COMMENT "Downloading sample FITS file: ${fname}"
+            VERBATIM
+        )
+    endforeach()
+    add_custom_command(
+        OUTPUT  ${TESTDATA_DIR}/DSS.fits
+        COMMAND ${CMAKE_COMMAND} -E rm -f ${TESTDATA_DIR}/DSS.fits
+        COMMAND sh -c "\"${WCSLIB_TOFITS}\" < \"${WCSLIB_SRC_DIR}/C/test/DSS.keyrec\" > \"${TESTDATA_DIR}/DSS.fits\""
+        DEPENDS wcslib_external
+        COMMENT "Writing DSS.fits with wcslib tofits"
+        VERBATIM
+    )
+    list(APPEND TESTDATA_FILES ${TESTDATA_DIR}/DSS.fits)
+    add_custom_target(testdata DEPENDS ${TESTDATA_FILES})
 
-add_custom_target(download_testdata
-    DEPENDS ${SAMPLE_FITS_FILE}
-)
+    file(GLOB TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/test/gTest_*.cxx)
+    set(TEST_NAMES "")
+    foreach(test_source IN LISTS TEST_SOURCES)
+        get_filename_component(tname ${test_source} NAME_WE)
+        list(APPEND TEST_NAMES ${tname})
+        add_executable(${tname} ${test_source})
+        target_link_libraries(${tname} PRIVATE DSTfits gtest gtest_main)
+        target_include_directories(${tname} PRIVATE ${GENERATED_DIR}/test)
+        add_dependencies(${tname} testdata)
+        gtest_discover_tests(${tname} WORKING_DIRECTORY ${CMAKE_BINARY_DIR} PROPERTIES TIMEOUT 300)
+    endforeach()
+    message("${Blue}-- Test executables ${ColourReset} ${TEST_NAMES} (run with ctest)")
+else()
+    set(DSTFITS_TESTS OFF)
+endif()
 
-foreach( test_source_file ${TEST_SRC} )
-	get_filename_component( tSRC ${test_source_file} NAME_WE)
-	add_executable(
-		${tSRC}
-		${test_source_file}
-	)
-    # Ensure test data is downloaded before running tests
-    add_dependencies(${tSRC} download_testdata)
-
-    if(COMPILER_SUPPORTS_CXX17)
-        target_link_libraries( ${tSRC} DSTfits Minuit2 gtest gtest_main)
-    else(COMPILER_SUPPORTS_CXX17)
-        target_link_libraries( ${tSRC} DSTfits Minuit2 ${Boost_LIBRARIES} gtest gtest_main)
-    endif(COMPILER_SUPPORTS_CXX17)
-
-
-endforeach( test_source_file ${TEST_SRC} )
-
-include(GoogleTest)
-
-foreach( test_source_file ${TEST_SRC} )
-    get_filename_component( tSRC ${test_source_file} NAME_WE)
-    gtest_discover_tests(${tSRC})
-endforeach( test_source_file ${TEST_SRC} )
-
-add_dependencies(gTest_wcs tofits)
-
-#-------------------- CONFIGURATION OF DOXYGEN DOC GENERATION
-
+#-------------------- Doxygen documentation (target: doc, written in build/doc)
 find_package(Doxygen)
 if(DOXYGEN_FOUND)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/DSL.Doxyfile ${CMAKE_CURRENT_BINARY_DIR}/DSL.Doxyfile @ONLY)
+    # The Doxyfile paths are relative to the sources: run there, but write in the build directory
+    file(READ ${CMAKE_SOURCE_DIR}/DSL.Doxyfile _doxyfile)
+    string(APPEND _doxyfile "\nOUTPUT_DIRECTORY = ${CMAKE_BINARY_DIR}/doc\n")
+    file(WRITE ${GENERATED_DIR}/DSL.Doxyfile "${_doxyfile}")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/DSL.Doxyfile)
     add_custom_target(doc
-    ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/DSL.Doxyfile
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    COMMENT "Generating API documentation with Doxygen" VERBATIM
+        COMMAND ${DOXYGEN_EXECUTABLE} ${GENERATED_DIR}/DSL.Doxyfile
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Generating API documentation with Doxygen in ${CMAKE_BINARY_DIR}/doc"
+        VERBATIM
+    )
+endif()
+
+#-------------------- Installation
+# Headers of the submodules come from their sources, so that they are known at the first configure;
+# wcslib's are only produced by its build, so they are listed at install time (install(DIRECTORY)).
+file(GLOB CFITSIO_HEADERS    ${CFITSIO_SRC_DIR}/*.h)
+file(GLOB SUPERNOVAS_HEADERS ${CMAKE_SOURCE_DIR}/SuperNOVAS/include/*.h)
+
+install(FILES ${DSTFITS_PUBLIC_HEADERS} DESTINATION include/DSTfits)
+install(FILES ${CFITSIO_HEADERS}        DESTINATION include/cfitsio)
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/Minuit2/inc/ DESTINATION include/Minuit2)
+install(FILES ${SUPERNOVAS_HEADERS}     DESTINATION include/supernovas)
+install(DIRECTORY ${WCSLIB_INCLUDE_DIR}/wcslib-${WCSLIB_VERSION}/ DESTINATION include/wcslib
+    FILES_MATCHING PATTERN "*.h")
+
+install(TARGETS DSTfits
+    RUNTIME DESTINATION exe
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
 )
-endif(DOXYGEN_FOUND)
-
-
-
-#-------------------- ADD DISTCLEAN CUSTOM TARGET
-
-add_custom_target(distclean)
-set(DISTCLEANED
-cmake.depends
-cmake.check_depends
-CMakeCache.txt
-cmake.check_cache
-CMakeTmp
-CMakeDoxyfile.in
-${version_file}
-Makefile
-CMakeFiles
-*.cmake
-./build
-./doc
-./wcslib*
-./googletest/CMakeFiles
-./googletest/Makefile
-./googletest/*.cmake
-./lib
-./bin
-./Testing
-./cfitsio_external-prefix
-./include/cfitsio
-./include/Minuit2
-./include/supernovas
+install(TARGETS Minuit2 Minuit2Math
+    RUNTIME DESTINATION exe
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
 )
+install(TARGETS core ARCHIVE DESTINATION lib)
+install(FILES ${CFITSIO_LIBRARY} ${WCSLIB_LIBRARY} DESTINATION lib)
 
-add_custom_target(
-    distclean_run
-    COMMENT "distribution clean"
-    COMMAND ${CMAKE_COMMAND} -E echo "distribution clean"
-    COMMAND rm -Rf ${DISTCLEANED}
-    COMMAND /usr/bin/env bash -c "test -e install_manifest.txt && xargs rm -f < install_manifest.txt || true"
-    COMMAND /usr/bin/env bash -c "test -e install_manifest.txt && rm -f install_manifest.txt || true"
-    VERBATIM
-)
-add_dependencies(distclean distclean_run)
-
-
-#-------------------- Installation proceedure
-if(CMAKE_INSTALL_PREFIX)
-    INSTALL(FILES ${CORE_HEADER} DESTINATION include/DSTfits)
-    INSTALL(FILES ${FITS_HEADER} DESTINATION include/cfitsio)
-    INSTALL(FILES ${MINUIT_HEADER} DESTINATION include/Minuit2)
-    INSTALL(FILES ${MINUIT2_HEADER} DESTINATION include/Minuit2/Minuit2)
-    INSTALL(FILES ${MINUITF_HEADER} DESTINATION include/Minuit2/Fit)
-    INSTALL(FILES ${MINUITM_HEADER} DESTINATION include/Minuit2/Math)
-    INSTALL(FILES ${SUPERNOVAS_HEADER} DESTINATION include/supernovas)
-    INSTALL(FILES ${WCSLIB_HEADER} DESTINATION include/wcslib)
-
-    # Core library built by this project
-    INSTALL(TARGETS DSTfits
-        RUNTIME DESTINATION exe
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib
+if(DSTfits_NUMERIC_VERSION)
+    # CMake package, so that dependent projects can call find_package(DSTfits <version>)
+    include(CMakePackageConfigHelpers)
+    set(DSTfits_CMAKE_DIR lib/cmake/DSTfits)
+    configure_package_config_file(
+        ${CMAKE_SOURCE_DIR}/modules/DSTfitsConfig.cmake.in
+        ${GENERATED_DIR}/DSTfitsConfig.cmake
+        INSTALL_DESTINATION ${DSTfits_CMAKE_DIR}
+    )
+    write_basic_package_version_file(
+        ${GENERATED_DIR}/DSTfitsConfigVersion.cmake
+        VERSION ${DSTfits_NUMERIC_VERSION}
+        COMPATIBILITY AnyNewerVersion
+    )
+    install(FILES
+        ${GENERATED_DIR}/DSTfitsConfig.cmake
+        ${GENERATED_DIR}/DSTfitsConfigVersion.cmake
+        DESTINATION ${DSTfits_CMAKE_DIR}
     )
 
-    if(DSTfits_NUMERIC_VERSION)
-        # CMake package, so that dependent projects can call find_package(DSTfits <version>)
-        include(CMakePackageConfigHelpers)
-        set(DSTfits_CMAKE_DIR lib/cmake/DSTfits)
-        configure_package_config_file(
-            ${CMAKE_SOURCE_DIR}/modules/DSTfitsConfig.cmake.in
-            ${CMAKE_CURRENT_BINARY_DIR}/build/cmake/DSTfitsConfig.cmake
-            INSTALL_DESTINATION ${DSTfits_CMAKE_DIR}
-        )
-        write_basic_package_version_file(
-            ${CMAKE_CURRENT_BINARY_DIR}/build/cmake/DSTfitsConfigVersion.cmake
-            VERSION ${DSTfits_NUMERIC_VERSION}
-            COMPATIBILITY AnyNewerVersion
-        )
-        INSTALL(FILES
-            ${CMAKE_CURRENT_BINARY_DIR}/build/cmake/DSTfitsConfig.cmake
-            ${CMAKE_CURRENT_BINARY_DIR}/build/cmake/DSTfitsConfigVersion.cmake
-            DESTINATION ${DSTfits_CMAKE_DIR}
-        )
-
-        # CMake never removes files from the install directory: drop the versioned libraries
-        # (libDSTfits.1.5.0.dylib, libDSTfits.so.1.5.0, ...) left behind by previous installs.
-        install(CODE "set(DSTfits_KEEP_VERSIONS \"${DSTfits_NUMERIC_VERSION};${VERSION_MAJOR}\")")
-        install(CODE [[
-            file(GLOB _dsf_libs "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libDSTfits.*")
-            foreach(_dsf_lib ${_dsf_libs})
-                get_filename_component(_dsf_name "${_dsf_lib}" NAME)
-                if(_dsf_name MATCHES "^libDSTfits\\.(so\\.)?([0-9.]*[0-9])(\\.dylib)?$")
-                    list(FIND DSTfits_KEEP_VERSIONS "${CMAKE_MATCH_2}" _dsf_keep)
-                    if(_dsf_keep EQUAL -1)
-                        message(STATUS "Removing old library: ${_dsf_lib}")
-                        file(REMOVE "${_dsf_lib}")
-                    endif()
+    # CMake never removes files from the install directory: drop the versioned libraries
+    # (libDSTfits.1.5.0.dylib, libDSTfits.so.1.5.0, ...) left behind by previous installs.
+    install(CODE "set(DSTfits_KEEP_VERSIONS \"${DSTfits_NUMERIC_VERSION};${VERSION_MAJOR}\")")
+    install(CODE [[
+        file(GLOB _dsf_libs "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libDSTfits.*")
+        foreach(_dsf_lib ${_dsf_libs})
+            get_filename_component(_dsf_name "${_dsf_lib}" NAME)
+            if(_dsf_name MATCHES "^libDSTfits\\.(so\\.)?([0-9.]*[0-9])(\\.dylib)?$")
+                list(FIND DSTfits_KEEP_VERSIONS "${CMAKE_MATCH_2}" _dsf_keep)
+                if(_dsf_keep EQUAL -1)
+                    message(STATUS "Removing old library: ${_dsf_lib}")
+                    file(REMOVE "${_dsf_lib}")
                 endif()
-            endforeach()
-        ]])
-    endif()
+            endif()
+        endforeach()
+    ]])
+endif()
 
-    # cfitsio is built via ExternalProject -> not a CMake target; install the produced archive directly
-    set(CFITSIO_OUTPUT_LIB ${CMAKE_SOURCE_DIR}/build/lib/libcfitsio.a)
-    INSTALL(FILES ${CFITSIO_OUTPUT_LIB} DESTINATION lib)
-
-    set(WCSLIB_OUTPUT_LIB ${CMAKE_SOURCE_DIR}/build/wcslib/lib/libwcs-${WCSLIB_VERSION}.a)
-    INSTALL(FILES ${WCSLIB_OUTPUT_LIB} DESTINATION lib)
-
-    # Minuit2 libraries: install if targets exist and are not imported
-    if(TARGET Minuit2 AND NOT MINUIT2_LIB_FILE)
-        INSTALL(TARGETS Minuit2
-            RUNTIME DESTINATION exe
-            LIBRARY DESTINATION lib
-            ARCHIVE DESTINATION lib
-        )
-    endif()
-
-    if(TARGET Minuit2Math)
-        INSTALL(TARGETS Minuit2Math
-            RUNTIME DESTINATION exe
-            LIBRARY DESTINATION lib
-            ARCHIVE DESTINATION lib
-        )
-    endif()
-
-    if(MINUIT2_LIB_FILE OR NOT (TARGET Minuit2 OR TARGET Minuit2Math))
-        # Fallback: copy any libMinuit2* libraries found in the build lib dir
-        install(DIRECTORY ${CMAKE_SOURCE_DIR}/build/lib/ DESTINATION lib
-            FILES_MATCHING
-            PATTERN "libMinuit2*.a"
-            PATTERN "libMinuit2*.so"
-            PATTERN "libMinuit2*.dylib"
-        )
-    endif()
-
-    # SuperNOVAS: install if built as a real target, otherwise copy the imported/prebuilt library
-    if(TARGET core)
-        INSTALL(TARGETS core
-            RUNTIME DESTINATION exe
-            LIBRARY DESTINATION lib
-            ARCHIVE DESTINATION lib
-        )
-    else()
-        install(DIRECTORY ${CMAKE_SOURCE_DIR}/build/lib/ DESTINATION lib
-            FILES_MATCHING
-            PATTERN "libsupernovas*.a"
-            PATTERN "libsupernovas*.so"
-            PATTERN "libsupernovas*.dylib"
-        )
-    endif()
-endif(CMAKE_INSTALL_PREFIX)
-
-# At the end of your CMakeLists.txt, generate a helper script for cfitsio headers:
-file(WRITE ${CMAKE_SOURCE_DIR}/cmake/copy_cfitsio_headers.cmake
-"file(GLOB FITSIO_HEADER \"${CMAKE_SOURCE_DIR}/cfitsio/*.h\")\n"
-"file(MAKE_DIRECTORY \"${CFITSIO_INCLUDE_DIR}\")\n"
-"foreach(header \${FITSIO_HEADER})\n"
-"  file(COPY \${header} DESTINATION \"${CFITSIO_INCLUDE_DIR}\")\n"
-"endforeach()\n"
-)
-
-# Generate a helper script for Minuit2 headers:
-file(WRITE ${CMAKE_SOURCE_DIR}/cmake/copy_minuit2_headers.cmake
-"file(GLOB MINUIT2_HEADER \"${CMAKE_SOURCE_DIR}/Minuit2/inc/*\")\n"
-"file(MAKE_DIRECTORY \"${CMAKE_SOURCE_DIR}/include/Minuit2\")\n"
-"foreach(header \${MINUIT2_HEADER})\n"
-"  file(COPY \${header} DESTINATION \"${CMAKE_SOURCE_DIR}/include/Minuit2\")\n"
-"endforeach()\n"
-)
-
-# Add a post-build custom command to copy Minuit2 headers
-add_custom_command(
-    TARGET DSTfits POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/cmake/copy_minuit2_headers.cmake
-    COMMENT "Copying Minuit2 headers to include/Minuit2"
-)
-
-# Generate a helper script for SuperNOVAS headers:
-file(WRITE ${CMAKE_SOURCE_DIR}/cmake/copy_supernovas_headers.cmake
-"file(GLOB SUPERNOVAS_HEADER \"${CMAKE_SOURCE_DIR}/SuperNOVAS/include/*.h\")\n"
-"file(MAKE_DIRECTORY \"${CMAKE_SOURCE_DIR}/include/supernovas\")\n"
-"foreach(header \${SUPERNOVAS_HEADER})\n"
-"  file(COPY \${header} DESTINATION \"${CMAKE_SOURCE_DIR}/include/supernovas\")\n"
-"endforeach()\n"
-)
-
-# Add a post-build custom command to copy SuperNOVAS headers
-add_custom_command(
-    TARGET DSTfits POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/cmake/copy_supernovas_headers.cmake
-    COMMENT "Copying SuperNOVAS headers to include/supernovas"
-)
+#-------------------- Summary
+message("${BoldGreen}----------- DeepSkyFits ${VERSION} configured -----------${ColourReset}")
+message("${Green}-- Build directory  :${ColourReset} ${CMAKE_BINARY_DIR}")
+message("${Green}-- Build type       :${ColourReset} ${CMAKE_BUILD_TYPE}")
+message("${Green}-- AddressSanitizer :${ColourReset} ${WITH_ASAN}")
+message("${Green}-- Tests            :${ColourReset} ${DSTFITS_TESTS}")
+message("${Green}-- DSTfits          :${ColourReset} ${DSTfits_NUMERIC_VERSION}")
+message("${Green}-- cfitsio          :${ColourReset} submodule, static")
+message("${Green}-- wcslib           :${ColourReset} ${WCSLIB_VERSION}, static")
+message("${Green}-- Minuit2          :${ColourReset} submodule, shared")
+message("${Green}-- SuperNOVAS       :${ColourReset} submodule, static")
+message("${Green}-- Install prefix   :${ColourReset} ${CMAKE_INSTALL_PREFIX}")
+if(WITH_ASAN)
+    message("${Yellow}--                    AddressSanitizer build: installing it replaces the release libDSTfits${ColourReset}")
+endif()
+message("${BoldGreen}-------------------------------------------------${ColourReset}")

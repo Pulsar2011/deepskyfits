@@ -33,18 +33,10 @@ class FITSimgStatsTest : public ::testing::Test
         std::string MakeFilename() const
         {
             std::ostringstream ss;
-#ifndef CI_CIWORKER
-            ss << "build/testdata/stat_test_" << typeid(T).name() << ".fits";
-#else
             ss << "testdata/stat_test_" << typeid(T).name() << ".fits";
-#endif
             return ss.str();
         }
-#ifndef CI_CIWORKER
-        void EnsureOutDir() const { std::filesystem::create_directories("build/testdata"); }
-#else
         void EnsureOutDir() const { std::filesystem::create_directories("testdata"); }
-#endif
 };
 
 TEST(FITSimg, Create_BYTE)
@@ -78,13 +70,8 @@ TEST(FITSimg, Create_BYTE)
     EXPECT_EQ(img[N*N/2]  ,NN2);
     EXPECT_EQ(img[N*N-1]  ,NN );
 
-#ifndef CI_CIWORKER
-    img.Write("build/testdata/test_byte.fits", true);
-    FITSmanager ff("build/testdata/test_byte.fits");
-#else
     img.Write("testdata/test_byte.fits", true);
     FITSmanager ff("testdata/test_byte.fits");
-#endif
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -144,13 +131,8 @@ TEST(FITSimg, Create_SBYTE)
     EXPECT_EQ(img[N*N/2]  ,NN2);
     EXPECT_EQ(img[N*N-1]  ,NN );
 
-#ifndef CI_CIWORKER
-    img.Write("build/testdata/test_sbyte.fits", true);
-    FITSmanager ff("build/testdata/test_sbyte.fits");
-#else
     img.Write("testdata/test_sbyte.fits", true);
     FITSmanager ff("testdata/test_sbyte.fits");
-#endif
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -209,13 +191,8 @@ TEST(FITSimg, Create_SHORT)
     EXPECT_EQ(img[N*N/2],  NN2);
     EXPECT_EQ(img[N*N-1]  ,NN );
 
-#ifndef CI_CIWORKER
-    img.Write("build/testdata/test_short.fits", true);
-    FITSmanager ff("build/testdata/test_short.fits");
-#else
     img.Write("testdata/test_short.fits", true);
     FITSmanager ff("testdata/test_short.fits");
-#endif
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -281,13 +258,8 @@ TEST(FITSimg, Create_USHORT)
     EXPECT_EQ(img[N*N/2],  NN2);
     EXPECT_EQ(img[N*N-1]  ,NN );
 
-#ifndef CI_CIWORKER
-    img.Write("build/testdata/test_ushort.fits", true);
-    FITSmanager ff("build/testdata/test_ushort.fits");
-#else
     img.Write("testdata/test_ushort.fits", true);
     FITSmanager ff("testdata/test_ushort.fits");
-#endif
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -347,13 +319,8 @@ TEST(FITSimg, Create_LONG)
     EXPECT_EQ(img[N*N/2]  , NN2 );
     EXPECT_EQ(img[N*N-1]  , NN  );
 
-#ifndef CI_CIWORKER
-    img.Write("build/testdata/test_long.fits", true);
-    FITSmanager ff("build/testdata/test_long.fits");
-#else
     img.Write("testdata/test_long.fits", true);
     FITSmanager ff("testdata/test_long.fits");
-#endif
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -414,13 +381,8 @@ TEST(FITSimg, Create_ULONG)
     EXPECT_EQ(img[N*N/2]  , NN2 );
     EXPECT_EQ(img[N*N-1]  , NN  );
 
-#ifndef CI_CIWORKER
-    img.Write("build/testdata/test_ulong.fits", true);
-    FITSmanager ff("build/testdata/test_ulong.fits");
-#else
     img.Write("testdata/test_ulong.fits", true);
     FITSmanager ff("testdata/test_ulong.fits");
-#endif
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -480,13 +442,8 @@ TEST(FITSimg, Create_LONGLONG)
     EXPECT_EQ(img[N*N/2],  NN2);
     EXPECT_EQ(img[N*N-1]  ,NN );
 
-#ifndef CI_CIWORKER
-    img.Write("build/testdata/test_longlong.fits", true);
-    FITSmanager ff("build/testdata/test_longlong.fits");
-#else
     img.Write("testdata/test_longlong.fits", true);
     FITSmanager ff("testdata/test_longlong.fits");
-#endif
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -547,13 +504,8 @@ TEST(FITSimg, Create_ULONGLONG)
     EXPECT_EQ(img[N*N/2],  NN2);
     EXPECT_EQ(img[N*N-1]  ,NN );
 
-#ifndef CI_CIWORKER
-    img.Write("build/testdata/test_ulonglong.fits", true);
-    FITSmanager ff("build/testdata/test_ulonglong.fits");
-#else
     img.Write("testdata/test_ulonglong.fits", true);
     FITSmanager ff("testdata/test_ulonglong.fits");
-#endif
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -603,13 +555,8 @@ TEST(FITSimg, Create_FLOAT)
     EXPECT_EQ(img[N*N/2],  (float) 129);
     EXPECT_EQ(img[N*N-1]  ,(float) 256);
 
-#ifndef CI_CIWORKER
-    img.Write("build/testdata/test_float.fits", true);
-    FITSmanager ff("build/testdata/test_float.fits");
-#else
     img.Write("testdata/test_float.fits", true);
     FITSmanager ff("testdata/test_float.fits");
-#endif
 
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
@@ -661,13 +608,8 @@ TEST(FITSimg, Create_DOUBLE)
     EXPECT_EQ(img[N*N/2],  (double) 129);
     EXPECT_EQ(img[N*N-1]  ,(double) 256);
 
-#ifndef CI_CIWORKER
-    img.Write("build/testdata/test_double.fits", true);
-    FITSmanager ff("build/testdata/test_double.fits");
-#else
     img.Write("testdata/test_double.fits", true);
     FITSmanager ff("testdata/test_double.fits");
-#endif
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -741,13 +683,8 @@ TEST(FITSimg, Create_SHORT2FLOAT)
     img.Bzero( (double)0.0);
     img.BitPerPixel(SHORT_IMG,FLOAT_IMG);
     
-#ifndef CI_CIWORKER
-    img.Write("build/testdata/test_short2float.fits", true);
-    FITSmanager ff("build/testdata/test_short2float.fits");
-#else
     img.Write("testdata/test_short2float.fits", true);
     FITSmanager ff("testdata/test_short2float.fits");
-#endif
 
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
@@ -821,13 +758,8 @@ TEST(FITSimg, Create_LONG2DOUBLE)
     img.Bzero( (double)0.0);
     img.BitPerPixel(LONG_IMG,DOUBLE_IMG);
     
-#ifndef CI_CIWORKER
-    img.Write("build/testdata/test_long2double.fits", true);
-    FITSmanager ff("build/testdata/test_long2double.fits");
-#else
     img.Write("testdata/test_long2double.fits", true);
     FITSmanager ff("testdata/test_long2double.fits");
-#endif
     EXPECT_TRUE(ff.isOpen());
     std::shared_ptr<FITScube> rimg = ff.GetPrimary();
     EXPECT_NE(rimg, nullptr);
@@ -910,11 +842,7 @@ TEST(FITSimg, Read_SHORT)
 {
     verbose = verboseLevel::VERBOSE_NONE;
 
-#ifndef CI_CIWORKER
-    std::string src = "build/testdata/testkeys.fits";
-#else
     std::string src = "testdata/testkeys.fits";
-#endif
 
     // Use the copied file for all operations
 
@@ -942,11 +870,7 @@ TEST(FITSimg, Test_Crop)
 {
     verbose = verboseLevel::VERBOSE_NONE;
 
-#ifndef CI_CIWORKER
-    std::string src = "build/testdata/testkeys.fits";
-#else
     std::string src = "testdata/testkeys.fits";
-#endif
 
     // Use the copied file for all operations
 
@@ -1006,15 +930,34 @@ TEST(FITSimg, Test_Crop)
     EXPECT_FALSE(ff.isOpen());
 }
 
+TEST(FITSimg, WorldAxesComeFromTheFitsWcs)
+{
+    verbose = verboseLevel::VERBOSE_NONE;
+
+    FITSmanager ff("testdata/testkeys.fits");
+    std::shared_ptr<FITScube> img = ff.GetPrimary();
+    ASSERT_NE(img, nullptr);
+    ASSERT_EQ(img->getNumberOfWCS(), 1);
+
+    EXPECT_TRUE(img->HasWorldCoordinates());
+    EXPECT_EQ(img->WorldAxisNames(), img->getWCS().CTYPE(0));
+    EXPECT_EQ(img->WorldAxisUnits(), img->getWCS().CUNIT(0));
+    EXPECT_EQ(img->WorldAxisNames().size(), img->GetDimension());
+    EXPECT_TRUE(img->WorldAxisNames(1).empty());     // no such WCS
+    EXPECT_TRUE(img->WorldAxisUnits(-1).empty());
+
+    // Without WCS: WorldCoordinates() gives the pixel back
+    FITSimg<float> plain(std::vector<size_t>({10, 10}));
+    EXPECT_FALSE(plain.HasWorldCoordinates());
+    EXPECT_TRUE(plain.WorldAxisNames().empty());
+    EXPECT_TRUE(plain.WorldAxisUnits().empty());
+}
+
 TEST(FITSimg, Test_RebinningWCS)
 {
     verbose = verboseLevel::VERBOSE_NONE;
 
-#ifndef CI_CIWORKER
-    std::string src = "build/testdata/testkeys.fits";
-#else
     std::string src = "testdata/testkeys.fits";
-#endif
 
     // Use the copied file for all operations
 
@@ -1054,11 +997,7 @@ TEST(FITSimg, Naming)
 {
     verbose = verboseLevel::VERBOSE_NONE;
 
-#ifndef CI_CIWORKER
-    std::string src = "build/testdata/testkeys.fits";
-#else
     std::string src = "testdata/testkeys.fits";
-#endif
 
     // Use the copied file for all operations
 
@@ -1410,11 +1349,7 @@ class FITSimgMixTest : public ::testing::Test
         using value_type = typename Pair::T;
         using other_type = typename Pair::D;
         static size_t N() { return 10; }
-#ifndef CI_CIWORKER
-        void EnsureOutDir() const { std::filesystem::create_directories("build/testdata"); }
-#else
-        void EnsureOutDir() const { std::filesystem::create_directories("testdata");}
-#endif
+        void EnsureOutDir() const { std::filesystem::create_directories("testdata"); }
 };
 
 // instantiate the pair list: here all T are paired with double as D (adjust if you want other D per T)
@@ -2065,11 +2000,7 @@ TEST(FITSimg, WorldCoordinates)
 {
     verbose = verboseLevel::VERBOSE_NONE;
 
-#ifndef CI_CIWORKER
-    std::string src = "build/testdata/testkeys.fits";
-#else
     std::string src = "testdata/testkeys.fits";
-#endif  
 
     // Use the copied file for all operations
 
@@ -2115,11 +2046,7 @@ TEST(FITSimg, WorldCoordinatesMatrix)
 {
     verbose = verboseLevel::VERBOSE_NONE;
 
-#ifndef CI_CIWORKER
-    std::string src = "build/testdata/testkeys.fits";
-#else
     std::string src = "testdata/testkeys.fits";
-#endif  
 
     // Use the copied file for all operations
 
@@ -2153,11 +2080,7 @@ TEST(FITSimg, WorldCoordinatesConvention)
 {
     verbose = verboseLevel::VERBOSE_NONE;
 
-#ifndef CI_CIWORKER
-    std::string src = "build/testdata/testkeys.fits";
-#else
     std::string src = "testdata/testkeys.fits";
-#endif
 
     FITSmanager ff(src);
     EXPECT_TRUE(ff.isOpen());

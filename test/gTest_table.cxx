@@ -7,11 +7,7 @@
 
 using namespace DSL;
 
-#ifndef CI_CIWORKER
-std::string testurl = "./build/testdata/test_fitstable.fits";
-#else
 std::string testurl = "./testdata/test_fitstable.fits";
-#endif
 
 // Small helper to validate a freshly constructed empty table header.
 static void expect_empty_table_header(const FITStable& table) {

@@ -17,11 +17,7 @@ using namespace DSL;
 
 namespace
 {
-#ifndef CI_CIWORKER
-    const std::string kTestFile = "build/testdata/test_fitsnumeric.fits";
-#else
     const std::string kTestFile = "testdata/test_fitsnumeric.fits";
-#endif
 
     // Creates an empty primary HDU and returns it still open.
     std::shared_ptr<fitsfile> createEmptyFile()

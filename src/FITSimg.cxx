@@ -597,6 +597,41 @@ class FITSmanager;
     }
     
     /**
+     * @brief Tell whether the image has world coordinates.
+     * @details By default, whether a FITS WCS was read from the header. Without one, WorldCoordinates() gives the
+     * pixel back.
+     * @return True if WorldCoordinates() gives world coordinates.
+     */
+    bool FITScube::HasWorldCoordinates() const
+    {
+        return getNumberOfWCS() > 0;
+    }
+
+    /**
+     * @brief Get the name of each world axis.
+     * @param wcsIndex Index of the WCS (default is 0)
+     * @return The CTYPEi values of that WCS; empty if there is no such WCS
+     */
+    std::vector<std::string> FITScube::WorldAxisNames(const int& wcsIndex) const
+    {
+        if(wcsIndex < 0 || static_cast<size_t>(wcsIndex) >= getNumberOfWCS())
+            return std::vector<std::string>();
+        return fwcs.CTYPE(static_cast<size_t>(wcsIndex));
+    }
+
+    /**
+     * @brief Get the unit of each world axis.
+     * @param wcsIndex Index of the WCS (default is 0)
+     * @return The CUNITi values of that WCS; empty if there is no such WCS
+     */
+    std::vector<std::string> FITScube::WorldAxisUnits(const int& wcsIndex) const
+    {
+        if(wcsIndex < 0 || static_cast<size_t>(wcsIndex) >= getNumberOfWCS())
+            return std::vector<std::string>();
+        return fwcs.CUNIT(static_cast<size_t>(wcsIndex));
+    }
+
+    /**
      *  Get the pixel coordinates given the pixel index from the 1D pixel array of the FITS datacube
      *  @param k: 1D pixel index
      *  @return Pixel coordinates on each dimension of the FITS datacube

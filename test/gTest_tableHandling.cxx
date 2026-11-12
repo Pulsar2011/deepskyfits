@@ -1484,11 +1484,7 @@ TEST(TableCsvTest, DecimalPointIsADotWhateverTheLocale)
 
 TEST(WhereExpressionTest, TableReadBackFromFile)
 {
-#ifndef CI_CIWORKER
-    const std::string fileName = "./build/testdata/test_fitstable_where.fits";
-#else
     const std::string fileName = "./testdata/test_fitstable_where.fits";
-#endif
 
     FITStable written;
 

@@ -18,6 +18,8 @@ doc/latex
 *.csh
 *.sh
 build
+build-*/
+CMakeUserPresets.json
 *.*~
 scripts
 DarkSim
@@ -97,8 +99,6 @@ include/Minuit2
 include/cfitsio
 include/supernovas
 CPack*.cmake
-copy_cfitsio_*.cmake
-copy_minuit2_*.cmake
 
 
 

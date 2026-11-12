@@ -9,13 +9,8 @@
 
 using namespace DSL;
 
-#ifndef CI_CIWORKER
-std::string testvurl = "./build/testdata/test_vstringtable.fits";
-std::string testurl = "./build/testdata/test_stringtable.fits";
-#else
 std::string testvurl = "./testdata/test_vstringtable.fits";
 std::string testurl = "./testdata/test_stringtable.fits";
-#endif
 
 std::string random_string(std::size_t length)
 {
