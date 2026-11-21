@@ -451,6 +451,10 @@ install(TARGETS Minuit2 Minuit2Math
 )
 install(TARGETS core ARCHIVE DESTINATION lib)
 install(FILES ${CFITSIO_LIBRARY} ${WCSLIB_LIBRARY} DESTINATION lib)
+# Unversioned name, as wcslib's own "make install" provides: consumers look for libwcs.a
+# (find_library(NAMES wcs)). Relative symlink, so it stays valid when the tree is moved or archived.
+install(CODE "execute_process(COMMAND \${CMAKE_COMMAND} -E create_symlink
+    libwcs-${WCSLIB_VERSION}.a \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/lib/libwcs.a\")")
 
 if(DSTfits_NUMERIC_VERSION)
     # CMake package, so that dependent projects can call find_package(DSTfits <version>)
