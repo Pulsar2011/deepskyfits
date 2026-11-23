@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="DeepSkyFitsLogo.png" alt="DeepSkySys" width="300">
+</p>
+
 # DeepSkyFits
 
 A C++ library for reading, writing, and manipulating FITS images and tables, built on CFITSIO and WCSLIB, with optional GTest-based tests and Doxygen documentation.
