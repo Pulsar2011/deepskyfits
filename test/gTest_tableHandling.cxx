@@ -165,12 +165,219 @@ TEST(ToCSVTest, ExportsScalarAndVectorCells)
     std::cout<<oss.str();
 
     const std::string expected =
-        "SCALAR\tVEC\tSTR\n"
-        "[px]\t[adu]\t\n"
+        "SCALAR [px]\tVEC [adu]\tSTR\n"
         "1\t{1;2;3}\thello\n"
         "2\t{42;8;5}\tplain\n";
 
     EXPECT_EQ(expected, oss.str());
+}
+
+namespace
+{
+    FITStable ReadCSV(const std::string& text, const char delimiter = ',')
+    {
+        std::istringstream in(text);
+        return FITStable::fromCSV(in, delimiter);
+    }
+
+    // Same doubles, NaN (NULL) matching NaN.
+    void ExpectSameDoubles(const std::vector<double>& expected, const std::vector<double>& actual)
+    {
+        ASSERT_EQ(expected.size(), actual.size());
+        for(size_t k = 0; k < expected.size(); ++k)
+        {
+            if(std::isnan(expected[k])) EXPECT_TRUE(std::isnan(actual[k])) << "element " << k;
+            else                        EXPECT_DOUBLE_EQ(expected[k], actual[k]) << "element " << k;
+        }
+    }
+} // namespace
+
+TEST(FromCSVTest, FieldCountMustMatchNames)
+{
+    EXPECT_THROW((void)ReadCSV("A,B,C,D\n1,2,3,4\n1,2,3\n"), std::invalid_argument);       // 3 fields
+    EXPECT_THROW((void)ReadCSV("A,B,C,D\n1,2,3,4\n1,2,3,4,5\n"), std::invalid_argument);   // 5 fields
+    EXPECT_THROW((void)ReadCSV("A,B,C,D\n1,2,{3;4;5},6\n1,2,{3;4}\n"), std::invalid_argument);   // a vector is one field
+    EXPECT_THROW((void)ReadCSV("# no line of names\n\n"), std::invalid_argument);
+
+    // A trailing delimiter ends an empty last field: 4 fields, D NULL in the second row.
+    EXPECT_NO_THROW((void)ReadCSV("A,B,C,D\n1,2,3,4\n1,2,3,\n"));
+    const FITStable table = ReadCSV("A,B,C,D\n1,2,3,4\n1,2,3,\n");
+
+    const FITSform& d = *table.getColumn("D");
+    ASSERT_TRUE(d.payloadType() == std::type_index(typeid(double)));
+    ExpectSameDoubles({4, std::numeric_limits<double>::quiet_NaN()}, d.values<double>());
+}
+
+TEST(FromCSVTest, MalformedVectorThrows)
+{
+    EXPECT_THROW((void)ReadCSV("A,B\n1,{2;3\n"), std::invalid_argument);       // no '}'
+    EXPECT_THROW((void)ReadCSV("A,B\n1,{2;3}x\n"), std::invalid_argument);     // characters after '}'
+    EXPECT_THROW((void)ReadCSV("A,B\n1,{2,3}\n"), std::invalid_argument);      // unquoted delimiter: "{2" and "3}"
+    EXPECT_THROW((void)ReadCSV("A;B\n1;{2;3}\n", ';'), std::invalid_argument); // same: toCSV() quotes this field
+}
+
+TEST(FromCSVTest, NamesUnitsAndScalarColumns)
+{
+    const FITStable table = ReadCSV(
+        "# comment\n"
+        "RA [deg],NAME,[Fe/H] [dex],flux[2],EMPTY []\n"
+        "\n"
+        "10.5,alpha,-0.5,1,x\n"
+        "-3,\"be,ta\",,2.5e3,y\n");
+
+    ASSERT_EQ(5u, table.ncols());
+    ASSERT_EQ(2u, table.nrows());
+
+    const FITSform& ra = *table.getColumn("RA");
+    EXPECT_EQ("deg", ra.getUnit());
+    EXPECT_EQ(tdouble, ra.getType());
+    ExpectSameDoubles({10.5, -3.0}, ra.values<double>());
+
+    const FITSform& name = *table.getColumn("NAME");
+    EXPECT_EQ("", name.getUnit());
+    EXPECT_EQ(tstring, name.getType());
+    EXPECT_EQ((std::vector<std::string>{"alpha", "be,ta"}), name.values<std::string>());
+
+    // "[Fe/H]" is a name; its empty field is NULL and keeps the column numeric.
+    const FITSform& feh = *table.getColumn("[Fe/H]");
+    EXPECT_EQ("dex", feh.getUnit());
+    EXPECT_EQ(tdouble, feh.getType());
+    ExpectSameDoubles({-0.5, std::numeric_limits<double>::quiet_NaN()}, feh.values<double>());
+
+    // No blank before '[': part of the name, no unit.
+    const FITSform& flux = *table.getColumn("flux[2]");
+    EXPECT_EQ("", flux.getUnit());
+    ExpectSameDoubles({1.0, 2500.0}, flux.values<double>());
+
+    const FITSform& empty = *table.getColumn("EMPTY");
+    EXPECT_EQ("", empty.getUnit());
+    EXPECT_EQ((std::vector<std::string>{"x", "y"}), empty.values<std::string>());
+}
+
+TEST(FromCSVTest, VectorColumnsCompletedWithNull)
+{
+    const double NaN = std::numeric_limits<double>::quiet_NaN();
+
+    // Vectors of different lengths from row to row; a scalar field in a vector column is one element;
+    // a quoted vector, holding the delimiter, is still a vector.
+    const FITStable table = ReadCSV(
+        "A,V [m],S\n"
+        "1,{1.5;2.5;3.5},\"{a;b,c;d}\"\n"
+        "2,{10;20},{e}\n"
+        "3, { 7; ;9 } ,{}\n"
+        "4,8,f\n");
+
+    ASSERT_EQ(3u, table.ncols());
+    ASSERT_EQ(4u, table.nrows());
+
+    const FITSform& a = *table.getColumn("A");
+    ASSERT_TRUE(a.payloadType() == std::type_index(typeid(double)));
+    ExpectSameDoubles({1, 2, 3, 4}, a.values<double>());
+
+    const FITSform& v = *table.getColumn("V");
+    ASSERT_TRUE(v.payloadType() == std::type_index(typeid(FITSform::doubleVector)));
+    EXPECT_EQ(tdouble, v.getType());
+    EXPECT_EQ("m", v.getUnit());
+    EXPECT_EQ(int64_t(3), v.getNelem());
+    const auto& cells = v.values<FITSform::doubleVector>();
+    ASSERT_EQ(4u, cells.size());
+    ExpectSameDoubles({1.5, 2.5, 3.5}, cells[0]);
+    ExpectSameDoubles({10, 20, NaN},   cells[1]);
+    ExpectSameDoubles({7, NaN, 9},     cells[2]);
+    ExpectSameDoubles({8, NaN, NaN},   cells[3]);
+
+    const FITSform& s = *table.getColumn("S");
+    ASSERT_TRUE(s.payloadType() == std::type_index(typeid(FITSform::stringVector)));
+    EXPECT_EQ(tstring, s.getType());
+    EXPECT_EQ(int64_t(3), s.getNelem());
+    EXPECT_EQ((std::vector<FITSform::stringVector>{{"a", "b,c", "d"}, {"e", "", ""}, {"", "", ""}, {"f", "", ""}}),
+              s.values<FITSform::stringVector>());
+}
+
+TEST(FromCSVTest, NanIsReadAsNaN)
+{
+    const double NaN = std::numeric_limits<double>::quiet_NaN();
+
+    // toCSV() writes a NaN "nan" or "-nan" depending on the standard library: a number either way.
+    const FITStable table = ReadCSV("X,V\n1,{nan;2}\nnan,{1;-nan}\n-nan,{NaN}\nNaN,{}\n");
+
+    const FITSform& x = *table.getColumn("X");
+    ASSERT_TRUE(x.payloadType() == std::type_index(typeid(double)));
+    ExpectSameDoubles({1, NaN, NaN, NaN}, x.values<double>());
+
+    const FITSform& v = *table.getColumn("V");
+    ASSERT_TRUE(v.payloadType() == std::type_index(typeid(FITSform::doubleVector)));
+    const auto& cells = v.values<FITSform::doubleVector>();
+    ASSERT_EQ(4u, cells.size());
+    ExpectSameDoubles({NaN, 2},   cells[0]);
+    ExpectSameDoubles({1, NaN},   cells[1]);
+    ExpectSameDoubles({NaN, NaN}, cells[2]);
+    ExpectSameDoubles({NaN, NaN}, cells[3]);
+}
+
+TEST(FromCSVTest, RoundTripFromToCSV)
+{
+    const double NaN = std::numeric_limits<double>::quiet_NaN();
+
+    // Known table of the column types fromCSV() creates: double and string, scalar and vector.
+    // The doubles have at most 6 significant digits, the precision toCSV() writes.
+    const std::vector<double>                 ra   {10.5, -0.25, 1234.5, NaN};
+    const std::vector<std::string>            name {"plain", "with,comma", "with \"quote\"", "with;semicolon"};
+    const std::vector<FITSform::doubleVector> flux {{1.5, 2.5, 3.5}, {-4, NaN, 6}, {0, 0.125, 1e-05}, {NaN, NaN, NaN}};
+    const std::vector<FITSform::stringVector> tags {{"a", "b c"}, {"d,e", "f"}, {"g", ""}, {"\"h\"", "i"}};
+
+    FITStable known;
+
+    auto raCol = std::make_shared<FITScolumn<double>>("RA", tdouble, "deg", 1);
+    for (const double v : ra) raCol->push_back(v);
+    known.InsertColumn(raCol);
+
+    auto nameCol = std::make_shared<FITScolumn<std::string>>("NAME", tstring, "", 2);
+    for (const std::string& v : name) nameCol->push_back(v);
+    known.InsertColumn(nameCol);
+
+    auto fluxCol = std::make_shared<FITScolumn<FITSform::doubleVector>>("FLUX", tdouble, "erg/s", 3);
+    for (const FITSform::doubleVector& v : flux) fluxCol->push_back(v);
+    known.InsertColumn(fluxCol);
+
+    auto tagsCol = std::make_shared<FITScolumn<FITSform::stringVector>>("TAGS", tstring, "", 4);
+    for (const FITSform::stringVector& v : tags) tagsCol->push_back(v);
+    known.InsertColumn(tagsCol);
+
+    for (const char delimiter : {',', ';', '\t'})
+    {
+        SCOPED_TRACE(std::string("delimiter '") + delimiter + "'");
+
+        std::ostringstream csv;
+        known.toCSV(csv, delimiter);
+        const FITStable back = ReadCSV(csv.str(), delimiter);
+
+        ASSERT_EQ(known.ncols(), back.ncols()) << csv.str();
+        ASSERT_EQ(known.nrows(), back.nrows()) << csv.str();
+
+        const FITSform& raBack = *back.getColumn("RA");
+        EXPECT_EQ("deg", raBack.getUnit());
+        ASSERT_TRUE(raBack.payloadType() == std::type_index(typeid(double))) << csv.str();
+        ExpectSameDoubles(ra, raBack.values<double>());
+
+        const FITSform& nameBack = *back.getColumn("NAME");
+        EXPECT_EQ("", nameBack.getUnit());
+        ASSERT_TRUE(nameBack.payloadType() == std::type_index(typeid(std::string))) << csv.str();
+        EXPECT_EQ(name, nameBack.values<std::string>());
+
+        const FITSform& fluxBack = *back.getColumn("FLUX");
+        EXPECT_EQ("erg/s", fluxBack.getUnit());
+        ASSERT_TRUE(fluxBack.payloadType() == std::type_index(typeid(FITSform::doubleVector))) << csv.str();
+        const auto& fluxCells = fluxBack.values<FITSform::doubleVector>();
+        ASSERT_EQ(flux.size(), fluxCells.size());
+        for (size_t r = 0; r < flux.size(); ++r)
+            ExpectSameDoubles(flux[r], fluxCells[r]);
+
+        const FITSform& tagsBack = *back.getColumn("TAGS");
+        EXPECT_EQ("", tagsBack.getUnit());
+        ASSERT_TRUE(tagsBack.payloadType() == std::type_index(typeid(FITSform::stringVector))) << csv.str();
+        EXPECT_EQ(tags, tagsBack.values<FITSform::stringVector>());
+    }
 }
 
 TEST(ColumnViewTest, SortAscendingPreservesAlignment)

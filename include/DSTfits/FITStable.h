@@ -24,6 +24,7 @@
 #include <stdexcept>
 #include <functional>
 #include <iomanip>
+#include <istream>
 #include <typeindex> 
 #include <numeric>
 #include <algorithm>
@@ -1228,6 +1229,34 @@ template<> void FITScolumn<FITSform::boolVector>      ::write(const std::shared_
         void write(const std::string&, const int64_t&, bool replace=false);
 
         void toCSV( std::ostream& out, const char delimiter=',') const;
+
+        /**
+         * @brief Table read from CSV text, in the layout toCSV() writes.
+         * @details
+         *  - The first line holds the column names, each followed by " [unit]" when the column has one
+         *    ("colA [m],colB"). The unit is a last "[...]" with a blank and a name before it: "[Fe/H]" and
+         *    "flux[2]" are names without unit. Then one line per row.
+         *  - Fields are separated by @p delimiter; "..." quotes a field (a delimiter inside it is kept)
+         *    and "" is a quote inside it. A quoted field cannot span several lines.
+         *  - Every row has as many fields as there are names; "A,B,C," has 4 fields, the last empty.
+         *  - In the rows, a field whose first non-blank character is '{' is a vector "{a;b;...}", as toCSV()
+         *    writes it, quoted or not: its last non-blank character is '}' and its elements are separated
+         *    by ';'. Names are never vectors.
+         *  - An empty or blank field or element is NULL.
+         *  - Blank lines, and lines whose first non-blank character is '#', are skipped.
+         *  - A column holding a vector is a vector column, as wide as its longest vector: shorter vectors,
+         *    and scalar fields taken as one element, are completed with NULL.
+         *  - A column whose every value not NULL is a number, read with '.' as decimal point, becomes a
+         *    double column (TFORM D, NULL is NaN); any other column a string column (NULL is an empty
+         *    string). "nan", "-nan" or "NaN", as toCSV() writes a NaN, is a number: NaN.
+         *  The table is in memory only: write() stores it.
+         * @param in Stream to read.
+         * @param delimiter Field separator.
+         * @return The table.
+         * @throws std::invalid_argument if there is no line of names, a row has not as many fields as names,
+         *         or a field starting with '{' does not end with '}'.
+         */
+        static FITStable fromCSV( std::istream& in, const char delimiter=',');
 #pragma endregion
 
     };

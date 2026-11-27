@@ -3803,18 +3803,12 @@ namespace DSL
         // Header (names + units)
         const FITStable::clist meta = this->listColumns();
 
-        for(size_t i = 0; i < meta.size(); ++i)
-        {
-            if(i) out << delimiter;
-            out << csvEscape(meta[i][0]);
-        }
-        out << std::endl;
-
+        // One line: each name followed by " [unit]" when the column has one.
         for(size_t i = 0; i < meta.size(); ++i)
         {
             if(i) out << delimiter;
             const std::string& unit = meta[i][2];
-            out << csvEscape(unit.empty() ? std::string() : ("[" + unit + "]"));
+            out << csvEscape(unit.empty() ? meta[i][0] : (meta[i][0] + " [" + unit + "]"));
         }
         out << std::endl;
 
@@ -3984,6 +3978,206 @@ namespace DSL
             }
             out << std::endl;
         }
+    }
+
+    FITStable FITStable::fromCSV(std::istream& in, const char delimiter)
+    {
+        // One field of a line: a scalar holds one value, a vector "{a;b;...}" its elements.
+        struct Field
+        {
+            bool vector = false;
+            std::vector<std::string> values;
+        };
+
+        // Fields of one line: "..." quotes a field (a delimiter inside it is kept), "" is a quote inside it.
+        // With 'vectors', a field whose first non-blank character is '{' is a vector, as toCSV() writes it,
+        // quoted or not: its last non-blank character is '}' and its elements are separated by ';'.
+        auto split = [delimiter](const std::string& line, const size_t number, const bool vectors)
+        {
+            std::vector<std::string> texts(1);
+            bool quoted = false;
+            for(size_t i = 0; i < line.size(); ++i)
+            {
+                const char c = line[i];
+                if(quoted)
+                {
+                    if(c != '"')                                       texts.back() += c;
+                    else if(i + 1 < line.size() && line[i + 1] == '"') { texts.back() += '"'; ++i; }
+                    else                                               quoted = false;
+                }
+                else if(c == '"')       quoted = true;
+                else if(c == delimiter) texts.emplace_back();
+                else if(c != '\r')      texts.back() += c;
+            }
+
+            std::vector<Field> fields(texts.size());
+            for(size_t f = 0; f < texts.size(); ++f)
+            {
+                const std::string& text = texts[f];
+                const size_t first = text.find_first_not_of(" \t");
+                if(!vectors || first == std::string::npos || text[first] != '{')
+                {
+                    fields[f].values.push_back(text);
+                    continue;
+                }
+
+                const size_t last = text.find_last_not_of(" \t");
+                if(text[last] != '}')
+                    throw std::invalid_argument("FITStable::fromCSV: line " + std::to_string(number) + " has a '{' without '}'.");
+
+                fields[f].vector = true;
+                if(last > first + 1)    // "{}" has no element
+                    for(size_t begin = first + 1; ; )
+                    {
+                        const size_t end = std::min(text.find(';', begin), last);
+                        fields[f].values.push_back(text.substr(begin, end - begin));
+                        if(end == last) break;
+                        begin = end + 1;
+                    }
+            }
+            return fields;
+        };
+
+        // Number held by a whole field, blanks around it allowed. "nan", "-nan" or "NaN", as toCSV() writes
+        // a NaN, is NaN whatever the standard library: libstdc++ streams do not read it.
+        auto toNumber = [](const std::string& field, double& value)
+        {
+            const size_t first = field.find_first_not_of(" \t");
+            if(first != std::string::npos)
+            {
+                std::string word = field.substr(first, field.find_last_not_of(" \t") - first + 1);
+                if(word[0] == '+' || word[0] == '-') word.erase(0, 1);
+                std::transform(word.begin(), word.end(), word.begin(), [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
+                if(word == "nan")
+                {
+                    value = std::numeric_limits<double>::quiet_NaN();
+                    return true;
+                }
+            }
+
+            std::istringstream iss(field);
+            iss.imbue(std::locale::classic());
+            if(!(iss >> value)) return false;
+            iss >> std::ws;
+            return iss.eof();
+        };
+
+        // NULL value: empty or blank.
+        auto isNull = [](const std::string& value){ return value.find_first_not_of(" \t") == std::string::npos; };
+
+        std::vector< std::pair<size_t, std::vector<Field>> > lines;   // line number, fields
+        size_t number = 0;
+        for(std::string line; std::getline(in, line); )
+        {
+            ++number;
+            const size_t first = line.find_first_not_of(" \t\r");
+            if(first == std::string::npos || line[first] == '#')
+                continue;   // blank line or comment
+            lines.emplace_back(number, split(line, number, !lines.empty()));   // names are never vectors
+        }
+        if(lines.empty())
+            throw std::invalid_argument("FITStable::fromCSV: no line of column names.");
+
+        // Names, each followed by " [unit]" when the column has one: the unit is a last "[...]" with a blank
+        // and a name before it, so that "[Fe/H]" and "flux[2]" are names without unit.
+        std::vector<std::string> names, units;
+        for(const Field& f : lines.front().second)
+        {
+            const std::string& name = f.values.front();
+            const size_t end  = name.find_last_not_of(" \t");
+            const size_t open = (end != std::string::npos && name[end] == ']') ? name.rfind('[', end) : std::string::npos;
+            const size_t stop = (open != std::string::npos && open > 0) ? name.find_last_not_of(" \t", open - 1) : std::string::npos;
+            if(stop != std::string::npos && stop + 1 < open)
+            {
+                names.push_back(name.substr(0, stop + 1));
+                units.push_back(name.substr(open + 1, end - open - 1));
+            }
+            else
+            {
+                names.push_back(name);
+                units.emplace_back();
+            }
+        }
+        const size_t firstRow = 1;   // rows follow the names
+
+        for(size_t r = firstRow; r < lines.size(); ++r)
+            if(lines[r].second.size() != names.size())
+                throw std::invalid_argument("FITStable::fromCSV: line " + std::to_string(lines[r].first) + " has " +
+                                            std::to_string(lines[r].second.size()) + " fields for " +
+                                            std::to_string(names.size()) + " columns.");
+
+        const double null = std::numeric_limits<double>::quiet_NaN();
+
+        FITStable table;
+        for(size_t c = 0; c < names.size(); ++c)
+        {
+            // Vector column when one of its fields is a vector, as wide as the longest: shorter vectors, and
+            // scalar fields taken as one element, are completed with NULL. Numeric when every value not NULL
+            // is a number, one at least.
+            bool   vectorColumn = false;
+            bool   anyNumber    = false;
+            bool   anyText      = false;
+            size_t nelem        = 1;
+            for(size_t r = firstRow; r < lines.size(); ++r)
+            {
+                const Field& f = lines[r].second[c];
+                vectorColumn = vectorColumn || f.vector;
+                nelem        = std::max(nelem, f.values.size());
+                for(const std::string& value : f.values)
+                {
+                    double v;
+                    if(isNull(value))          continue;
+                    if(toNumber(value, v))     anyNumber = true;
+                    else                       anyText   = true;
+                }
+            }
+            const bool numeric = anyNumber && !anyText;
+
+            if(vectorColumn && numeric)
+            {
+                auto col = std::make_shared< FITScolumn<FITSform::doubleVector> >(names[c], tdouble, units[c], c + 1);
+                for(size_t r = firstRow; r < lines.size(); ++r)
+                {
+                    const std::vector<std::string>& values = lines[r].second[c].values;
+                    FITSform::doubleVector cell(nelem, null);
+                    for(size_t k = 0; k < values.size(); ++k)
+                        if(!isNull(values[k])) toNumber(values[k], cell[k]);
+                    col->push_back(cell);
+                }
+                table.InsertColumn(col);
+            }
+            else if(vectorColumn)
+            {
+                auto col = std::make_shared< FITScolumn<FITSform::stringVector> >(names[c], tstring, units[c], c + 1);
+                for(size_t r = firstRow; r < lines.size(); ++r)
+                {
+                    FITSform::stringVector cell = lines[r].second[c].values;
+                    cell.resize(nelem);    // NULL: empty string
+                    col->push_back(cell);
+                }
+                table.InsertColumn(col);
+            }
+            else if(numeric)
+            {
+                auto col = std::make_shared< FITScolumn<double> >(names[c], tdouble, units[c], c + 1);
+                for(size_t r = firstRow; r < lines.size(); ++r)
+                {
+                    const std::string& value = lines[r].second[c].values.front();
+                    double cell = null;
+                    if(!isNull(value)) toNumber(value, cell);
+                    col->push_back(cell);
+                }
+                table.InsertColumn(col);
+            }
+            else
+            {
+                auto col = std::make_shared< FITScolumn<std::string> >(names[c], tstring, units[c], c + 1);
+                for(size_t r = firstRow; r < lines.size(); ++r)
+                    col->push_back(lines[r].second[c].values.front());
+                table.InsertColumn(col);
+            }
+        }
+        return table;
     }
 
 #pragma endregion
